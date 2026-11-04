@@ -223,7 +223,7 @@ try {
     await f.nth(1).fill('4321');
     await p3.click('button:has-text("Log in")');
     await p3.waitForSelector('.top');
-    const r = await p3.evaluate(() => window.pos.invoke('report.sales', { from: '2000-01-01T00:00:00.000Z', to: '2100-01-01T00:00:00.000Z' }));
+    const r = await p3.evaluate(() => window.pos.invoke('report.sales', { fromDay: '2000-01-01', toDay: '2099-12-31' }));
     assert.equal(r.ok, true);
     assert.equal(r.data.saleCount, 3);
     assert.equal(r.data.totalIncl, 500 + 200 + 250);

@@ -1,3 +1,4 @@
+import { storeDay } from '../core/store-time';
 import { MILLI_PER_UNIT, roundDiv } from '../core/money';
 import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
@@ -102,7 +103,7 @@ export function receiveGoods(ctx: Ctx, userId: number, input: GrnInput): { grnId
       applyMovement(ctx, { productId: l.productId, qty: l.qty, unitCost: l.unitCost, reason: 'grn', sourceType: 'grn', sourceId: grnId, sourceLine: i + 1, userId });
     });
     postEntry(ctx, {
-      date: ctx.now().slice(0, 10),
+      date: storeDay(ctx.now()),
       sourceType: 'grn',
       sourceId: grnId,
       memo: `Goods received ${grnNo}`,

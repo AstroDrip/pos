@@ -1,4 +1,5 @@
-import type { Ctx } from './context';
+import { nextDay, sqlStoreDay, storeDayStartUtc } from '../core/store-time';
+import { DomainError, type Ctx } from './context';
 import { requirePermission } from './users';
 
 export interface StockRow {
@@ -38,9 +39,12 @@ export interface SalesSummary {
   topProducts: { productId: number; nameEn: string; qty: number; totalIncl: number }[];
 }
 
-/** Sales between two UTC ISO dates (from inclusive, to exclusive). */
-export function salesSummary(ctx: Ctx, userId: number, from: string, to: string): SalesSummary {
+/** Sales for store days fromDay..toDay inclusive ("YYYY-MM-DD", Saudi time). */
+export function salesSummary(ctx: Ctx, userId: number, fromDay: string, toDay: string): SalesSummary {
   requirePermission(ctx, userId, 'reports.view');
+  if (toDay < fromDay) throw new DomainError('VALIDATION', '"To" date is before "From" date');
+  const from = storeDayStartUtc(fromDay);
+  const to = storeDayStartUtc(nextDay(toDay));
   const t = ctx.db
     .prepare(
       `SELECT count(*) AS saleCount, COALESCE(SUM(total_incl),0) AS totalIncl, COALESCE(SUM(total_vat),0) AS totalVat,
@@ -53,14 +57,14 @@ export function salesSummary(ctx: Ctx, userId: number, from: string, to: string)
     (ctx.db.prepare('SELECT COALESCE(SUM(p.amount),0) AS v FROM payments p JOIN sales s ON s.id = p.sale_id WHERE p.tender = ? AND s.created_at >= ? AND s.created_at < ?').get(k, from, to) as { v: number }).v;
   const { change, ...totals } = t;
   return {
-    from,
-    to,
+    from: fromDay,
+    to: toDay,
     ...totals,
     cash: tender('cash') - change,
     card: tender('card'),
     byDay: ctx.db
       .prepare(
-        `SELECT substr(created_at,1,10) AS day, count(*) AS saleCount, SUM(total_incl) AS totalIncl, SUM(total_vat) AS totalVat
+        `SELECT ${sqlStoreDay('created_at')} AS day, count(*) AS saleCount, SUM(total_incl) AS totalIncl, SUM(total_vat) AS totalVat
          FROM sales WHERE created_at >= ? AND created_at < ? GROUP BY day ORDER BY day`,
       )
       .all(from, to) as SalesSummary['byDay'],
@@ -72,4 +76,29 @@ export function salesSummary(ctx: Ctx, userId: number, from: string, to: string)
       )
       .all(from, to) as SalesSummary['topProducts'],
   };
+}
+
+export interface VoidRow {
+  at: string;
+  user: string;
+  kind: string;
+  items: number;
+  total: number;
+}
+
+/** Items removed from bills before payment, for store days fromDay..toDay (Saudi time). */
+export function voidsReport(ctx: Ctx, userId: number, fromDay: string, toDay: string): VoidRow[] {
+  requirePermission(ctx, userId, 'reports.view');
+  return (
+    ctx.db
+      .prepare(
+        `SELECT a.at, COALESCE(u.display_name, '?') AS user, a.action AS kind, a.details_json
+         FROM audit_log a LEFT JOIN users u ON u.id = a.user_id
+         WHERE a.action IN ('sale.line_removed', 'sale.bill_cleared') AND a.at >= ? AND a.at < ? ORDER BY a.id`,
+      )
+      .all(storeDayStartUtc(fromDay), storeDayStartUtc(nextDay(toDay))) as { at: string; user: string; kind: string; details_json: string }[]
+  ).map((r) => {
+    const d = JSON.parse(r.details_json) as { lines: unknown[]; total: number };
+    return { at: r.at, user: r.user, kind: r.kind.replace('sale.', ''), items: d.lines.length, total: d.total };
+  });
 }

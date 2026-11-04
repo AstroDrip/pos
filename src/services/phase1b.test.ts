@@ -5,17 +5,18 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseCsv } from '../core/csv';
 import { openDatabase } from '../db/connection';
-import { createBackup, backupStatus, installRestore, prepareRestore, pruneLocal } from './backup';
+import { createBackup, backupStatus, encryptedSnapshot, installRestore, prepareRestore, pruneLocal } from './backup';
 import { decryptBackup, keyToRecoveryCode, readManifest, recoveryCodeToKey } from './backup-crypto';
 import { createProduct } from './catalog';
 import { DomainError, type Ctx } from './context';
-import { holdBill, listHeldBills, recallBill } from './held-bills';
+import { holdBill, listHeldBills, recallBill, recordRemoval } from './held-bills';
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from './import';
 import { receiveGoods } from './inventory';
 import { createCustomer, createSupplier, customerHistory, findCustomers, listSuppliers } from './parties';
-import { salesSummary, stockOnHand } from './reports';
+import { salesSummary, stockOnHand, voidsReport } from './reports';
+import { trialBalance, unbalancedEntries } from './ledger';
 import { finalizeSale } from './sales';
-import { openShift } from './shifts';
+import { openShift, recordCashMovement, shiftSummary } from './shifts';
 import { makeTestCtx, seedUsers } from './test-helpers';
 
 let t: ReturnType<typeof makeTestCtx>;
@@ -84,7 +85,7 @@ describe('reports', () => {
     t.advance(86_400_000);
     sell('b', 1000);
     expect(stockOnHand(ctx, u.admin, true)).toMatchObject([{ sku: 'WAT', qty: 9000, reorderLevel: 10_000 }]);
-    const s = salesSummary(ctx, u.admin, '2026-11-01T00:00:00Z', '2026-12-01T00:00:00Z');
+    const s = salesSummary(ctx, u.admin, '2026-11-01', '2026-11-30');
     expect(s).toMatchObject({ saleCount: 2, totalIncl: 750, cash: 750, card: 0 });
     expect(s.totalExcl + s.totalVat).toBe(s.totalIncl);
     expect(s.byDay.map((d) => d.day)).toEqual(['2026-11-05', '2026-11-06']);
@@ -223,16 +224,71 @@ describe('CSV import', () => {
   });
 });
 
+/** Makes a fresh database look like one created by schema v1 (undoes migrations 2 and 3). */
+function rollBackToV1(db: ReturnType<typeof openDatabase>) {
+  db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
+  db.exec("DROP TABLE backup_jobs; DROP TABLE restore_events; DELETE FROM accounts WHERE code = '2900';");
+}
+
 describe('pre-migration snapshot', () => {
   it('opening an existing database with pending migrations snapshots it first', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pos-mig-'));
     const p = join(dir, 'pos.db');
     const db = openDatabase(p);
-    db.prepare('DELETE FROM schema_migrations WHERE version = 2').run();
-    db.exec('DROP TABLE backup_jobs; DROP TABLE restore_events;');
+    rollBackToV1(db);
     db.close();
     openDatabase(p).close();
     expect(readdirSync(dir).some((f) => f.startsWith('pos.db.pre-v2-'))).toBe(true);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('with a backup key, the snapshot is encrypted and restorable', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pos-mig-'));
+    const p = join(dir, 'pos.db');
+    const key = randomBytes(32);
+    const db = openDatabase(p);
+    rollBackToV1(db);
+    db.close();
+    let written = '';
+    openDatabase(p, { preMigrationSnapshot: (d, v) => (written = encryptedSnapshot(d, join(dir, 'backups'), key, 't', `pre-v${v}`)) }).close();
+    expect(written).toMatch(/pre-v2\.posbak$/);
+    expect(readdirSync(dir).some((f) => f.startsWith('pos.db.pre-v2-'))).toBe(false); // no plain copy
+    const file = readFileSync(written);
+    expect(file.includes(Buffer.from('SQLite format 3'))).toBe(false);
+    expect(prepareRestore(written, key, join(dir, 'stage.db')).schemaVersion).toBe(1);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('gap fixes', () => {
+  it('cash in/out posts to suspense so book cash equals drawer cash', () => {
+    openShift(ctx, u.cashier, 10_000);
+    recordCashMovement(ctx, u.supervisor, 'out', 300, 'Ice');
+    recordCashMovement(ctx, u.supervisor, 'in', 1000, 'Change float top-up');
+    const bal = (code: string) => {
+      const r = trialBalance(ctx).find((x) => x.code === code);
+      return r ? r.debit - r.credit : 0;
+    };
+    expect(bal('1010')).toBe(700);
+    expect(bal('2900')).toBe(-700);
+    expect(unbalancedEntries(ctx)).toEqual([]);
+    expect(shiftSummary(ctx, 1).expectedCash).toBe(10_700);
+  });
+
+  it('removed lines are audited and appear in the voids report on the Saudi day', () => {
+    t.advance(13 * 3_600_000 + 30 * 60_000); // 21:30 UTC = 00:30 next day in Riyadh
+    recordRemoval(ctx, u.cashier, 'line_removed', [{ productId: water, qty: 1000, amount: 250 }]);
+    expect(voidsReport(ctx, u.admin, '2026-11-06', '2026-11-06')).toMatchObject([{ user: 'Cashier', kind: 'line_removed', items: 1, total: 250 }]);
+    expect(voidsReport(ctx, u.admin, '2026-11-05', '2026-11-05')).toEqual([]);
+    expect(code(() => voidsReport(ctx, u.cashier, '2026-11-06', '2026-11-06'))).toBe('PERMISSION_DENIED');
+  });
+
+  it('a sale after 9 pm UTC is dated the next Saudi day in reports and the journal', () => {
+    openShift(ctx, u.cashier, 0);
+    t.advance(13 * 3_600_000 + 30 * 60_000);
+    const r = sell('late');
+    expect(salesSummary(ctx, u.admin, '2026-11-06', '2026-11-06').saleCount).toBe(1);
+    expect(salesSummary(ctx, u.admin, '2026-11-05', '2026-11-05').saleCount).toBe(0);
+    expect((ctx.db.prepare("SELECT entry_date AS d FROM journal_entries WHERE source_type = 'sale' AND source_id = ?").get(r.saleId) as { d: string }).d).toBe('2026-11-06');
   });
 });

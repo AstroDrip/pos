@@ -29,6 +29,8 @@ const PRELOAD_CHANNELS = [
   'report.sales',
   'import.dryRun',
   'import.commit',
+  'bill.removed',
+  'report.voids',
   'user.list',
   'user.create',
   'backup.status',

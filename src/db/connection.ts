@@ -15,11 +15,19 @@ export function checkSqliteVersion(version: string): void {
   if (a === 3 && b === 52 && c === 0) throw new Error('SQLite 3.52.0 is blocked');
 }
 
+export interface OpenOptions {
+  /**
+   * Called before migrating an existing database, to save a copy of it. The default writes a plain
+   * SQLite copy next to the database; the app passes an encrypting version once a backup key exists.
+   */
+  preMigrationSnapshot?: (db: Db, firstPendingVersion: number) => void;
+}
+
 /**
  * Opens the single application connection. Only the Electron main process calls this;
  * all reads and writes go through this one connection (plan §E).
  */
-export function openDatabase(path: string): Db {
+export function openDatabase(path: string, opts: OpenOptions = {}): Db {
   const db = new Database(path);
   checkSqliteVersion((db.prepare('SELECT sqlite_version() AS v').get() as { v: string }).v);
   db.pragma('journal_mode = WAL');
@@ -29,8 +37,8 @@ export function openDatabase(path: string): Db {
   // Plan §J: snapshot an existing database before changing its schema.
   const pending = pendingMigrations(db);
   if (pending.length > 0) {
-    const snapshot = `${path}.pre-v${pending[0]}-${Date.now()}.db`;
-    db.prepare('VACUUM INTO ?').run(snapshot);
+    if (opts.preMigrationSnapshot) opts.preMigrationSnapshot(db, pending[0]!);
+    else db.prepare('VACUUM INTO ?').run(`${path}.pre-v${pending[0]}-${Date.now()}.db`);
   }
   migrate(db);
   const fk = db.pragma('foreign_key_check') as unknown[];

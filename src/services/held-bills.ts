@@ -48,3 +48,15 @@ export function recallBill(ctx: Ctx, userId: number, id: number): HeldPayload {
     return payloadSchema.parse(JSON.parse(row.payload_json));
   })();
 }
+
+export type RemovalKind = 'line_removed' | 'bill_cleared';
+
+/**
+ * Records items taken off a bill before payment (a "void"). Not blocked, but always audited
+ * so the owner can review them in the voids report. Whether cashiers need approval is decision §Q-10.
+ */
+export function recordRemoval(ctx: Ctx, userId: number, kind: RemovalKind, lines: { productId: number; qty: number; amount: number }[]): void {
+  requirePermission(ctx, userId, 'sale.create');
+  if (lines.length === 0) return;
+  appendAudit(ctx, { userId, action: `sale.${kind}`, entity: 'bill', details: { lines, total: lines.reduce((s, l) => s + l.amount, 0) } });
+}

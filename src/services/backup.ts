@@ -87,6 +87,29 @@ export function createBackup(ctx: Ctx, opts: BackupOptions): { backupId: string;
   }
 }
 
+/**
+ * Encrypted copy of a database taken before a schema migration (plan §J). Not recorded in backup_jobs,
+ * because that table may not exist yet in an old schema. Returns the file path.
+ */
+export function encryptedSnapshot(db: Database.Database, dir: string, masterKey: Buffer, appVersion: string, label: string): string {
+  mkdirSync(dir, { recursive: true });
+  const createdAt = new Date().toISOString();
+  const backupId = `${createdAt.replace(/[-:]/g, '').replace(/\..*/, '')}-${label}`;
+  const tmp = join(dir, `.tmp-${backupId}.db`);
+  const out = join(dir, `pos-${backupId}.posbak`);
+  try {
+    db.prepare('VACUUM INTO ?').run(tmp);
+    const { file } = encryptBackup(readFileSync(tmp), masterKey, { backupId, createdAt, appVersion, ...inspectSnapshot(tmp) });
+    writeFileSync(`${out}.part`, file);
+    renameSync(`${out}.part`, out);
+    decryptBackup(readFileSync(out), masterKey);
+    return out;
+  } finally {
+    rmSync(tmp, { force: true });
+    rmSync(`${out}.part`, { force: true });
+  }
+}
+
 /** Keeps the newest KEEP_LOCAL verified files; older ones are deleted and marked pruned. */
 export function pruneLocal(ctx: Ctx, dir: string, keep = KEEP_LOCAL): number {
   const old = ctx.db

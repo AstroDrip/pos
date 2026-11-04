@@ -1,3 +1,4 @@
+import { storeDay } from '../core/store-time';
 import { computeInvoice } from '../core/vat';
 import { appendAudit } from './audit';
 import { getProduct } from './catalog';
@@ -131,7 +132,7 @@ export function finalizeSale(ctx: Ctx, userId: number, input: SaleInput): SaleRe
     for (const p of input.payments) insertPay.run(saleId, p.tender, p.amount, p.reference ?? null);
 
     postEntry(ctx, {
-      date: createdAt.slice(0, 10),
+      date: storeDay(createdAt),
       sourceType: 'sale',
       sourceId: saleId,
       memo: `Sale ${invoiceNo}`,

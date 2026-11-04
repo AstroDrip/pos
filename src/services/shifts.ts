@@ -1,3 +1,4 @@
+import { storeDay } from '../core/store-time';
 import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
 import { postEntry } from './ledger';
@@ -48,6 +49,14 @@ export function recordCashMovement(ctx: Ctx, userId: number, kind: 'in' | 'out',
         .prepare('INSERT INTO cash_movements (shift_id, kind, amount, reason, user_id, at) VALUES (?, ?, ?, ?, ?, ?)')
         .run(shiftId, kind, amount, reason.trim(), userId, ctx.now()).lastInsertRowid,
     );
+    // Suspense account 2900 until the accountant maps reasons to real accounts (migration 003).
+    postEntry(ctx, {
+      date: storeDay(ctx.now()),
+      sourceType: 'cash_movement',
+      sourceId: id,
+      memo: `Cash ${kind}: ${reason.trim()}`,
+      lines: kind === 'in' ? [{ account: '1010', debit: amount }, { account: '2900', credit: amount }] : [{ account: '2900', debit: amount }, { account: '1010', credit: amount }],
+    });
     appendAudit(ctx, { userId, action: `cash.${kind}`, entity: 'cash_movement', entityId: id, details: { amount, reason } });
   })();
 }
@@ -93,7 +102,7 @@ export function closeShift(ctx: Ctx, userId: number, countedCash: number): Shift
       .run(ctx.now(), userId, summary.expectedCash, countedCash, shiftId);
     if (diff !== 0) {
       postEntry(ctx, {
-        date: ctx.now().slice(0, 10),
+        date: storeDay(ctx.now()),
         sourceType: 'shift_close',
         sourceId: shiftId,
         memo: `Cash ${diff > 0 ? 'over' : 'short'} at shift close`,

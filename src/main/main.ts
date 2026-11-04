@@ -7,7 +7,7 @@ import { openDatabase } from '../db/connection';
 import { makeCtx } from '../services/context';
 import { CHANNELS } from '../shared/ipc';
 import { appendAudit } from '../services/audit';
-import { backupStatus, createBackup, installRestore } from '../services/backup';
+import { backupStatus, createBackup, encryptedSnapshot, installRestore } from '../services/backup';
 import { createHandlers, type BackupEnv, type Printer, type Session } from './handlers';
 import { receiptHtml } from './receipt-html';
 
@@ -113,8 +113,17 @@ function makeBackupEnv(dataDir: string, dbPath: string): BackupEnv {
 app.whenReady().then(() => {
   const dataDir = app.getPath('userData');
   const dbPath = join(dataDir, 'pos.db');
-  ctx = makeCtx(openDatabase(dbPath));
   const backupEnv = makeBackupEnv(dataDir, dbPath);
+  ctx = makeCtx(
+    openDatabase(dbPath, {
+      // Encrypted when a backup key exists; otherwise the plain default (no key means no encrypted backups at all yet).
+      preMigrationSnapshot: (db, version) => {
+        const key = backupEnv.getKey();
+        if (key) encryptedSnapshot(db, backupEnv.dir, key, backupEnv.appVersion, `pre-v${version}`);
+        else db.prepare('VACUUM INTO ?').run(`${dbPath}.pre-v${version}-${Date.now()}.db`);
+      },
+    }),
+  );
   const dispatch = createHandlers(ctx, printer, backupEnv);
 
   // Scheduled local backup while the app is open (plan §J). Failures show in backup status.

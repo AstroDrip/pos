@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import * as m001 from './migrations/001_initial';
 import * as m002 from './migrations/002_backups';
+import * as m003 from './migrations/003_suspense_and_voids';
 
 export interface Migration {
   version: number;
@@ -13,6 +14,7 @@ export interface Migration {
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'initial', sql: m001.sql },
   { version: 2, name: 'backups', sql: m002.sql },
+  { version: 3, name: 'suspense_and_voids', sql: m003.sql },
 ];
 
 /** Versions not yet applied to this database (empty for a brand-new file before migrate()). */

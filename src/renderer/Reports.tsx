@@ -1,21 +1,23 @@
 import { useEffect, useState } from 'react';
 import { formatQty, formatSar } from '../core/money';
-import type { SalesSummary } from '../services/reports';
+import { storeDay } from '../core/store-time';
+import type { SalesSummary, VoidRow } from '../services/reports';
 import { call } from './api';
 
-const day = (d: Date) => d.toISOString().slice(0, 10);
+const today = () => storeDay(new Date().toISOString());
 
 export function Reports() {
-  const [from, setFrom] = useState(day(new Date()));
-  const [to, setTo] = useState(day(new Date()));
+  const [from, setFrom] = useState(today());
+  const [to, setTo] = useState(today());
   const [r, setR] = useState<SalesSummary | null>(null);
+  const [voids, setVoids] = useState<VoidRow[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Dates are whole UTC days for now; store-local (UTC+3) day boundaries come with the reporting phase.
-    const end = new Date(`${to}T00:00:00Z`);
-    end.setUTCDate(end.getUTCDate() + 1);
-    call<SalesSummary>('report.sales', { from: `${from}T00:00:00.000Z`, to: end.toISOString() }).then(setR, (e: Error) => setError(e.message));
+    // Days are Saudi-time business days (UTC+3); the main process converts them.
+    setError('');
+    call<SalesSummary>('report.sales', { fromDay: from, toDay: to }).then(setR, (e: Error) => setError(e.message));
+    call<VoidRow[]>('report.voids', { fromDay: from, toDay: to }).then(setVoids, () => setVoids([]));
   }, [from, to]);
 
   return (
@@ -47,6 +49,11 @@ export function Reports() {
           <table className="list">
             <thead><tr><th>Product</th><th className="num">Qty</th><th className="num">Total</th></tr></thead>
             <tbody>{r.topProducts.map((p) => <tr key={p.productId}><td>{p.nameEn}</td><td className="num">{formatQty(p.qty)}</td><td className="num">{formatSar(p.totalIncl)}</td></tr>)}</tbody>
+          </table>
+          <h4>Items removed before payment ({voids.length})</h4>
+          <table className="list">
+            <thead><tr><th>Time</th><th>User</th><th>Type</th><th className="num">Items</th><th className="num">Value</th></tr></thead>
+            <tbody>{voids.map((v, i) => <tr key={i}><td>{new Date(v.at).toLocaleString()}</td><td>{v.user}</td><td>{v.kind}</td><td className="num">{v.items}</td><td className="num">{formatSar(v.total)}</td></tr>)}</tbody>
           </table>
         </>
       )}

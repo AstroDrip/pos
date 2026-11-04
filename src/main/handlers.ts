@@ -5,11 +5,11 @@ import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto'
 import { createProduct, getProduct, lookup, searchProducts } from '../services/catalog';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit } from '../services/audit';
-import { holdBill, listHeldBills, recallBill } from '../services/held-bills';
+import { holdBill, listHeldBills, recallBill, recordRemoval } from '../services/held-bills';
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from '../services/import';
 import { receiveGoods } from '../services/inventory';
 import { createCustomer, createSupplier, findCustomers, listSuppliers } from '../services/parties';
-import { salesSummary, stockOnHand } from '../services/reports';
+import { salesSummary, stockOnHand, voidsReport } from '../services/reports';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
 import { closeShift, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, userCount, type User } from '../services/users';
@@ -111,7 +111,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'customer.create': (p, s) => createCustomer(ctx, userId(s), p),
     'grn.create': (p, s) => receiveGoods(ctx, userId(s), p),
     'report.stock': (p, s) => stockOnHand(ctx, userId(s), p.onlyLow),
-    'report.sales': (p, s) => salesSummary(ctx, userId(s), p.from, p.to),
+    'report.sales': (p, s) => salesSummary(ctx, userId(s), p.fromDay, p.toDay),
     'import.dryRun': (p, s) => {
       requirePermission(ctx, userId(s), p.kind === 'products' ? 'product.manage' : 'supplier.manage');
       try {
@@ -121,6 +121,8 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       }
     },
     'import.commit': (p, s) => (p.kind === 'products' ? importProducts(ctx, userId(s), p.csv, p.acceptWarnings) : importSuppliers(ctx, userId(s), p.csv)),
+    'bill.removed': (p, s) => recordRemoval(ctx, userId(s), p.kind, p.lines),
+    'report.voids': (p, s) => voidsReport(ctx, userId(s), p.fromDay, p.toDay),
     'user.list': (_p, s) => {
       requirePermission(ctx, userId(s), 'user.manage');
       return listUsers(ctx);

@@ -134,6 +134,13 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
     }
   };
 
+  /** Every removal before payment is audited (voids report). The line goes even if logging fails, but staff are told. */
+  const removeLines = (kind: 'line_removed' | 'bill_cleared', idx: number[]) => {
+    const gone = idx.map((i) => ({ productId: lines[i]!.product.id, qty: lines[i]!.qty, amount: totals ? totals.lines[i]!.lineIncl : 0 }));
+    setLines(lines.filter((_, k) => !idx.includes(k)));
+    call('bill.removed', { kind, lines: gone }).catch((e: Error) => setMsg({ kind: 'warn', text: `Removed, but the removal could not be logged: ${e.message}` }));
+  };
+
   const hold = async () => {
     const label = customer?.name ?? `Bill ${new Date().toLocaleTimeString()}`;
     try {
@@ -224,7 +231,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
                   <input aria-label="discount" defaultValue={l.discount ? formatSar(l.discount) : ''} onBlur={(e) => setDiscount(i, e.target.value)} />
                 </td>
                 <td className="num">{totals ? formatSar(totals.lines[i]!.lineIncl) : '—'}</td>
-                <td><button className="danger" onClick={() => setLines(lines.filter((_, k) => k !== i))}>✕</button></td>
+                <td><button className="danger" aria-label="remove line" onClick={() => removeLines('line_removed', [i])}>✕</button></td>
               </tr>
             ))}
           </tbody>
@@ -287,7 +294,10 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
           <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>Cash</button>
           <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>Card</button>
         </div>
-        <button disabled={busy || lines.length === 0} onClick={hold}>Hold bill</button>
+        <div className="row">
+          <button disabled={busy || lines.length === 0} onClick={hold}>Hold bill</button>
+          <button className="danger" disabled={busy || lines.length === 0} onClick={() => window.confirm('Clear the whole bill?') && removeLines('bill_cleared', lines.map((_, i) => i))}>Clear bill</button>
+        </div>
         {msg && <div className={`msg ${msg.kind}`}>{msg.text}</div>}
         {lastSaleId !== null && (
           <button onClick={() => call('sale.print', { saleId: lastSaleId, copy: true }).catch((e: Error) => setMsg({ kind: 'error', text: e.message }))}>
