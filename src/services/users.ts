@@ -44,6 +44,18 @@ export function createUser(
   })();
 }
 
+export function listUsers(ctx: Ctx): { id: number; username: string; displayName: string; roles: string; active: boolean }[] {
+  return (
+    ctx.db
+      .prepare(
+        `SELECT u.id, u.username, u.display_name AS displayName, COALESCE(group_concat(r.code, ', '), '') AS roles, u.active
+         FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN roles r ON r.id = ur.role_id
+         GROUP BY u.id ORDER BY u.username`,
+      )
+      .all() as { id: number; username: string; displayName: string; roles: string; active: number }[]
+  ).map((u) => ({ ...u, active: u.active === 1 }));
+}
+
 export function userCount(ctx: Ctx): number {
   return (ctx.db.prepare('SELECT count(*) AS n FROM users').get() as { n: number }).n;
 }

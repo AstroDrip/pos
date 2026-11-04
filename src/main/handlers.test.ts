@@ -1,10 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { makeTestCtx } from '../services/test-helpers';
 import { createUser } from '../services/users';
 import { CHANNELS } from '../shared/ipc';
-import { createHandlers, type Session } from './handlers';
+import { createHandlers, type BackupEnv, type Session } from './handlers';
 import { receiptHtml } from './receipt-html';
 
 let t: ReturnType<typeof makeTestCtx>;
@@ -82,5 +84,56 @@ describe('receipt HTML', () => {
     expect(html).toContain('COPY');
     expect(html).toContain('9.87');
     expect(html).toContain('NOT A ZATCA TAX INVOICE');
+  });
+});
+
+describe('backup and restore over IPC', () => {
+  function fakeEnv(dir: string): BackupEnv & { applied: string[]; key: Buffer | null; file: string } {
+    const env = {
+      dir,
+      appVersion: 't',
+      stagingPath: join(dir, 'stage.db'),
+      key: null as Buffer | null,
+      applied: [] as string[],
+      file: '',
+      getKey: () => env.key,
+      saveNewKey: (k: Buffer) => void (env.key = k),
+      newKey: () => randomBytes(32),
+      pickBackupFile: async () => env.file || null,
+      applyRestore: (p: string) => void env.applied.push(p),
+    };
+    return env;
+  }
+
+  it('key is created once by an admin and the recovery code restores on a fresh install', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pos-ipc-bak-'));
+    const env = fakeEnv(dir);
+    const d = createHandlers(t.ctx, { printReceipt: async () => {} }, env);
+    await d('auth.setupAdmin', { username: 'owner', displayName: 'Owner', pin: '4321' }, s);
+    expect(await d('backup.run', null, s)).toMatchObject({ ok: false, message: /key first/ });
+    const k = await d('backup.setupKey', null, s);
+    expect(k).toMatchObject({ ok: true });
+    expect(await d('backup.setupKey', null, s)).toMatchObject({ ok: false, code: 'CONFLICT' });
+    const run = (await d('backup.run', null, s)) as { ok: true; data: { fileName: string } };
+    expect(run.ok).toBe(true);
+    expect(await d('backup.status', null, s)).toMatchObject({ ok: true, data: { keyConfigured: true, lastVerifiedLocal: { fileName: run.data.fileName } } });
+
+    // New computer: empty database, nobody logged in, no key yet.
+    const t2 = makeTestCtx();
+    const env2 = fakeEnv(dir);
+    env2.file = join(dir, run.data.fileName);
+    const d2 = createHandlers(t2.ctx, { printReceipt: async () => {} }, env2);
+    const anon: Session = { user: null };
+    expect(await d2('restore.prepare', {}, anon)).toMatchObject({ ok: false, message: /recovery code/ });
+    const code = (k as { ok: true; data: { recoveryCode: string } }).data.recoveryCode;
+    expect(await d2('restore.prepare', { recoveryCode: code }, anon)).toMatchObject({ ok: true, data: { counts: { users: 1 } } });
+    expect(await d2('restore.apply', null, anon)).toMatchObject({ ok: true });
+    expect(env2.applied).toEqual([env2.stagingPath]);
+    expect(env2.key?.equals(env.key!)).toBe(true);
+    t2.cleanup();
+
+    // Once users exist, an anonymous session can no longer restore.
+    expect(await d('restore.prepare', {}, { user: null })).toMatchObject({ ok: false, code: 'PERMISSION_DENIED' });
+    rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -1,15 +1,16 @@
-import { BrowserWindow, app, ipcMain, session } from 'electron';
-import { writeFileSync } from 'node:fs';
+import { BrowserWindow, app, dialog, ipcMain, safeStorage, session } from 'electron';
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openDatabase } from '../db/connection';
 import { makeCtx } from '../services/context';
 import { CHANNELS } from '../shared/ipc';
-import { createHandlers, type Printer, type Session } from './handlers';
+import { appendAudit } from '../services/audit';
+import { backupStatus, createBackup, installRestore } from '../services/backup';
+import { createHandlers, type BackupEnv, type Printer, type Session } from './handlers';
 import { receiptHtml } from './receipt-html';
 
-// One instance only: two processes must never write the same SQLite file.
-if (!app.requestSingleInstanceLock()) app.quit();
 
 const RENDERER_INDEX = join(__dirname, '..', '..', 'renderer', 'index.html');
 const RENDERER_URL = pathToFileURL(RENDERER_INDEX).href;
@@ -34,6 +35,10 @@ app.on('web-contents-created', (_e, contents) => {
 
 // Diagnostics/testing only: keep app data in another folder, and write receipts to a file instead of printing.
 if (process.env.POS_USER_DATA) app.setPath('userData', process.env.POS_USER_DATA);
+
+// One instance per data folder: two processes must never write the same SQLite file.
+// (Must come after the userData path is final; the lock is tied to it.)
+if (!app.requestSingleInstanceLock()) app.quit();
 const RECEIPT_TO_FILE = process.env.POS_RECEIPT_TO_FILE;
 
 const printer: Printer = {
@@ -55,10 +60,75 @@ const printer: Printer = {
 };
 
 let ctx: ReturnType<typeof makeCtx>;
+let mainWindow: BrowserWindow | null = null;
+
+const BACKUP_EVERY_MS = 4 * 60 * 60 * 1000;
+
+function makeBackupEnv(dataDir: string, dbPath: string): BackupEnv {
+  const keyPath = join(dataDir, 'backup-key.bin');
+  const dir = join(dataDir, 'backups');
+  mkdirSync(dir, { recursive: true });
+  return {
+    dir,
+    appVersion: app.getVersion(),
+    stagingPath: join(dataDir, 'restore-staging.db'),
+    // The backup key is protected with Windows DPAPI via safeStorage; it is never written in plain text.
+    getKey() {
+      if (!existsSync(keyPath)) return null;
+      return Buffer.from(safeStorage.decryptString(readFileSync(keyPath)), 'base64');
+    },
+    saveNewKey(key) {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows secure storage is not available');
+      writeFileSync(keyPath, safeStorage.encryptString(key.toString('base64')));
+    },
+    newKey: () => randomBytes(32),
+    async pickBackupFile() {
+      if (process.env.POS_RESTORE_FILE) return process.env.POS_RESTORE_FILE; // automated tests only
+      const r = await dialog.showOpenDialog(mainWindow!, {
+        title: 'Choose a backup file',
+        defaultPath: dir,
+        filters: [{ name: 'POS backup', extensions: ['posbak'] }],
+        properties: ['openFile'],
+      });
+      return r.canceled ? null : (r.filePaths[0] ?? null);
+    },
+    applyRestore(stagingPath, info) {
+      ctx.db.close();
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      installRestore(dbPath, stagingPath, stamp);
+      const restored = makeCtx(openDatabase(dbPath));
+      restored.db.transaction(() => {
+        restored.db
+          .prepare('INSERT INTO restore_events (at, user_id, backup_id, manifest_json) VALUES (?, ?, ?, ?)')
+          .run(restored.now(), null, info.backupId, info.manifestJson);
+        appendAudit(restored, { userId: null, action: 'backup.restore', entity: 'backup', entityId: info.backupId, details: { restoredByUserIdInOldDb: info.userId } });
+      })();
+      restored.db.close();
+      if (!process.env.POS_NO_RELAUNCH) app.relaunch(); // automated tests restart the app themselves
+      app.exit(0);
+    },
+  };
+}
 
 app.whenReady().then(() => {
-  ctx = makeCtx(openDatabase(join(app.getPath('userData'), 'pos.db')));
-  const dispatch = createHandlers(ctx, printer);
+  const dataDir = app.getPath('userData');
+  const dbPath = join(dataDir, 'pos.db');
+  ctx = makeCtx(openDatabase(dbPath));
+  const backupEnv = makeBackupEnv(dataDir, dbPath);
+  const dispatch = createHandlers(ctx, printer, backupEnv);
+
+  // Scheduled local backup while the app is open (plan §J). Failures show in backup status.
+  setInterval(() => {
+    try {
+      const key = backupEnv.getKey();
+      const last = backupStatus(ctx).lastVerifiedLocal;
+      if (key && ctx.db.open && (!last || Date.now() - Date.parse(last.at) > BACKUP_EVERY_MS)) {
+        createBackup(ctx, { dir: backupEnv.dir, masterKey: key, appVersion: backupEnv.appVersion, trigger: 'scheduled', userId: null });
+      }
+    } catch (e) {
+      console.error('[backup] scheduled backup failed', e);
+    }
+  }, 15 * 60 * 1000);
   const sessions = new Map<number, Session>();
 
   // Deny camera, mic, notifications, etc. The POS needs none of them.
@@ -83,7 +153,9 @@ app.whenReady().then(() => {
     title: 'POS',
     webPreferences: { ...SECURE_PREFS, preload: join(__dirname, '..', 'preload', 'preload.js') },
   });
-  win.webContents.on('destroyed', () => sessions.delete(win.webContents.id));
+  mainWindow = win;
+  const wcId = win.webContents.id;
+  win.webContents.on('destroyed', () => sessions.delete(wcId));
   win.once('ready-to-show', () => win.show());
   void win.loadFile(RENDERER_INDEX);
 });

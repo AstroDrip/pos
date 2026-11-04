@@ -1,24 +1,51 @@
 import { useEffect, useState } from 'react';
 import type { User } from '../services/users';
+import { Admin, Restore, type FullBackupStatus } from './Admin';
 import { call } from './api';
 import { Products } from './Products';
+import { Reports } from './Reports';
 import { Sell } from './Sell';
 import { Shift } from './Shift';
+import { Stock } from './Stock';
 
 type Status = { needsSetup: boolean; user: User | null };
-type Tab = 'sell' | 'products' | 'shift';
+type Tab = 'sell' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
+
+const TABS: { id: Tab; label: string; perm?: string }[] = [
+  { id: 'sell', label: 'Sell' },
+  { id: 'stock', label: 'Stock', perm: 'stock.receive' },
+  { id: 'products', label: 'Products', perm: 'product.manage' },
+  { id: 'reports', label: 'Reports', perm: 'reports.view' },
+  { id: 'shift', label: 'Shift' },
+  { id: 'admin', label: 'Admin', perm: 'backup.run' },
+];
 
 export function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [tab, setTab] = useState<Tab>('sell');
   const [error, setError] = useState('');
 
-  const refresh = () => call<Status>('auth.status').then(setStatus, (e: Error) => setError(e.message));
+  // Every login starts on Sell: the previous user's tab may be one the new user is not allowed to see.
+  const refresh = () =>
+    call<Status>('auth.status').then((s) => {
+      setTab('sell');
+      setStatus(s);
+    }, (e: Error) => setError(e.message));
   useEffect(() => void refresh(), []);
 
   if (error) return <div className="card msg error">{error}</div>;
   if (!status) return null;
-  if (status.needsSetup) return <Login setup onDone={refresh} />;
+  if (status.needsSetup) {
+    return (
+      <>
+        <Login setup onDone={refresh} />
+        <div className="card">
+          <p>Replacing a computer? Restore the store's data instead of starting fresh.</p>
+          <Restore />
+        </div>
+      </>
+    );
+  }
   if (!status.user) return <Login onDone={refresh} />;
 
   const user = status.user;
@@ -27,20 +54,39 @@ export function App() {
     <>
       <div className="top">
         <strong>POS</strong>
-        <button className={tab === 'sell' ? 'active' : ''} onClick={() => setTab('sell')}>Sell</button>
-        {can('product.manage') && (
-          <button className={tab === 'products' ? 'active' : ''} onClick={() => setTab('products')}>Products</button>
-        )}
-        <button className={tab === 'shift' ? 'active' : ''} onClick={() => setTab('shift')}>Shift</button>
+        {TABS.filter((t) => !t.perm || can(t.perm)).map((t) => (
+          <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
         <span className="spacer" />
+        <BackupBadge />
         <span>{user.displayName}</span>
         <button onClick={() => call('auth.logout').then(refresh)}>Log out</button>
       </div>
-      {tab === 'sell' && <Sell />}
+      {tab === 'sell' && <Sell canDiscount={can('sale.discount')} />}
+      {tab === 'stock' && <Stock can={can} />}
       {tab === 'products' && <Products />}
+      {tab === 'reports' && <Reports />}
       {tab === 'shift' && <Shift can={can} />}
+      {tab === 'admin' && <Admin can={can} />}
     </>
   );
+}
+
+/** Always-visible backup state (plan §J): green under 24 h, amber older, red never/failed. */
+function BackupBadge() {
+  const [s, setS] = useState<FullBackupStatus | null>(null);
+  useEffect(() => {
+    const load = () => void call<FullBackupStatus>('backup.status').then(setS, () => setS(null));
+    load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!s) return null;
+  const last = s.lastVerifiedLocal;
+  const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
+  const color = s.lastFailure || !last ? '#f97066' : ageH > 24 ? '#fdb022' : '#32d583';
+  const text = !s.keyConfigured ? 'Backup not set up' : last ? `Backup ${ageH < 1 ? '<1' : Math.floor(ageH)}h ago (local only)` : 'No backup yet';
+  return <span style={{ color, marginRight: 12 }} title={s.lastFailure?.error}>● {text}</span>;
 }
 
 function Login({ setup = false, onDone }: { setup?: boolean; onDone: () => void }) {

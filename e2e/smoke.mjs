@@ -1,7 +1,7 @@
 // End-to-end smoke test of the packaged-layout app (run `npm run build` first).
 // Usage: node e2e/smoke.mjs [screenshotDir]
 import { _electron as electron } from 'playwright-core';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
@@ -9,6 +9,8 @@ import assert from 'node:assert/strict';
 const shots = process.argv[2];
 const dir = mkdtempSync(join(tmpdir(), 'pos-e2e-'));
 const receipt = join(dir, 'receipt.html');
+const dir2 = mkdtempSync(join(tmpdir(), 'pos-e2e-restore-'));
+let closed = false;
 const app = await electron.launch({ args: ['.'], env: { ...process.env, POS_USER_DATA: dir, POS_RECEIPT_TO_FILE: receipt } });
 const results = [];
 const step = async (name, fn) => {
@@ -87,10 +89,10 @@ try {
   });
 
   await step('cash sale saves, shows change and prints', async () => {
-    await page.locator('.side input').nth(1).fill('10');
+    await page.locator('input[aria-label="cash received"]').fill('10');
     await page.click('button:has-text("Cash")');
     await page.waitForSelector('text=SAVED INV-00000001');
-    assert.match(await page.locator('.msg').innerText(), /Change: 5\.00/);
+    assert.match(await page.locator('.msg:has-text("SAVED")').innerText(), /Change: 5\.00/);
     const html = readFileSync(receipt, 'utf8');
     assert.match(html, /INV-00000001/);
     assert.match(html, /ماء/);
@@ -98,15 +100,96 @@ try {
 
   if (shots) await page.screenshot({ path: join(shots, 'pos-after-sale.png') });
 
+  let recoveryCode = '';
+  await step('admin: set up backup key and see the recovery code once', async () => {
+    await page.click('.top button:has-text("Admin")');
+    await page.click('button:has-text("Set up backup key")');
+    recoveryCode = (await page.locator('pre').innerText()).trim();
+    assert.match(recoveryCode, /^([0-9A-Z]{5}-){10}[0-9A-Z]{5}$/);
+    await page.click('text=I have written it down');
+    assert.equal(await page.locator('pre').count(), 0);
+  });
+
+  await step('admin: add a cashier and a supplier', async () => {
+    const uf = page.locator('form:has(h3:text("Users")) input');
+    await uf.nth(0).fill('cash1');
+    await uf.nth(1).fill('Cashier One');
+    await uf.nth(2).fill('1111');
+    await page.click('button:has-text("Add user")');
+    await page.waitForSelector('td:has-text("cash1")');
+    await page.locator('form:has(h3:text("Suppliers")) input').first().fill('Farm Co');
+    await page.click('button:has-text("Add supplier")');
+    await page.waitForSelector('td:has-text("Farm Co")');
+  });
+
+  await step('stock: receive goods from the supplier', async () => {
+    await page.click('.top button:has-text("Stock")');
+    await page.locator('.card select').selectOption({ label: 'Farm Co' });
+    await page.locator('.card input[placeholder="Search name or SKU"]').fill('Water');
+    await page.click('.card button:has-text("Water 1.5L")');
+    const row = page.locator('.card table.list tbody tr').first().locator('input');
+    await row.nth(0).fill('24');
+    await row.nth(1).fill('1.50');
+    await page.click('button:has-text("Save receipt")');
+    await page.waitForSelector('text=Received GRN-000001');
+  });
+
+  await step('cashier: discount needs supervisor PIN, then card sale', async () => {
+    await page.click('.top button:has-text("Log out")');
+    const f = page.locator('form input');
+    await f.nth(0).fill('cash1');
+    await f.nth(1).fill('1111');
+    await page.click('button:has-text("Log in")');
+    await page.waitForSelector('text=Scan, or type');
+    assert.equal(await page.locator('.top button:has-text("Admin")').count(), 0);
+    await page.keyboard.type('6281000000014', { delay: 5 });
+    await page.keyboard.press('Enter');
+    await page.locator('input[aria-label="discount"]').fill('0.50');
+    await page.locator('input[aria-label="discount"]').blur();
+    await page.waitForSelector('text=Discount needs a supervisor');
+    await page.fill('input[placeholder="Supervisor username"]', 'owner');
+    await page.fill('input[placeholder="PIN"]', '0000');
+    await page.click('.side button:has-text("Card")');
+    await page.waitForSelector('text=NOT SAVED');
+    await page.fill('input[placeholder="PIN"]', '4321');
+    await page.click('.side button:has-text("Card")');
+    await page.waitForSelector('text=SAVED INV-00000002');
+  });
+
+  await step('hold and recall a bill', async () => {
+    await page.waitForTimeout(600);
+    await page.keyboard.type('6281000000014', { delay: 5 });
+    await page.keyboard.press('Enter');
+    await page.click('button:has-text("Hold bill")');
+    await page.waitForSelector('text=Held:');
+    await page.click('.cart button:has-text("(1)")');
+    await page.waitForSelector('td:has-text("Water 1.5L")');
+    await page.click('.side button:has-text("Cash")');
+    await page.waitForSelector('text=SAVED INV-00000003');
+  });
+
   await step('shift shows expected cash and closes', async () => {
-    await page.click('button:has-text("Shift")');
+    await page.click('.top button:has-text("Shift")');
     await page.waitForSelector('text=Expected cash in drawer');
-    assert.match(await page.locator('table').innerText(), /105\.00/);
+    assert.match(await page.locator('table').innerText(), /107\.50/);
     page.once('dialog', (d) => d.accept());
-    await page.locator('.card input').last().fill('105');
+    await page.locator('.card input').last().fill('107.50');
     await page.click('button:has-text("Close shift")');
     await page.waitForSelector('text=No open shift');
   });
+
+  await step('owner: manual backup is verified and shown', async () => {
+    await page.click('.top button:has-text("Log out")');
+    const f = page.locator('form input');
+    await f.nth(0).fill('owner');
+    await f.nth(1).fill('4321');
+    await page.click('button:has-text("Log in")');
+    await page.click('.top button:has-text("Admin")');
+    await page.click('button:has-text("Back up now")');
+    await page.waitForSelector('text=Backup saved');
+    assert.match(await page.locator('.top').innerText(), /Backup <1h ago/);
+  });
+
   // Last: Playwright keeps waiting on a cancelled navigation.
   await step('navigation away is blocked', async () => {
     await page.evaluate(() => { window.location.href = 'https://example.com'; });
@@ -114,8 +197,41 @@ try {
     assert.match(page.url(), /^file:/);
   });
 
-} finally {
   await app.close();
+  closed = true;
+
+  // Replacement computer: empty data folder, restore with the recovery code.
+  const bak = readdirSync(join(dir, 'backups')).filter((f) => f.endsWith('.posbak')).sort().at(-1);
+  const env2 = { ...process.env, POS_USER_DATA: dir2, POS_RECEIPT_TO_FILE: receipt, POS_RESTORE_FILE: join(dir, 'backups', bak), POS_NO_RELAUNCH: '1' };
+  const app2 = await electron.launch({ args: ['.'], env: env2 });
+  await step('restore on a new computer with the recovery code', async () => {
+    const p2 = await app2.firstWindow();
+    await p2.waitForSelector('text=Replacing a computer?');
+    await p2.fill('input[placeholder^="XXXXX"]', recoveryCode.toLowerCase());
+    await p2.click('button:has-text("Choose backup file and check it")');
+    await p2.waitForSelector('text=Last invoice: INV-00000003');
+    p2.once('dialog', (d) => d.accept());
+    const exited = new Promise((r) => app2.process().once('exit', r));
+    await p2.click('button:has-text("Restore this backup")');
+    await exited;
+  });
+  const app3 = await electron.launch({ args: ['.'], env: { ...process.env, POS_USER_DATA: dir2, POS_RECEIPT_TO_FILE: receipt } });
+  await step('restored data: owner can log in and all 3 sales are there', async () => {
+    const p3 = await app3.firstWindow();
+    const f = p3.locator('form input');
+    await f.nth(0).fill('owner');
+    await f.nth(1).fill('4321');
+    await p3.click('button:has-text("Log in")');
+    await p3.waitForSelector('.top');
+    const r = await p3.evaluate(() => window.pos.invoke('report.sales', { from: '2000-01-01T00:00:00.000Z', to: '2100-01-01T00:00:00.000Z' }));
+    assert.equal(r.ok, true);
+    assert.equal(r.data.saleCount, 3);
+    assert.equal(r.data.totalIncl, 500 + 200 + 250);
+  });
+  await app3.close();
+} finally {
+  if (!closed) await app.close();
+  rmSync(dir2, { recursive: true, force: true });
   rmSync(dir, { recursive: true, force: true });
   for (const r of results) console.log(r.join('  '));
   console.log(`${results.filter((r) => r[0] === 'PASS').length}/${results.length} steps passed`);
