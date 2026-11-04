@@ -14,7 +14,8 @@
     "start": "npm run build && electron .",
     "rebuild:electron": "electron-builder install-app-deps",
     "audit": "npm audit --omit=dev",
-    "e2e": "npm run build && node e2e/smoke.mjs"
+    "e2e": "npm run build && node e2e/smoke.mjs",
+    "dist": "npm run build && electron-builder --win nsis --x64"
   },
   "engines": {
     "node": ">=22"
@@ -39,5 +40,40 @@
     "typescript-eslint": "8.72.1",
     "vite": "8.3.5",
     "vitest": "5.0.5"
+  },
+  "productName": "Store POS",
+  "author": "QOZYD",
+  "build": {
+    "appId": "sa.store.pos",
+    "productName": "Store POS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
