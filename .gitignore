@@ -1,0 +1,11 @@
+node_modules/
+dist/
+out/
+release/
+coverage/
+*.db
+*.db-wal
+*.db-shm
+*.log
+.env
+.env.*
