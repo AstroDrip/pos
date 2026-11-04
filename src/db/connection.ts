@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { migrate } from './migrations';
+import { migrate, pendingMigrations } from './migrations';
 
 export type Db = Database.Database;
 
@@ -26,6 +26,12 @@ export function openDatabase(path: string): Db {
   db.pragma('synchronous = FULL'); // survive power loss at the till, at a small speed cost
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
+  // Plan §J: snapshot an existing database before changing its schema.
+  const pending = pendingMigrations(db);
+  if (pending.length > 0) {
+    const snapshot = `${path}.pre-v${pending[0]}-${Date.now()}.db`;
+    db.prepare('VACUUM INTO ?').run(snapshot);
+  }
   migrate(db);
   const fk = db.pragma('foreign_key_check') as unknown[];
   if (fk.length > 0) throw new Error(`Foreign key violations found at startup: ${fk.length}`);

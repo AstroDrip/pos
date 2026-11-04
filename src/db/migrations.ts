@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import * as m001 from './migrations/001_initial';
+import * as m002 from './migrations/002_backups';
 
 export interface Migration {
   version: number;
@@ -9,7 +10,18 @@ export interface Migration {
 }
 
 // Append only. Never edit a migration after it has shipped: the checksum check will refuse to start.
-export const MIGRATIONS: readonly Migration[] = [{ version: 1, name: 'initial', sql: m001.sql }];
+export const MIGRATIONS: readonly Migration[] = [
+  { version: 1, name: 'initial', sql: m001.sql },
+  { version: 2, name: 'backups', sql: m002.sql },
+];
+
+/** Versions not yet applied to this database (empty for a brand-new file before migrate()). */
+export function pendingMigrations(db: Database.Database, migrations: readonly Migration[] = MIGRATIONS): number[] {
+  const hasTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").get();
+  if (!hasTable) return [];
+  const done = new Set((db.prepare('SELECT version FROM schema_migrations').all() as { version: number }[]).map((r) => r.version));
+  return migrations.filter((m) => !done.has(m.version)).map((m) => m.version);
+}
 
 const checksum = (sql: string) => createHash('sha256').update(sql).digest('hex');
 
