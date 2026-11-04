@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "lib": ["ES2023"],
+    "jsx": "preserve",
+    "rootDir": "src",
+    "outDir": "dist/main",
+    "noEmit": false,
+    "sourceMap": true
+  },
+  "include": ["src/main", "src/preload", "src/core", "src/db", "src/services", "src/shared"],
+  "exclude": ["**/*.test.ts"]
+}

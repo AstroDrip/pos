@@ -1,0 +1,41 @@
+{
+  "name": "saudi-pos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline-first POS, inventory and accounting for a single Saudi store",
+  "main": "dist/main/main/main.js",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build": "npm run build:main && npm run build:renderer",
+    "start": "npm run build && electron .",
+    "rebuild:electron": "electron-builder install-app-deps",
+    "audit": "npm audit --omit=dev"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "better-sqlite3": "13.0.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "electron": "45.2.2",
+    "electron-builder": "26.18.0",
+    "eslint": "10.14.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
