@@ -8,6 +8,7 @@ import type { Customer } from '../services/parties';
 import type { SaleResult } from '../services/sales';
 import type { ShiftSummary } from '../services/shifts';
 import { call } from './api';
+import { ProductName, useI18n } from './i18n';
 
 interface Line {
   product: Product;
@@ -18,6 +19,7 @@ interface Line {
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
 export function Sell({ canDiscount }: { canDiscount: boolean }) {
+  const { t } = useI18n();
   const [shift, setShift] = useState<ShiftSummary | null | undefined>(undefined);
   const [float, setFloat] = useState('0');
   const [lines, setLines] = useState<Line[]>([]);
@@ -54,19 +56,19 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
     setMsg(null);
     try {
       const r = await call<LookupResult | null>('catalog.lookup', { code });
-      if (!r) return setMsg({ kind: 'error', text: `Not found: ${code}` });
+      if (!r) return setMsg({ kind: 'error', text: t('Not found: {0}', code) });
       if (r.qty === 0) {
         // Manual weight entry is not approved yet (plan §Q-8); weighed goods need a scale label.
-        return setMsg({ kind: 'warn', text: `${r.product.nameEn} is sold by weight. Scan the scale label.` });
+        return setMsg({ kind: 'warn', text: t('{0} is sold by weight. Scan the scale label.', r.product.nameEn) });
       }
-      if (possibleDuplicate && !window.confirm(`${r.product.nameEn} was scanned twice very quickly. Add it again?`)) return;
+      if (possibleDuplicate && !window.confirm(t('{0} was scanned twice very quickly. Add it again?', r.product.nameEn))) return;
       setLines((prev) => {
         const i = prev.findIndex((l) => l.product.id === r.product.id && r.product.sellMode === 'unit');
         if (i < 0) return [...prev, { product: r.product, qty: r.qty, discount: 0 }];
         return prev.map((l, k) => (k === i ? { ...l, qty: l.qty + r.qty } : l));
       });
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   }, []);
 
@@ -104,7 +106,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
       try {
         amount = parseSar(cash);
       } catch {
-        return setMsg({ kind: 'error', text: 'Cash amount is not a valid number' });
+        return setMsg({ kind: 'error', text: t('Cash amount is not a valid number') });
       }
     }
     setBusy(true);
@@ -119,16 +121,16 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
       });
       resetBill();
       setLastSaleId(r.saleId);
-      const warn = r.negativeStockProducts.length ? ' Stock went below zero for some items.' : '';
-      setMsg({ kind: 'ok', text: `SAVED ${r.invoiceNo}. Change: ${formatSar(r.changeGiven)} SAR.${warn}` });
+      const warn = r.negativeStockProducts.length ? t(' Stock went below zero for some items.') : '';
+      setMsg({ kind: 'ok', text: t('SAVED {0}. Change: {1} SAR.', r.invoiceNo, formatSar(r.changeGiven)) + warn });
       try {
         await call('sale.print', { saleId: r.saleId, copy: false });
       } catch (e) {
-        setMsg({ kind: 'warn', text: `SAVED ${r.invoiceNo}. Change: ${formatSar(r.changeGiven)}. Printing failed: ${(e as Error).message}. Use Reprint.` });
+        setMsg({ kind: 'warn', text: t('SAVED {0}. Change: {1}. Printing failed: {2}. Use Reprint.', r.invoiceNo, formatSar(r.changeGiven), (e as Error).message) });
       }
     } catch (e) {
       // The bill stays on screen with the same key, so pressing pay again is safe.
-      setMsg({ kind: 'error', text: `NOT SAVED: ${(e as Error).message}` });
+      setMsg({ kind: 'error', text: t('NOT SAVED: {0}', t((e as Error).message)) });
     } finally {
       setBusy(false);
     }
@@ -138,7 +140,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const removeLines = (kind: 'line_removed' | 'bill_cleared', idx: number[]) => {
     const gone = idx.map((i) => ({ productId: lines[i]!.product.id, qty: lines[i]!.qty, amount: totals ? totals.lines[i]!.lineIncl : 0 }));
     setLines(lines.filter((_, k) => !idx.includes(k)));
-    call('bill.removed', { kind, lines: gone }).catch((e: Error) => setMsg({ kind: 'warn', text: `Removed, but the removal could not be logged: ${e.message}` }));
+    call('bill.removed', { kind, lines: gone }).catch((e: Error) => setMsg({ kind: 'warn', text: t('Removed, but the removal could not be logged: {0}', e.message) }));
   };
 
   const hold = async () => {
@@ -146,21 +148,21 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
     try {
       await call('hold.create', { label, lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty })), customerId: customer?.id });
       resetBill();
-      setMsg({ kind: 'ok', text: `Held: ${label}. Discounts are not kept on held bills.` });
+      setMsg({ kind: 'ok', text: t('Held: {0}. Discounts are not kept on held bills.', label) });
       void loadHeld();
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   };
 
   const recall = async (id: number) => {
-    if (lines.length) return setMsg({ kind: 'warn', text: 'Finish or hold the current bill first.' });
+    if (lines.length) return setMsg({ kind: 'warn', text: t('Finish or hold the current bill first.') });
     try {
       const r = await call<{ lines: { product: Product; qty: number }[] }>('hold.recall', { id });
       setLines(r.lines.map((l) => ({ ...l, discount: 0 })));
       void loadHeld();
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   };
 
@@ -177,7 +179,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
       } else setMsg({ kind: 'warn', text: `${found.length} customers match. Type more of the phone number.` });
       setCustSearch('');
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   };
 
@@ -191,15 +193,15 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
           try {
             setShift(await call<ShiftSummary>('shift.open', { openingFloat: parseSar(float) }));
           } catch (err) {
-            setMsg({ kind: 'error', text: (err as Error).message });
+            setMsg({ kind: 'error', text: t((err as Error).message) });
           }
         }}
       >
-        <h2>Open shift</h2>
-        <label>Opening cash float (SAR)</label>
+        <h2>{t('Open shift')}</h2>
+        <label>{t('Opening cash float (SAR)')}</label>
         <input value={float} onChange={(e) => setFloat(e.target.value)} />
         {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
-        <p><button className="primary">Open shift</button></p>
+        <p><button className="primary">{t('Open shift')}</button></p>
       </form>
     );
   }
@@ -219,12 +221,12 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
       <div className="cart">
         <table>
           <thead>
-            <tr><th>Item</th><th className="num">Qty</th><th className="num">Price</th><th className="num">Discount</th><th className="num">Amount</th><th /></tr>
+            <tr><th>{t('Item')}</th><th className="num">{t('Qty')}</th><th className="num">{t('Price')}</th><th className="num">{t('Discount')}</th><th className="num">{t('Amount')}</th><th /></tr>
           </thead>
           <tbody>
             {lines.map((l, i) => (
               <tr key={i}>
-                <td>{l.product.nameEn}<div className="ar">{l.product.nameAr}</div></td>
+                <td><ProductName en={l.product.nameEn} ar={l.product.nameAr} /></td>
                 <td className="num">{formatQty(l.qty, l.product.sellMode === 'unit' ? 0 : 3)}</td>
                 <td className="num">{formatSar(l.product.priceIncl)}</td>
                 <td className="num" style={{ width: 90 }}>
@@ -238,7 +240,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
         </table>
         {held.length > 0 && (
           <div className="page">
-            <strong>Held bills:</strong>{' '}
+            <strong>{t('Held bills:')}</strong>{' '}
             {held.map((h) => (
               <button key={h.id} onClick={() => recall(h.id)} style={{ marginRight: 6 }}>
                 {h.label} ({h.lineCount})
@@ -255,53 +257,53 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
             setManual('');
           }}
         >
-          <label>Scan, or type barcode / PLU / SKU and press Enter</label>
+          <label>{t('Scan, or type barcode / PLU / SKU and press Enter')}</label>
           <input autoFocus value={manual} onChange={(e) => setManual(e.target.value)} />
         </form>
         <div className="row">
           {customer ? (
-            <span>Customer: <strong>{customer.name}</strong> <button onClick={() => setCustomer(null)}>✕</button></span>
+            <span>{t('Customer:')} <strong>{customer.name}</strong> <button onClick={() => setCustomer(null)}>✕</button></span>
           ) : (
             <form onSubmit={(e) => { e.preventDefault(); if (custSearch.trim()) void findCustomer(); }} className="row">
-              <input placeholder="Customer phone (optional)" value={custSearch} onChange={(e) => setCustSearch(e.target.value)} />
+              <input placeholder={t('Customer phone (optional)')} value={custSearch} onChange={(e) => setCustSearch(e.target.value)} />
             </form>
           )}
         </div>
         <div>
           {totals ? (
             <>
-              <div className="row"><span>Excl. VAT</span><span className="num">{formatSar(totals.totalExcl)}</span></div>
-              <div className="row"><span>VAT</span><span className="num">{formatSar(totals.totalVat)}</span></div>
-              {hasDiscount && <div className="row"><span>Discount</span><span className="num">-{formatSar(totals.totalDiscount)}</span></div>}
-              <div className="total">{formatSar(totals.totalIncl)} SAR</div>
+              <div className="row"><span>{t('Excl. VAT')}</span><span className="num">{formatSar(totals.totalExcl)}</span></div>
+              <div className="row"><span>{t('VAT')}</span><span className="num">{formatSar(totals.totalVat)}</span></div>
+              {hasDiscount && <div className="row"><span>{t('Discount')}</span><span className="num">-{formatSar(totals.totalDiscount)}</span></div>}
+              <div className="total">{formatSar(totals.totalIncl)} {t('SAR')}</div>
             </>
           ) : (
-            <div className="msg error">A discount is larger than its line amount.</div>
+            <div className="msg error">{t('A discount is larger than its line amount.')}</div>
           )}
         </div>
         {needsApproval && (
           <div className="msg warn">
-            Discount needs a supervisor:
+            {t('Discount needs a supervisor:')}
             <div className="row">
-              <input placeholder="Supervisor username" value={approver.username} onChange={(e) => setApprover({ ...approver, username: e.target.value })} />
-              <input placeholder="PIN" type="password" value={approver.pin} onChange={(e) => setApprover({ ...approver, pin: e.target.value })} />
+              <input placeholder={t('Supervisor username')} value={approver.username} onChange={(e) => setApprover({ ...approver, username: e.target.value })} />
+              <input placeholder={t('PIN')} type="password" value={approver.pin} onChange={(e) => setApprover({ ...approver, pin: e.target.value })} />
             </div>
           </div>
         )}
-        <label>Cash received (blank = exact)</label>
+        <label>{t('Cash received (blank = exact)')}</label>
         <input aria-label="cash received" value={cash} onChange={(e) => setCash(e.target.value)} />
         <div className="row">
-          <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>Cash</button>
-          <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>Card</button>
+          <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>{t('Cash')}</button>
+          <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>{t('Card')}</button>
         </div>
         <div className="row">
-          <button disabled={busy || lines.length === 0} onClick={hold}>Hold bill</button>
-          <button className="danger" disabled={busy || lines.length === 0} onClick={() => window.confirm('Clear the whole bill?') && removeLines('bill_cleared', lines.map((_, i) => i))}>Clear bill</button>
+          <button disabled={busy || lines.length === 0} onClick={hold}>{t('Hold bill')}</button>
+          <button className="danger" disabled={busy || lines.length === 0} onClick={() => window.confirm(t('Clear the whole bill?')) && removeLines('bill_cleared', lines.map((_, i) => i))}>{t('Clear bill')}</button>
         </div>
         {msg && <div className={`msg ${msg.kind}`}>{msg.text}</div>}
         {lastSaleId !== null && (
-          <button onClick={() => call('sale.print', { saleId: lastSaleId, copy: true }).catch((e: Error) => setMsg({ kind: 'error', text: e.message }))}>
-            Reprint last receipt (copy)
+          <button onClick={() => call('sale.print', { saleId: lastSaleId, copy: true }).catch((e: Error) => setMsg({ kind: 'error', text: t(e.message) }))}>
+            {t('Reprint last receipt (copy)')}
           </button>
         )}
       </div>

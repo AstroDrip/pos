@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { nextDay, sqlStoreDay, storeDay, storeDayStartUtc } from './store-time';
+import { nextDay, sqlStoreDay, storeDateTime, storeDay, storeDayStartUtc } from './store-time';
 
 describe('Saudi business day', () => {
   it('evening UTC timestamps belong to the next Saudi day', () => {
@@ -17,5 +17,12 @@ describe('Saudi business day', () => {
     for (const ts of ['2026-11-05T20:59:59.999Z', '2026-11-05T21:00:00.000Z', '2026-12-31T22:00:00.000Z']) {
       expect((db.prepare(`SELECT ${sqlStoreDay('?')} AS d`).get(ts) as { d: string }).d).toBe(storeDay(ts));
     }
+  });
+});
+
+describe('storeDateTime', () => {
+  it('shows Riyadh wall-clock time', () => {
+    expect(storeDateTime('2026-11-04T20:27:20.451Z')).toBe('2026-11-04 23:27');
+    expect(storeDateTime('2026-11-04T21:05:00.000Z')).toBe('2026-11-05 00:05');
   });
 });

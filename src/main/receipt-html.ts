@@ -1,4 +1,5 @@
 import { formatQty, formatSar } from '../core/money';
+import { storeDateTime } from '../core/store-time';
 import type { ReceiptData } from '../services/sales';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -15,7 +16,8 @@ export function receiptHtml(r: ReceiptData, store: { nameAr: string; nameEn: str
 <tr><td>${formatQty(l.qty, 3)} × ${formatSar(l.unitPriceIncl)}</td><td>${l.discount ? '-' + formatSar(l.discount) : ''}</td><td class="r">${formatSar(l.lineIncl)}</td></tr>`,
     )
     .join('');
-  const pays = r.payments.map((p) => `<tr><td>${esc(p.tender)}</td><td></td><td class="r">${formatSar(p.amount)}</td></tr>`).join('');
+  const TENDER: Record<string, string> = { cash: 'Cash / نقداً', card: 'Card / بطاقة' };
+  const pays = r.payments.map((p) => `<tr><td>${esc(TENDER[p.tender] ?? p.tender)}</td><td></td><td class="r">${formatSar(p.amount)}</td></tr>`).join('');
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
 <style>
@@ -28,12 +30,12 @@ export function receiptHtml(r: ReceiptData, store: { nameAr: string; nameEn: str
 <div class="c">VAT No. / الرقم الضريبي: ${esc(store.vatNumber || '—')}</div>
 ${copy ? '<div class="c b">COPY / نسخة</div>' : ''}
 <div class="c">TEST BUILD — NOT A ZATCA TAX INVOICE</div>
-<hr><div>Invoice: ${esc(r.invoiceNo)}</div><div>Date: ${esc(r.createdAt)}</div><div>Cashier: ${esc(r.cashier)}</div><hr>
+<hr><div>Invoice: ${esc(r.invoiceNo)}</div><div>Date / التاريخ: ${esc(storeDateTime(r.createdAt))}</div><div>Cashier: ${esc(r.cashier)}</div><hr>
 <table>${rows}</table><hr>
 <table>
 <tr><td>Total excl. VAT</td><td></td><td class="r">${formatSar(r.totalExcl)}</td></tr>
 <tr><td>VAT 15%</td><td></td><td class="r">${formatSar(r.totalVat)}</td></tr>
 <tr class="b"><td>Total / الإجمالي</td><td></td><td class="r">${formatSar(r.totalIncl)}</td></tr>
-${pays}<tr><td>Change</td><td></td><td class="r">${formatSar(r.changeGiven)}</td></tr>
+${pays}<tr><td>Change / الباقي</td><td></td><td class="r">${formatSar(r.changeGiven)}</td></tr>
 </table></body></html>`;
 }

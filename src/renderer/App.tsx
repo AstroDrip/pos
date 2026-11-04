@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { User } from '../services/users';
 import { Admin, Restore, type FullBackupStatus } from './Admin';
 import { call } from './api';
+import { LangToggle, useI18n } from './i18n';
 import { Products } from './Products';
 import { Reports } from './Reports';
 import { Sell } from './Sell';
@@ -21,6 +22,7 @@ const TABS: { id: Tab; label: string; perm?: string }[] = [
 ];
 
 export function App() {
+  const { t } = useI18n();
   const [status, setStatus] = useState<Status | null>(null);
   const [tab, setTab] = useState<Tab>('sell');
   const [error, setError] = useState('');
@@ -30,7 +32,7 @@ export function App() {
     call<Status>('auth.status').then((s) => {
       setTab('sell');
       setStatus(s);
-    }, (e: Error) => setError(e.message));
+    }, (e: Error) => setError(t(e.message)));
   useEffect(() => void refresh(), []);
 
   if (error) return <div className="card msg error">{error}</div>;
@@ -40,7 +42,7 @@ export function App() {
       <>
         <Login setup onDone={refresh} />
         <div className="card">
-          <p>Replacing a computer? Restore the store's data instead of starting fresh.</p>
+          <p>{t("Replacing a computer? Restore the store's data instead of starting fresh.")}</p>
           <Restore />
         </div>
       </>
@@ -54,13 +56,14 @@ export function App() {
     <>
       <div className="top">
         <strong>POS</strong>
-        {TABS.filter((t) => !t.perm || can(t.perm)).map((t) => (
-          <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>
+        {TABS.filter((tb) => !tb.perm || can(tb.perm)).map((tb) => (
+          <button key={tb.id} className={tab === tb.id ? 'active' : ''} onClick={() => setTab(tb.id)}>{t(tb.label)}</button>
         ))}
         <span className="spacer" />
         <BackupBadge />
+        <LangToggle />
         <span>{user.displayName}</span>
-        <button onClick={() => call('auth.logout').then(refresh)}>Log out</button>
+        <button onClick={() => call('auth.logout').then(refresh)}>{t('Log out')}</button>
       </div>
       {tab === 'sell' && <Sell canDiscount={can('sale.discount')} />}
       {tab === 'stock' && <Stock can={can} />}
@@ -74,6 +77,7 @@ export function App() {
 
 /** Always-visible backup state (plan §J): green under 24 h, amber older, red never/failed. */
 function BackupBadge() {
+  const { t } = useI18n();
   const [s, setS] = useState<FullBackupStatus | null>(null);
   useEffect(() => {
     const load = () => void call<FullBackupStatus>('backup.status').then(setS, () => setS(null));
@@ -85,11 +89,12 @@ function BackupBadge() {
   const last = s.lastVerifiedLocal;
   const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
   const color = s.lastFailure || !last ? '#f97066' : ageH > 24 ? '#fdb022' : '#32d583';
-  const text = !s.keyConfigured ? 'Backup not set up' : last ? `Backup ${ageH < 1 ? '<1' : Math.floor(ageH)}h ago (local only)` : 'No backup yet';
+  const text = !s.keyConfigured ? t('Backup not set up') : last ? (ageH < 1 ? t('Backup less than 1h ago (local only)') : t('Backup {0}h ago (local only)', Math.floor(ageH))) : t('No backup yet');
   return <span style={{ color, marginRight: 12 }} title={s.lastFailure?.error}>● {text}</span>;
 }
 
 function Login({ setup = false, onDone }: { setup?: boolean; onDone: () => void }) {
+  const { t } = useI18n();
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState('');
@@ -103,27 +108,27 @@ function Login({ setup = false, onDone }: { setup?: boolean; onDone: () => void 
       else await call('auth.login', { username, pin });
       onDone();
     } catch (err) {
-      setError((err as Error).message);
+      setError(t((err as Error).message));
       setPin('');
     }
   };
 
   return (
     <form className="card" onSubmit={submit}>
-      <h2>{setup ? 'First-time setup: create the owner account' : 'Log in'}</h2>
-      <label>Username</label>
+      <h2>{setup ? t('First-time setup: create the owner account') : t('Log in')}</h2>
+      <label>{t('Username')}</label>
       <input autoFocus value={username} onChange={(e) => setUsername(e.target.value)} />
       {setup && (
         <>
-          <label>Display name</label>
+          <label>{t('Display name')}</label>
           <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
         </>
       )}
-      <label>PIN (4–8 digits)</label>
+      <label>{t('PIN (4–8 digits)')}</label>
       <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} />
       {error && <p className="msg error">{error}</p>}
       <p>
-        <button className="primary" type="submit">{setup ? 'Create owner' : 'Log in'}</button>
+        <button className="primary" type="submit">{setup ? t('Create owner') : t('Log in')}</button>
       </p>
     </form>
   );

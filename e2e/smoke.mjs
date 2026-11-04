@@ -1,7 +1,7 @@
 // End-to-end smoke test of the packaged-layout app (run `npm run build` first).
 // Usage: node e2e/smoke.mjs [screenshotDir]
 import { _electron as electron } from 'playwright-core';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
@@ -187,7 +187,33 @@ try {
     await page.click('.top button:has-text("Admin")');
     await page.click('button:has-text("Back up now")');
     await page.waitForSelector('text=Backup saved');
-    assert.match(await page.locator('.top').innerText(), /Backup <1h ago/);
+    assert.match(await page.locator('.top').innerText(), /Backup less than 1h ago/);
+  });
+
+  await step('Arabic UI switches to right-to-left and back', async () => {
+    await page.click('button[aria-label="language"]');
+    await page.waitForSelector('.top button:has-text("البيع")');
+    assert.equal(await page.evaluate(() => document.documentElement.dir), 'rtl');
+    await page.click('.top button:has-text("التقارير")');
+    await page.waitForSelector('text=الأكثر مبيعاً');
+    if (shots) await page.screenshot({ path: join(shots, 'pos-arabic-reports.png') });
+    await page.click('.top button:has-text("البيع")');
+    if (shots) await page.screenshot({ path: join(shots, 'pos-arabic-sell.png') });
+    await page.click('button[aria-label="language"]');
+    await page.waitForSelector('.top button:has-text("Sell")');
+    assert.equal(await page.evaluate(() => document.documentElement.dir), 'ltr');
+  });
+
+  await step('receipt renders at 80 mm with shaped Arabic (visual check image)', async () => {
+    const png = await app.evaluate(async ({ BrowserWindow }, file) => {
+      const w = new BrowserWindow({ width: 320, height: 760, show: false, webPreferences: { sandbox: true, javascript: false } });
+      await w.loadFile(file);
+      const img = await w.webContents.capturePage();
+      w.destroy();
+      return img.toPNG().toString('base64');
+    }, receipt);
+    assert.ok(png.length > 1000);
+    if (shots) writeFileSync(join(shots, 'receipt-80mm.png'), Buffer.from(png, 'base64'));
   });
 
   // Last: Playwright keeps waiting on a cancelled navigation.

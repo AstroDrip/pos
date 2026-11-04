@@ -75,7 +75,7 @@ describe('IPC boundary', () => {
 describe('receipt HTML', () => {
   it('escapes product names and marks copies', () => {
     const html = receiptHtml(
-      { invoiceNo: 'INV-1', uuid: 'u', createdAt: 't', cashier: '<b>', lines: [{ nameAr: 'تفاح', nameEn: '<script>x</script>', qty: 1235, unitPriceIncl: 799, discount: 0, lineIncl: 987, vatRateBp: 1500 }], totalExcl: 858, totalVat: 129, totalIncl: 987, totalDiscount: 0, payments: [{ tender: 'cash', amount: 1000 }], changeGiven: 13 },
+      { invoiceNo: 'INV-1', uuid: 'u', createdAt: '2026-11-04T20:27:20.451Z', cashier: '<b>', lines: [{ nameAr: 'تفاح', nameEn: '<script>x</script>', qty: 1235, unitPriceIncl: 799, discount: 0, lineIncl: 987, vatRateBp: 1500 }], totalExcl: 858, totalVat: 129, totalIncl: 987, totalDiscount: 0, payments: [{ tender: 'cash', amount: 1000 }], changeGiven: 13 },
       { nameAr: 'متجر', nameEn: 'Store', vatNumber: '' },
       true,
     );
@@ -84,6 +84,7 @@ describe('receipt HTML', () => {
     expect(html).toContain('COPY');
     expect(html).toContain('9.87');
     expect(html).toContain('NOT A ZATCA TAX INVOICE');
+    expect(html).toContain('2026-11-04 23:27'); // Riyadh time, not UTC
   });
 });
 

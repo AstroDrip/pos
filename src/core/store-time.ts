@@ -11,6 +11,13 @@ export function storeDay(isoUtc: string): string {
   return new Date(t + STORE_UTC_OFFSET_MIN * 60_000).toISOString().slice(0, 10);
 }
 
+/** "YYYY-MM-DD HH:MM" in store time, for receipts and screens. */
+export function storeDateTime(isoUtc: string): string {
+  const t = Date.parse(isoUtc);
+  if (Number.isNaN(t)) throw new RangeError(`Invalid timestamp ${isoUtc}`);
+  return new Date(t + STORE_UTC_OFFSET_MIN * 60_000).toISOString().slice(0, 16).replace('T', ' ');
+}
+
 /** UTC ISO timestamp of 00:00 store time on `day`. */
 export function storeDayStartUtc(day: string): string {
   if (!DAY_RE.test(day) || Number.isNaN(Date.parse(`${day}T00:00:00Z`))) throw new RangeError(`Invalid day ${day}`);

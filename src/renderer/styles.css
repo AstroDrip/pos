@@ -31,16 +31,16 @@ label { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 4px
 .pos { display: grid; grid-template-columns: 1fr 360px; gap: 16px; height: calc(100vh - 52px); padding: 16px; }
 .cart { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: auto; }
 .cart table { width: 100%; border-collapse: collapse; }
-.cart th, .cart td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
-.num { text-align: right !important; font-variant-numeric: tabular-nums; }
+.cart th, .cart td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: start; }
+.num { text-align: end !important; font-variant-numeric: tabular-nums; unicode-bidi: isolate; }
 .side { display: flex; flex-direction: column; gap: 12px; }
-.total { font-size: 36px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.total { font-size: 36px; font-weight: 700; text-align: end; font-variant-numeric: tabular-nums; }
 .msg { padding: 10px 12px; border-radius: 6px; }
 .msg.error { background: #fde8e7; color: var(--danger); }
 .msg.ok { background: #e3f4ec; color: var(--accent); }
 .msg.warn { background: #fff4d6; color: var(--warn); }
 .row { display: flex; gap: 8px; }
 .row > * { flex: 1; }
-.ar { direction: rtl; font-size: 14px; color: var(--muted); }
+.ar { direction: rtl; text-align: start; font-size: 14px; color: var(--muted); }
 .list { width: 100%; border-collapse: collapse; background: var(--panel); }
-.list td, .list th { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.list td, .list th { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: start; }

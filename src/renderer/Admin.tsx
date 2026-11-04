@@ -3,6 +3,7 @@ import type { BackupStatus } from '../services/backup';
 import type { DryRun } from '../services/import';
 import type { Supplier } from '../services/parties';
 import { call } from './api';
+import { useI18n } from './i18n';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
@@ -20,6 +21,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
 export type FullBackupStatus = BackupStatus & { keyConfigured: boolean };
 
 function Backup({ canSetup, canRestore }: { canSetup: boolean; canRestore: boolean }) {
+  const { t } = useI18n();
   const [s, setS] = useState<FullBackupStatus | null>(null);
   const [code, setCode] = useState('');
   const [msg, setMsg] = useState<Msg>(null);
@@ -31,33 +33,33 @@ function Backup({ canSetup, canRestore }: { canSetup: boolean; canRestore: boole
     try {
       await fn();
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
     void load();
   };
 
   return (
     <div className="card" style={{ margin: 0 }}>
-      <h3>Backup</h3>
+      <h3>{t('Backup')}</h3>
       {s && (
         <>
-          <p>Last verified local backup: <strong>{s.lastVerifiedLocal ? new Date(s.lastVerifiedLocal.at).toLocaleString() : 'never'}</strong></p>
-          {s.lastFailure && <p className="msg error">Last failure {new Date(s.lastFailure.at).toLocaleString()}: {s.lastFailure.error}</p>}
-          <p className="msg warn">Off-site (cloud) backup is not set up yet. Local backups are on this computer only: copy the backups folder to a USB drive regularly.</p>
+          <p>{t('Last verified local backup:')} <strong>{s.lastVerifiedLocal ? new Date(s.lastVerifiedLocal.at).toLocaleString() : t('never')}</strong></p>
+          {s.lastFailure && <p className="msg error">{t('Last failure {0}: {1}', new Date(s.lastFailure.at).toLocaleString(), s.lastFailure.error)}</p>}
+          <p className="msg warn">{t('Off-site (cloud) backup is not set up yet. Local backups are on this computer only: copy the backups folder to a USB drive regularly.')}</p>
           {!s.keyConfigured && canSetup && (
             <button className="primary" onClick={() => run(async () => setCode((await call<{ recoveryCode: string }>('backup.setupKey')).recoveryCode))}>
-              Set up backup key
+              {t('Set up backup key')}
             </button>
           )}
-          {!s.keyConfigured && !canSetup && <p>An administrator must set up the backup key.</p>}
-          {s.keyConfigured && <button className="primary" onClick={() => run(async () => setMsg({ kind: 'ok', text: `Backup saved: ${(await call<{ fileName: string }>('backup.run')).fileName}` }))}>Back up now</button>}
+          {!s.keyConfigured && !canSetup && <p>{t('An administrator must set up the backup key.')}</p>}
+          {s.keyConfigured && <button className="primary" onClick={() => run(async () => setMsg({ kind: 'ok', text: t('Backup saved: {0}', (await call<{ fileName: string }>('backup.run')).fileName) }))}>{t('Back up now')}</button>}
         </>
       )}
       {code && (
         <div className="msg warn">
-          <strong>Write this recovery code on paper and keep it somewhere safe, away from this computer.</strong> It is shown only once. Without it, backups cannot be restored on another computer.
+          <strong>{t('Write this recovery code on paper and keep it somewhere safe, away from this computer.')}</strong> {t('It is shown only once. Without it, backups cannot be restored on another computer.')}
           <pre style={{ fontSize: 18, whiteSpace: 'pre-wrap' }}>{code}</pre>
-          <button onClick={() => setCode('')}>I have written it down</button>
+          <button onClick={() => setCode('')}>{t('I have written it down')}</button>
         </div>
       )}
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
@@ -68,6 +70,7 @@ function Backup({ canSetup, canRestore }: { canSetup: boolean; canRestore: boole
 
 /** Also shown on the first-run screen, so a replacement computer can be restored before any user exists. */
 export function Restore() {
+  const { t } = useI18n();
   const [code, setCode] = useState('');
   const [facts, setFacts] = useState<{ createdAt: string; lastInvoiceNo: string | null; counts: Record<string, number> } | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
@@ -77,28 +80,28 @@ export function Restore() {
     try {
       setFacts(await call('restore.prepare', { recoveryCode: code.trim() || undefined }));
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   };
   const apply = async () => {
-    if (!window.confirm('Replace ALL current data with this backup? The current data is kept in a side file, not deleted. The app will restart.')) return;
+    if (!window.confirm(t('Replace ALL current data with this backup? The current data is kept in a side file, not deleted. The app will restart.'))) return;
     try {
       await call('restore.apply');
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   };
 
   return (
     <div>
-      <h4>Restore from backup</h4>
-      <label>Recovery code (needed on a new computer)</label>
+      <h4>{t('Restore from backup')}</h4>
+      <label>{t('Recovery code (needed on a new computer)')}</label>
       <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="XXXXX-XXXXX-…" />
-      <p><button onClick={check}>Choose backup file and check it</button></p>
+      <p><button onClick={check}>{t('Choose backup file and check it')}</button></p>
       {facts && (
         <div className="msg ok">
-          Backup from {new Date(facts.createdAt).toLocaleString()} is valid. Last invoice: {facts.lastInvoiceNo ?? 'none'}. Sales: {facts.counts.sales}, products: {facts.counts.products}.
-          <p><button className="danger" onClick={apply}>Restore this backup</button></p>
+          {t('Backup from {0} is valid. Last invoice: {1}. Sales: {2}, products: {3}.', new Date(facts.createdAt).toLocaleString(), facts.lastInvoiceNo ?? t('none'), facts.counts.sales ?? 0, facts.counts.products ?? 0)}
+          <p><button className="danger" onClick={apply}>{t('Restore this backup')}</button></p>
         </div>
       )}
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
@@ -107,6 +110,7 @@ export function Restore() {
 }
 
 function Users() {
+  const { t } = useI18n();
   const [list, setList] = useState<{ id: number; username: string; displayName: string; roles: string }[]>([]);
   const [f, setF] = useState({ username: '', displayName: '', pin: '', role: 'cashier' });
   const [msg, setMsg] = useState<Msg>(null);
@@ -120,27 +124,28 @@ function Users() {
       setF({ username: '', displayName: '', pin: '', role: 'cashier' });
       void load();
     } catch (err) {
-      setMsg({ kind: 'error', text: (err as Error).message });
+      setMsg({ kind: 'error', text: t((err as Error).message) });
     }
   };
   return (
     <form className="card" style={{ margin: 0 }} onSubmit={save}>
-      <h3>Users</h3>
-      <label>Username</label><input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
-      <label>Display name</label><input value={f.displayName} onChange={(e) => setF({ ...f, displayName: e.target.value })} />
-      <label>PIN (4–8 digits)</label><input type="password" value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value })} />
-      <label>Role</label>
+      <h3>{t('Users')}</h3>
+      <label>{t('Username')}</label><input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
+      <label>{t('Display name')}</label><input value={f.displayName} onChange={(e) => setF({ ...f, displayName: e.target.value })} />
+      <label>{t('PIN (4–8 digits)')}</label><input type="password" value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value })} />
+      <label>{t('Role')}</label>
       <select value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
-        <option value="cashier">Cashier</option><option value="supervisor">Supervisor</option><option value="admin">Administrator</option>
+        <option value="cashier">{t('Cashier')}</option><option value="supervisor">{t('Supervisor')}</option><option value="admin">{t('Administrator')}</option>
       </select>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
-      <p><button className="primary">Add user</button></p>
+      <p><button className="primary">{t('Add user')}</button></p>
       <table className="list"><tbody>{list.map((u) => <tr key={u.id}><td>{u.username}</td><td>{u.displayName}</td><td>{u.roles}</td></tr>)}</tbody></table>
     </form>
   );
 }
 
 function Suppliers() {
+  const { t } = useI18n();
   const [list, setList] = useState<Supplier[]>([]);
   const [f, setF] = useState({ name: '', phone: '', vatNumber: '', terms: '0' });
   const [msg, setMsg] = useState<Msg>(null);
@@ -155,25 +160,26 @@ function Suppliers() {
       setF({ name: '', phone: '', vatNumber: '', terms: '0' });
       void load();
     } catch (err) {
-      setMsg({ kind: 'error', text: (err as Error).message });
+      setMsg({ kind: 'error', text: t((err as Error).message) });
     }
   };
 
   return (
     <form className="card" style={{ margin: 0 }} onSubmit={save}>
-      <h3>Suppliers</h3>
-      <label>Name</label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-      <label>Phone</label><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
-      <label>VAT number</label><input value={f.vatNumber} onChange={(e) => setF({ ...f, vatNumber: e.target.value })} />
-      <label>Payment terms (days)</label><input value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} />
+      <h3>{t('Suppliers')}</h3>
+      <label>{t('Name')}</label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+      <label>{t('Phone')}</label><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
+      <label>{t('VAT number')}</label><input value={f.vatNumber} onChange={(e) => setF({ ...f, vatNumber: e.target.value })} />
+      <label>{t('Payment terms (days)')}</label><input value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} />
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
-      <p><button className="primary">Add supplier</button></p>
+      <p><button className="primary">{t('Add supplier')}</button></p>
       <table className="list"><tbody>{list.map((s) => <tr key={s.id}><td>{s.name}</td><td>{s.phone}</td><td>{s.paymentTermsDays}d</td></tr>)}</tbody></table>
     </form>
   );
 }
 
 function Import() {
+  const { t } = useI18n();
   const [kind, setKind] = useState<'products' | 'suppliers'>('products');
   const [csv, setCsv] = useState('');
   const [dry, setDry] = useState<DryRun<unknown> | null>(null);
@@ -193,41 +199,41 @@ function Import() {
     try {
       setDry(await call<DryRun<unknown>>('import.dryRun', { kind, csv }));
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   };
   const commit = async () => {
     try {
       const n = await call<number>('import.commit', { kind, csv, acceptWarnings: accept });
-      setMsg({ kind: 'ok', text: `Imported ${n} ${kind}.` });
+      setMsg({ kind: 'ok', text: t('Imported {0} {1}.', n, t(kind === 'products' ? 'Products' : 'Suppliers')) });
       setDry(null);
     } catch (e) {
-      setMsg({ kind: 'error', text: (e as Error).message });
+      setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   };
 
   return (
     <div className="card" style={{ margin: 0 }}>
-      <h3>Import from CSV</h3>
+      <h3>{t('Import from CSV')}</h3>
       <select value={kind} onChange={(e) => { setKind(e.target.value as 'products' | 'suppliers'); setDry(null); }}>
-        <option value="products">Products</option>
-        <option value="suppliers">Suppliers</option>
+        <option value="products">{t('Products')}</option>
+        <option value="suppliers">{t('Suppliers')}</option>
       </select>
       <p className="ar" style={{ direction: 'ltr' }}>
         {kind === 'products' ? 'Columns: sku, name_ar, name_en, sold_by (piece|kg), price_incl, vat_percent, barcode, plu' : 'Columns: name, phone, vat_number, payment_terms_days'}
       </p>
       <input type="file" accept=".csv,text/csv" onChange={(e) => readFile(e.target.files?.[0])} />
-      <p><button disabled={!csv} onClick={check}>Check file (nothing is saved)</button></p>
+      <p><button disabled={!csv} onClick={check}>{t('Check file (nothing is saved)')}</button></p>
       {dry && (
         <div>
-          <p>{dry.rows} rows: {dry.valid.length} ready, {dry.issues.length} problems, {dry.warnings.length} warnings.</p>
+          <p>{t('{0} rows: {1} ready, {2} problems, {3} warnings.', dry.rows, dry.valid.length, dry.issues.length, dry.warnings.length)}</p>
           {[...dry.issues.map((i) => ({ ...i, kind: 'error' })), ...dry.warnings.map((i) => ({ ...i, kind: 'warn' }))].slice(0, 200).map((i, k) => (
-            <div key={k} className={`msg ${i.kind}`}>Row {i.row}, {i.field}: {i.message}</div>
+            <div key={k} className={`msg ${i.kind}`}>{t('Row {0}, {1}: {2}', i.row, i.field, i.message)}</div>
           ))}
           {dry.issues.length === 0 && (
             <>
-              {dry.warnings.length > 0 && <label><input type="checkbox" style={{ width: 'auto' }} checked={accept} onChange={(e) => setAccept(e.target.checked)} /> I have checked the warnings</label>}
-              <p><button className="primary" disabled={dry.warnings.length > 0 && !accept} onClick={commit}>Import {dry.valid.length} rows</button></p>
+              {dry.warnings.length > 0 && <label><input type="checkbox" style={{ width: 'auto' }} checked={accept} onChange={(e) => setAccept(e.target.checked)} /> {t('I have checked the warnings')}</label>}
+              <p><button className="primary" disabled={dry.warnings.length > 0 && !accept} onClick={commit}>{t('Import {0} rows', dry.valid.length)}</button></p>
             </>
           )}
         </div>
