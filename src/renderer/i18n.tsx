@@ -252,6 +252,11 @@ const AR: Record<string, string> = {
   'Refunds paid in cash ({0})': 'مرتجعات مدفوعة نقداً ({0})',
   'Refund NOT saved. Do not pay out cash. Try again.': 'لم يتم حفظ الاسترداد. لا تدفع أي نقود. حاول مرة أخرى.',
   'A refund needs supervisor approval': 'الاسترداد يحتاج موافقة المشرف',
+  // appearance
+  Appearance: 'المظهر',
+  Light: 'فاتح',
+  Dark: 'داكن',
+  System: 'حسب النظام',
   // wastage and stock counts
   'Wastage and stock count differences ({0})': 'الهدر وفروقات الجرد ({0})',
   Document: 'المستند',

@@ -9,6 +9,7 @@ import { Reports } from './Reports';
 import { Sell } from './Sell';
 import { Shift } from './Shift';
 import { Stock } from './Stock';
+import { ThemeSelect } from './theme';
 
 type Status = { needsSetup: boolean; user: User | null };
 type Tab = 'sell' | 'refund' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
@@ -50,7 +51,14 @@ export function App() {
       </>
     );
   }
-  if (!status.user) return <Login onDone={refresh} />;
+  if (!status.user) {
+    return (
+      <>
+        <div className="top"><strong>POS</strong><span className="spacer" /><ThemeSelect /><LangToggle /></div>
+        <Login onDone={refresh} />
+      </>
+    );
+  }
 
   const user = status.user;
   const can = (p: string) => user.permissions.includes(p);
@@ -63,6 +71,7 @@ export function App() {
         ))}
         <span className="spacer" />
         <BackupBadge />
+        <ThemeSelect />
         <LangToggle />
         <span>{user.displayName}</span>
         <button onClick={() => call('auth.logout').then(refresh)}>{t('Log out')}</button>
@@ -101,9 +110,9 @@ function BackupBadge() {
   if (!s) return null;
   const last = s.lastVerifiedLocal;
   const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
-  const color = s.lastFailure || !last ? '#f97066' : ageH > 24 ? '#fdb022' : '#32d583';
+  const cls = s.lastFailure || !last ? 'badge-bad' : ageH > 24 ? 'badge-warn' : 'badge-ok';
   const text = !s.keyConfigured ? t('Backup not set up') : last ? (ageH < 1 ? t('Backup less than 1h ago (local only)') : t('Backup {0}h ago (local only)', Math.floor(ageH))) : t('No backup yet');
-  return <span style={{ color, marginRight: 12 }} title={s.lastFailure?.error}>● {text}</span>;
+  return <span className={cls} style={{ marginInlineEnd: 12 }} title={s.lastFailure?.error}>● {text}</span>;
 }
 
 function Login({ setup = false, onDone }: { setup?: boolean; onDone: () => void }) {
