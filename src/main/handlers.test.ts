@@ -176,6 +176,7 @@ describe('permission matrix over IPC (audit 5.4: the backend enforces roles, not
       ['report.refunds', day],
       ['report.adjustments', day],
       ['scale.layouts', null],
+      ['dashboard.health', null],
       ['expense.categories', null],
       ['expense.list', day],
       ['expense.summary', day],

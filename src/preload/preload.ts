@@ -62,6 +62,7 @@ const PRELOAD_CHANNELS = [
   'finance.tb',
   'finance.gl',
   'finance.kpis',
+  'dashboard.health',
   'refund.find',
   'refund.create',
   'refund.print',

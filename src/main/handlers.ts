@@ -18,6 +18,7 @@ import {
   listRecurring, payExpense, postExpense, reverseExpense, reversePayment, saveCategory, saveRecurring, updateDraft,
 } from '../services/expenses';
 import { balanceSheet, datedTrialBalance, generalLedger, ownerKpis, profitAndLoss } from '../services/financials';
+import { syncHealth } from '../services/dashboard-sync';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
 import { closeShift, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
@@ -189,6 +190,10 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'finance.tb': (p, s) => datedTrialBalance(ctx, userId(s), p.fromDay, p.toDay),
     'finance.gl': (p, s) => generalLedger(ctx, userId(s), p.code, p.fromDay, p.toDay),
     'finance.kpis': (p, s) => ownerKpis(ctx, userId(s), p.fromDay, p.toDay),
+    'dashboard.health': (_p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      return syncHealth(ctx);
+    },
     'refund.find': (p, s) => findSaleForRefund(ctx, userId(s), p.invoiceNo),
     'refund.create': (p, s) => {
       let approverId: number | undefined;

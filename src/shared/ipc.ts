@@ -105,6 +105,7 @@ export const schemas = {
   'finance.tb': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
   'finance.gl': z.object({ code: z.string().regex(/^\d{4}$/), fromDay: z.iso.date(), toDay: z.iso.date() }),
   'finance.kpis': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
+  'dashboard.health': z.null(),
   'refund.find': z.object({ invoiceNo: z.string().min(1).max(40) }),
   'refund.create': z.object({
     requestKey: z.string().regex(/^[\w-]{8,64}$/),

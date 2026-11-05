@@ -70,8 +70,9 @@ export interface ProfitAndLoss {
   provisionalReasons: string[];
 }
 
-export function profitAndLoss(ctx: Ctx, userId: number, from: string, to: string): ProfitAndLoss {
-  requirePermission(ctx, userId, 'finance.view');
+/** userId null = internal job (dashboard snapshots); IPC handlers always pass the logged-in user. */
+export function profitAndLoss(ctx: Ctx, userId: number | null, from: string, to: string): ProfitAndLoss {
+  if (userId !== null) requirePermission(ctx, userId, 'finance.view');
   checkRange(from, to);
   recognizePrepaid(ctx, null); // prepaid months that have started belong in this period's expenses
   const t = accountTotals(ctx, from, to);
@@ -192,7 +193,7 @@ export interface OwnerKpis {
 }
 
 /** Owner KPIs for store days from..to. Uses the same P&L as the Accounting tab. */
-export function ownerKpis(ctx: Ctx, userId: number, from: string, to: string): OwnerKpis {
+export function ownerKpis(ctx: Ctx, userId: number | null, from: string, to: string): OwnerKpis {
   const pl = profitAndLoss(ctx, userId, from, to);
   const f = storeDayStartUtc(from);
   const tt = storeDayStartUtc(nextDay(to));

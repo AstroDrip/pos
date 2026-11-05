@@ -3,6 +3,7 @@ import type { BackupStatus } from '../services/backup';
 import type { DryRun } from '../services/import';
 import type { LookupResult, ScaleLayoutRow } from '../services/catalog';
 import type { Supplier } from '../services/parties';
+import type { SyncHealth } from '../services/dashboard-sync';
 import { formatQty } from '../core/money';
 import { call } from './api';
 import { useI18n } from './i18n';
@@ -17,6 +18,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
       {can('supplier.manage') && <Suppliers />}
       {(can('product.manage') || can('supplier.manage')) && <Import />}
       {can('settings.manage') && <ScaleLabels />}
+      {can('settings.manage') && <DashboardHealth />}
     </div>
   );
 }
@@ -318,6 +320,29 @@ function ScaleLabels() {
         <button style={{ flex: '0 0 auto' }} disabled={!test.trim()} onClick={tryLabel}>{t('Test')}</button>
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+    </div>
+  );
+}
+
+/** Owner phone dashboard: sync status only. The remote service is not set up yet (owner decision). */
+function DashboardHealth() {
+  const { t } = useI18n();
+  const [h, setH] = useState<SyncHealth | null>(null);
+  useEffect(() => void call<SyncHealth>('dashboard.health').then(setH, () => setH(null)), []);
+  if (!h) return null;
+  return (
+    <div className="card" style={{ margin: 8, maxWidth: 420 }}>
+      <h3>{t('Owner phone dashboard')}</h3>
+      {!h.enabled ? (
+        <p className="msg warn">{t('Not set up. It needs an online dashboard service; choose a provider first. Nothing is sent anywhere until then.')}</p>
+      ) : (
+        <table className="list"><tbody>
+          <tr><td>{t('Last successful sync')}</td><td>{h.lastSuccessAt ? new Date(h.lastSuccessAt).toLocaleString() : t('Never')}</td></tr>
+          <tr><td>{t('Waiting to send')}</td><td>{h.pending}</td></tr>
+          <tr><td>{t('Phone figures')}</td><td className={h.stale ? 'badge-bad' : 'badge-ok'}>{h.stale ? t('may be out of date') : t('up to date')}</td></tr>
+          {h.lastError && <tr><td>{t('Last error')}</td><td>{h.lastError}</td></tr>}
+        </tbody></table>
+      )}
     </div>
   );
 }
