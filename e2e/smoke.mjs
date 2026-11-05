@@ -340,6 +340,29 @@ try {
     if (shots) await page.screenshot({ path: join(shots, 'pos-accounting.png'), fullPage: true });
   });
 
+  await step('owner: supplier invoice for the goods receipt, paid by bank; balance clears; VAT summary matches the ledger', async () => {
+    await page.click('.top button:has-text("Purchases")');
+    await page.locator('select[aria-label="supplier"]').selectOption({ label: 'Farm Co' });
+    await page.locator('input[aria-label="grn GRN-000001"]').check();
+    await page.fill('input[aria-label="supplier invoice no"]', 'FC-1001');
+    await page.fill('input[aria-label="invoice net"]', '36.00');
+    await page.fill('input[aria-label="invoice vat"]', '5.40');
+    await page.locator('label:has-text("Input VAT is recoverable") input').uncheck(); // Farm Co has no VAT number
+    await page.click('button:has-text("Save supplier invoice")');
+    await page.waitForSelector('text=Supplier invoice saved as PI-000001');
+    await page.click('button:has-text("Balances and payments")');
+    await page.waitForSelector('td:has-text("Farm Co")');
+    assert.match(await page.locator('tr:has(td:has-text("Farm Co"))').first().innerText(), /41\.40/);
+    await page.locator('.card:has(h4:text("Pay a supplier")) select[aria-label="supplier"]').selectOption({ label: 'Farm Co' });
+    await page.fill('input[aria-label="supplier pay amount"]', '41.40');
+    await page.click('button:has-text("Record payment")');
+    await page.waitForSelector('text=Payment recorded');
+    assert.equal(await page.locator('tr:has(td:has-text("Farm Co"))').count(), 0); // nothing owed any more
+    await page.click('.top button:has-text("Accounting")');
+    await page.waitForSelector('text=VAT summary');
+    assert.match(await page.locator('h3:has-text("VAT summary")').innerText(), /matches the VAT accounts/);
+  });
+
   await step('Arabic UI switches to right-to-left and back', async () => {
     await page.click('button[aria-label="language"]');
     await page.waitForSelector('.top button:has-text("البيع")');

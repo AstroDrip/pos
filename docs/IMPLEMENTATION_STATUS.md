@@ -98,4 +98,6 @@ See the task ledger (`docs/IMPLEMENTATION_TASK_LEDGER.md`) for the per-task stat
 | E Weighed-label format | **PARTIAL / BLOCKED** (configurable parser built; real layout unverified) | `core/scale-layout.ts`, `services/catalog.ts`, Admin "Scale labels" | 6 | `scale-layout.test.ts` (8), `scale-labels.test.ts` (6) — synthetic layouts only | **Real label from the store's scale** | 2026-11-05 |
 | F Financial report integration | **VERIFIED, PROVISIONAL** | `services/financials.ts`, `renderer/Accounting.tsx` | — | reconciliation test (P&L = sales − refunds, COGS, BS balanced, TB balanced, GL, KPIs = P&L) | Accountant approval; no period close | 2026-11-05 |
 
+| G Purchasing + VAT summary | **VERIFIED, PROVISIONAL accounting** | `services/purchasing.ts`, `services/vat-report.ts`, `renderer/Purchases.tsx`, Accounting VAT section | 9 | `purchasing.test.ts` (12), permission matrix, e2e | Accountant approval; supplier-payment reverse button not on screen; purchase invoice printing | 2026-11-06 |
+
 Found and fixed during this work: BUG-015 (cost of units sold below zero stock), BUG-016 (default capital category), BUG-017/018 (keyboard focus). See `docs/audit/BUG_REGISTER.md`.

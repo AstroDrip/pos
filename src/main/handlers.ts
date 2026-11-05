@@ -19,6 +19,11 @@ import {
 } from '../services/expenses';
 import { balanceSheet, datedTrialBalance, generalLedger, ownerKpis, profitAndLoss } from '../services/financials';
 import { syncHealth } from '../services/dashboard-sync';
+import {
+  createPurchaseInvoice, createPurchaseReturn, paySupplier, purchaseRegister, reverseSupplierPayment, setSupplierOpeningBalance,
+  supplierAgeing, supplierBalances, supplierStatement, uninvoicedGrns,
+} from '../services/purchasing';
+import { vatSummary } from '../services/vat-report';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
 import { closeShift, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
@@ -190,6 +195,17 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'finance.tb': (p, s) => datedTrialBalance(ctx, userId(s), p.fromDay, p.toDay),
     'finance.gl': (p, s) => generalLedger(ctx, userId(s), p.code, p.fromDay, p.toDay),
     'finance.kpis': (p, s) => ownerKpis(ctx, userId(s), p.fromDay, p.toDay),
+    'purchase.uninvoiced': (p, s) => uninvoicedGrns(ctx, userId(s), p.supplierId),
+    'purchase.invoice': (p, s) => createPurchaseInvoice(ctx, userId(s), p),
+    'purchase.return': (p, s) => createPurchaseReturn(ctx, userId(s), p),
+    'purchase.opening': (p, s) => setSupplierOpeningBalance(ctx, userId(s), p),
+    'purchase.pay': (p, s) => paySupplier(ctx, userId(s), p),
+    'purchase.reversePayment': (p, s) => reverseSupplierPayment(ctx, userId(s), p.paymentId, p.requestKey, p.reason),
+    'purchase.statement': (p, s) => supplierStatement(ctx, userId(s), p.supplierId),
+    'purchase.ageing': (p, s) => supplierAgeing(ctx, userId(s), p.asOf),
+    'purchase.register': (p, s) => purchaseRegister(ctx, userId(s), p.fromDay, p.toDay),
+    'purchase.balances': (_p, s) => supplierBalances(ctx, userId(s)),
+    'finance.vat': (p, s) => vatSummary(ctx, userId(s), p.fromDay, p.toDay),
     'dashboard.health': (_p, s) => {
       requirePermission(ctx, userId(s), 'settings.manage');
       return syncHealth(ctx);

@@ -11,6 +11,9 @@ Only commands that were actually run are recorded here.
 | 2026-11-05 | `feature/owner-tools` @ 85d9b06 | `npm run build && node e2e/smoke.mjs` (3 runs) | **27/27, 27/27, 27/27** |
 | 2026-11-05 | `feature/owner-tools` @ 85d9b06 | `npm audit --omit=dev` | 0 vulnerabilities |
 
+| 2026-11-06 | `feature/owner-tools` (purchasing) | `npx vitest run` | 18 files, **183 passed**, 0 failed |
+| 2026-11-06 | `feature/owner-tools` (purchasing) | `npm run build && node e2e/smoke.mjs` | **28/28** |
+
 Earlier during T2–T4 the e2e scanner step failed twice on the first run straight after a build. Playwright's 5 ms "scanner"
 keystrokes arrived slower than the 35 ms burst limit while the app was still warming up. It passed on every later run,
 including first runs after the last builds. It is a test-timing effect, but watch for it on the store PC with the real scanner.

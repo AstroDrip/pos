@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { formatSar } from '../core/money';
 import { storeDay } from '../core/store-time';
 import type { BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
+import type { VatSummary } from '../services/vat-report';
 import { call } from './api';
 import { useI18n } from './i18n';
 
@@ -20,6 +21,7 @@ export function Accounting() {
   const [tb, setTb] = useState<Tb | null>(null);
   const [glCode, setGlCode] = useState('1010');
   const [gl, setGl] = useState<Gl | null>(null);
+  const [vat, setVat] = useState<VatSummary | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export function Accounting() {
     call<ProfitAndLoss>('finance.pl', { fromDay: from, toDay: to }).then(setPl, fail);
     call<BalanceSheet>('finance.bs', { asOf: to }).then(setBs, fail);
     call<Tb>('finance.tb', { fromDay: from, toDay: to }).then(setTb, fail);
+    call<VatSummary>('finance.vat', { fromDay: from, toDay: to }).then(setVat, fail);
   }, [from, to]);
   useEffect(() => void call<Gl>('finance.gl', { code: glCode, fromDay: from, toDay: to }).then(setGl, () => setGl(null)), [glCode, from, to]);
 
@@ -85,6 +88,28 @@ export function Accounting() {
               <Line l={t('Total operating expenses')} v={pl.totalOperating} neg />
               <Line l={t('Net profit')} v={pl.netProfit} strong />
               <tr><td colSpan={2} className="ar" style={{ direction: 'inherit' }}>{t('VAT is not income or cost: output VAT {0}, recoverable input VAT {1}.', formatSar(pl.outputVat), formatSar(pl.inputVat))}</td></tr>
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {vat && (
+        <>
+          <h3>{t('VAT summary')} {vat.reconciles ? <span className="tag paid">{t('matches the VAT accounts')}</span> : <span className="tag overdue">{t('DOES NOT match the VAT accounts')}</span>}</h3>
+          <p className="msg warn">{t('A working summary for your accountant, not the official VAT return. 0% sales cannot be split into zero-rated and exempt.')}</p>
+          <table className="list" style={{ maxWidth: 640 }}>
+            <thead><tr><th /><th className="num">{t('Net')}</th><th className="num">{t('VAT')}</th></tr></thead>
+            <tbody>
+              <tr><td>{t('Sales at 15%')}</td><td className="num">{formatSar(vat.salesStandard.net)}</td><td className="num">{formatSar(vat.salesStandard.vat)}</td></tr>
+              <tr><td>{t('Less refunds at 15%')}</td><td className="num">-{formatSar(vat.refundsStandard.net)}</td><td className="num">-{formatSar(vat.refundsStandard.vat)}</td></tr>
+              <tr><td>{t('Sales at 0% (zero-rated or exempt)')}</td><td className="num">{formatSar(vat.salesZeroOrExempt.net - vat.refundsZeroOrExempt.net)}</td><td className="num">0.00</td></tr>
+              <tr><td><strong>{t('Output VAT')}</strong></td><td /><td className="num"><strong>{formatSar(vat.outputVat)}</strong></td></tr>
+              <tr><td>{t('Supplier invoices (recoverable VAT)')}</td><td className="num">{formatSar(vat.purchasesRecoverable.net)}</td><td className="num">{formatSar(vat.purchasesRecoverable.vat)}</td></tr>
+              <tr><td>{t('Less returns to suppliers')}</td><td className="num">-{formatSar(vat.purchaseReturnsRecoverable.net)}</td><td className="num">-{formatSar(vat.purchaseReturnsRecoverable.vat)}</td></tr>
+              <tr><td>{t('Expenses (recoverable VAT)')}</td><td className="num">{formatSar(vat.expensesRecoverable.net - vat.expensesReversedRecoverable.net)}</td><td className="num">{formatSar(vat.expensesRecoverable.vat - vat.expensesReversedRecoverable.vat)}</td></tr>
+              <tr><td><strong>{t('Input VAT')}</strong></td><td /><td className="num"><strong>{formatSar(vat.inputVat)}</strong></td></tr>
+              <tr><td><strong>{vat.netVatDue >= 0 ? t('Net VAT payable') : t('Net VAT refundable')}</strong></td><td /><td className="num"><strong>{formatSar(Math.abs(vat.netVatDue))}</strong></td></tr>
+              {vat.purchasesNonRecoverableVat !== 0 && <tr><td colSpan={3} className="ar" style={{ direction: 'inherit' }}>{t('VAT paid but not recoverable (treated as cost): {0}', formatSar(vat.purchasesNonRecoverableVat))}</td></tr>}
             </tbody>
           </table>
         </>

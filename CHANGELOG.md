@@ -2,6 +2,28 @@
 
 Not for live trading: there is no ZATCA Phase 2 integration yet, and receipts are marked "NOT A ZATCA TAX INVOICE".
 
+## Unreleased — Purchasing and VAT summary (2026-11-06)
+
+ZAT Pro's logs show purchasing in use on 31 days in 2025, so it was required for the replacement. Posting rules are PROVISIONAL until the accountant approves.
+
+### Added
+- **Purchases tab**:
+  - supplier invoices matched to goods receipts (or goods received with the invoice), with supplier invoice number, due date from payment terms, and input VAT (recoverable only with the supplier's VAT number);
+  - a price difference needs a reason and goes to 5010;
+  - returns to supplier at average cost, with VAT reversal;
+  - supplier payments by bank or from the till, which lowers the shift's expected cash;
+  - opening balances per supplier, for starting fresh without migration;
+  - statement, ageing and purchase register.
+- **VAT summary** (Accounting tab):
+  - output VAT and input VAT for any period, from sales, refunds, supplier invoices, returns and expenses;
+  - checked against the VAT accounts in the journal.
+  - It is a working summary, not the official return.
+- Migration 9: new tables, account 5010, permissions (`purchase.view` for supervisors; manage and pay for the owner).
+
+### Checks
+- Every test: supplier balances add up to Accounts payable, and un-invoiced receipts add up to account 2100.
+- 183 tests; e2e 28/28.
+
 ## Unreleased — Owner tools: themes, keyboard checkout, scale layouts, expenses, accounting, dashboard sync (2026-11-05)
 
 Branch `feature/owner-tools`. Details: `docs/IMPLEMENTATION_STATUS.md`, `docs/ARCHITECTURE_DECISIONS.md`.

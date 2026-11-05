@@ -86,11 +86,11 @@ Status values:
 
 | Legacy capability | Evidence in old installation | Current POS implementation | Missing functionality | Status | Required action | Verification |
 |---|---|---|---|---|---|---|
-| Purchase invoice entry | `FrmNewPurchase` (**31 days in 2025 logs**), `PurchaseInvoice.frx` | Goods receipt (GRN): stock in at cost, Dr Inventory / Cr 2100 | **Supplier invoice** matched to the GRN (or entered directly): supplier invoice number, input VAT, payable to the supplier; clearing 2100 | **REQ-PART** | Build the purchase invoice on top of the existing GRN and journal (plan Phase 4) | — |
-| Purchase returns | Return voucher types in the program | None | Return to supplier: stock out at cost, debit note from the supplier | REQ-MISSING | Phase 4 | — |
-| Supplier accounts and balances | `FrmSupplier`, `OutStandingSummery.frx`, `OutstandingDetail.frx` | Supplier list only | Supplier ledger and balance | REQ-MISSING | Phase 4 | — |
-| Supplier payments | `FrmReceiptandpayment`, `CashReceipt_Payment.frx` | Expense payments exist, but not for suppliers | Pay supplier invoices (bank/till, partial) | REQ-MISSING | Phase 4, reusing the expense payment pattern | — |
-| Supplier ageing | `OutstandingAging.frx` | None | Ageing buckets by due date | REQ-MISSING | Phase 4 | — |
+| Purchase invoice entry | `FrmNewPurchase` (**31 days in 2025 logs**), `PurchaseInvoice.frx` | **Built 2026-11-06:** supplier invoice matched to goods receipts (or received with the invoice), input VAT, payable, price difference with a reason; Purchases tab | Printing the invoice | REQ-OK | — | purchasing.test, e2e |
+| Purchase returns | Return voucher types in the program | **Built:** return to supplier at average cost, supplier credit, VAT reversal | — | REQ-OK | — | purchasing.test |
+| Supplier accounts and balances | `FrmSupplier`, `OutStandingSummery.frx`, `OutstandingDetail.frx` | **Built:** balances, statement with running balance, opening balance per supplier; total = account 2000 (tested) | — | REQ-OK | — | purchasing.test, e2e |
+| Supplier payments | `FrmReceiptandpayment`, `CashReceipt_Payment.frx` | **Built:** bank or till (lowers the shift's expected cash), partial, never more than owed, idempotent, reversible (service; no reverse button on screen yet) | Reverse button on screen; supplier advances | REQ-PART | Small | purchasing.test, e2e |
+| Supplier ageing | `OutstandingAging.frx` | **Built:** not due / 1–30 / 31–60 / 61–90 / 90+, oldest settled first | — | REQ-OK | — | purchasing.test |
 | Purchase history and cost tracking | `ProductHistory.frx`, item history | Stock movements keep cost per movement; price history for selling prices | Last purchase cost per supplier, history screen | REQ-PART | Phase 4 | — |
 | Reorder voucher / low stock | `FrmReOrderVoucher`, `FrmReorderStockReport` | Low-stock report, dashboard count | Purchase order from low stock | REQ-PART | Phase 4 (optional PO) | stock report tests |
 
@@ -131,10 +131,10 @@ Status values:
 | Cash in/out register | `CashInOutRegister.frx`, `FrmCashInOut` | Cash in/out per shift (to suspense 2900), shift close over/short | — | REQ-OK | Accountant to map 2900 | services tests, e2e |
 | Income and expenditure | `IncomeExpenditure*.frx` | P&L by account | — | REQ-OK (as P&L) | — | — |
 | Cheque register | `Cheque_Report.frx`, `FrmChequeRegister` | None | — | UNKNOWN (Q-10) | Confirm | — |
-| Supplier ageing | `OutstandingAging.frx` | None | See B | REQ-MISSING | Phase 4 | — |
+| Supplier ageing | `OutstandingAging.frx` | Built (see B) | — | REQ-OK | — | purchasing.test |
 | Customer ageing | Same | None | See A (credit) | UNKNOWN (Q-1) | — | — |
 | Bank and cash accounts | Ledgers | 1010 cash, 1020 card clearing, 1030 bank | Card settlement to bank (1020 → 1030) and bank reconciliation | REQ-PART | Small (card settlement entry) | — |
-| VAT report | `TaxReport.frx`, `TaxReportNO2.frx` (Indian multi-rate layout), `FrmReportTaxDetails` | Output VAT and input VAT on the P&L screen | **VAT return report** (sales/purchases, standard/zero/exempt, adjustments, by period) | **REQ-MISSING** | Build after the purchase invoice (needs input VAT from purchases) | — |
+| VAT report | `TaxReport.frx`, `TaxReportNO2.frx` (Indian multi-rate layout), `FrmReportTaxDetails` | **Built:** VAT summary per period (sales/refunds at 15% and 0%, supplier invoices, returns, expenses), checked against the VAT accounts | Not the official return form; 0% cannot be split into zero-rated and exempt | REQ-PART (accountant files the return) | Accountant review | purchasing.test, e2e |
 | Salaries / salary slips | `FrmSalaryPayment`, `FrmSalarySlip` | Salaries as an expense category | Payroll | UNKNOWN (Q-11); recommend NOT in POS | Confirm | — |
 | Year ending | `Frmyearending` | None (no period close) | Period close, year-end close | REQ-MISSING | Plan Phase 3 | — |
 
@@ -227,4 +227,4 @@ See `docs/ZATCA_CONTINUITY_PLAN.md`.
 | Q-10 | Do you receive or issue cheques? | Cheque register not built |
 | Q-11 | Payroll in the POS, or only salaries as an expense? | Recommend expense only |
 | Q-12 | Did you use SMS or CRM features? | Assumed not |
-| — | Purchasing (supplier invoices, returns, payments, balances, ageing) and the VAT return report are **required** (31 days of purchase activity in 2025). **May I build them next (plan Phase 4)?** | Scope and cost |
+| — | Purchasing and the VAT summary: **built 2026-11-06** on the owner's go-ahead | — |
