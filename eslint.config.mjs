@@ -5,6 +5,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   { files: ['**/*.cjs'], rules: { '@typescript-eslint/no-require-imports': 'off' } },
   {
+    ignores: ['scripts/**'], // dev scripts (benchmark timings) are not money code
     rules: {
       // Money must never go through floating point helpers by accident.
       'no-restricted-properties': [
