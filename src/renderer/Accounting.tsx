@@ -65,6 +65,17 @@ export function Accounting() {
             <Tile l={t('Expenses still owed')} v={formatSar(k.expensesOutstanding)} />
             <Tile l={t('Products at/below reorder level')} v={String(k.lowStockCount)} />
           </div>
+          <h4>{t('Money position (right now)')}</h4>
+          <p className="ar" style={{ direction: 'inherit' }}>{t('Cash and bank is money the store has. Money customers owe is not cash until they pay; money owed to suppliers is not yet paid out.')}</p>
+          <div className="kpis">
+            <Tile l={t('Cash and bank (books)')} v={formatSar(k.cashAndBank)} />
+            <Tile l={t('Customers owe the store')} v={formatSar(k.receivablesOutstanding)} sub={t('{0} customers · overdue {1} · due soon {2}', k.customersWithBalance, formatSar(k.receivablesOverdue), formatSar(k.receivablesDueSoon))} />
+            <Tile l={t('Advances held for customers')} v={formatSar(k.customerAdvances)} />
+            <Tile l={t('Store owes suppliers')} v={formatSar(k.payablesOutstanding)} sub={t('{0} suppliers · overdue {1} · due soon {2}', k.suppliersWithBalance, formatSar(k.payablesOverdue), formatSar(k.payablesDueSoon))} />
+            <Tile l={t('Paid to suppliers in advance')} v={formatSar(k.supplierAdvances)} />
+            <Tile l={t('Customer payments received (period)')} v={formatSar(k.collectionsInPeriod)} />
+            <Tile l={t('Supplier payments made (period)')} v={formatSar(k.supplierPaymentsInPeriod)} />
+          </div>
         </>
       )}
 

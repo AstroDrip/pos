@@ -79,7 +79,7 @@ Status values:
 | Sales by cashier | `Daily_Sales_User.frx` | Cashier activity report | — | REQ-OK | — | phase1b/phase2 tests |
 | Invoice reprint and history | `FrmPrintInvoices`, `frmzatsearch` | Reprint of last receipt (audited); refund lookup by invoice number | **Search and reprint any past invoice** | REQ-PART | Invoice search and reprint screen (small) | — |
 | Customer loyalty points | `FrmCustomerCardPoint*` | None | — | UNKNOWN (Q-3) | Confirm | — |
-| Customer credit limits and outstanding | `FrmCreditLimit*`, `OutstandingAging.frx`, "By Credit" in the day summary | None | Customer accounts (AR) | UNKNOWN (Q-1) | Confirm; would be a scope change | — |
+| Customer credit limits and outstanding | `FrmCreditLimit*`, `OutstandingAging.frx`, "By Credit" in the day summary | **Built 2026-11-06:** credit sales, limits with override, payments with allocation, advances, statements, ageing | Owner confirmed by asking for it | REQ-OK | — | credit.test, e2e |
 | Kitchen tokens / KOT | `FrmToken`, `FrmShowToken` | None | — | NOT-USED (supermarket) | None | — |
 
 ### B. Purchasing and suppliers

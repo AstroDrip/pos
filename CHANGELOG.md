@@ -2,6 +2,37 @@
 
 Not for live trading: there is no ZATCA Phase 2 integration yet, and receipts are marked "NOT A ZATCA TAX INVOICE".
 
+## Unreleased — Customer and supplier credit (2026-11-06)
+
+Details: `docs/CREDIT_MANAGEMENT_IMPLEMENTATION_REPORT.md`. Accounting PROVISIONAL.
+
+### Added
+- **Credit sales at the till**, fully or partly paid:
+  - shows what the customer owes and what credit is still available;
+  - a supervisor PIN is needed over the limit;
+  - the receipt shows paid now and what remains.
+- **Customers tab:**
+  - account page with amounts, invoices with status, payment history, statement and credit settings;
+  - receive payments with an explicit split per invoice (oldest-first suggestion); any rest is kept as an advance, and a payment receipt prints;
+  - advances, reversals, disputes and write-offs;
+  - receivables ageing, including "no due date".
+- **Refunds on credit invoices** reduce the debt first.
+- **Supplier payments** are allocated to invoices. Also added:
+  - supplier advances;
+  - paying when the invoice is entered;
+  - no-due-date and arrangement notes;
+  - a payment reverse button;
+  - ageing by allocation.
+- **One status system:** icon + word + colour, in light and dark, used by customers, suppliers and expenses.
+- **Money position** on the owner overview and in the phone snapshot.
+- Migration 10. The `payments` table is rebuilt (copy verified) to allow the `account` tender.
+
+### Fixed during the work
+- New customers' credit form pre-ticked "No fixed limit".
+
+### Checks
+- 200 tests; e2e 29/29; red-green check of the refund rule.
+
 ## Unreleased — Purchasing and VAT summary (2026-11-06)
 
 ZAT Pro's logs show purchasing in use on 31 days in 2025, so it was required for the replacement. Posting rules are PROVISIONAL until the accountant approves.

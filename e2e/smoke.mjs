@@ -329,7 +329,7 @@ try {
     await form.locator('button:has-text("Post and pay by bank")').click();
     await page.waitForSelector('text=Expense posted and paid');
     await page.waitForSelector('td:has-text("Shop rent")');
-    assert.match(await page.locator('tr:has(td:has-text("Shop rent"))').innerText(), /1500\.00[\s\S]*1500\.00[\s\S]*paid/);
+    assert.match(await page.locator('tr:has(td:has-text("Shop rent"))').innerText(), /1500\.00[\s\S]*1500\.00[\s\S]*Paid/);
     await page.click('.top button:has-text("Accounting")');
     await page.waitForSelector('text=Profit and loss');
     const text = await page.locator('.page').innerText();
@@ -355,12 +355,65 @@ try {
     assert.match(await page.locator('tr:has(td:has-text("Farm Co"))').first().innerText(), /41\.40/);
     await page.locator('.card:has(h4:text("Pay a supplier")) select[aria-label="supplier"]').selectOption({ label: 'Farm Co' });
     await page.fill('input[aria-label="supplier pay amount"]', '41.40');
-    await page.click('button:has-text("Record payment")');
-    await page.waitForSelector('text=Payment recorded');
+    await page.click('[aria-label="pay supplier"] button:has-text("Suggest: oldest first")'); // payments are allocated to invoices
+    assert.equal(await page.locator('input[aria-label="apply PI-000001"]').inputValue(), '41.40');
+    await page.click('[aria-label="pay supplier"] button:has-text("Record payment")');
+    await page.waitForSelector('text=Payment SP-000001 recorded.');
     assert.equal(await page.locator('tr:has(td:has-text("Farm Co"))').count(), 0); // nothing owed any more
     await page.click('.top button:has-text("Accounting")');
     await page.waitForSelector('text=VAT summary');
     assert.match(await page.locator('h3:has-text("VAT summary")').innerText(), /matches the VAT accounts/);
+  });
+
+  await step('credit: owner enables a credit customer; till sale part paid, rest on account; customer pays the rest later', async () => {
+    await page.click('.top button:has-text("Customers")');
+    await page.locator('div:has(> label:text("New customer name")) input').fill('Ahmed');
+    await page.locator('div:has(> label:text-is("Phone")) input').fill('0500000001');
+    await page.click('button:has-text("Add customer")');
+    const acc = page.locator('[aria-label="customer account"]');
+    await acc.waitFor();
+    await acc.locator('label:has-text("Allowed to buy on credit") input').check();
+    await acc.locator('div:has(> label:text("Credit limit (SAR)")) input').fill('10');
+    await acc.locator('.card:has(h4:text("Credit settings")) label:has-text("No due date") input').uncheck(); // new customers start with no due date
+    await acc.locator('div:has(> label:text("Pay within (days)")) input').fill('30');
+    await acc.locator('button:has-text("Save credit settings")').click();
+    await page.waitForSelector('text=Saved');
+    // till: open a shift, scan water, attach Ahmed, pay 1.00 now, 1.50 on account
+    await page.click('.top button:has-text("Sell")');
+    await page.locator('form:has(h2:text("Open shift")) input').fill('0');
+    await page.click('button:has-text("Open shift")');
+    await page.waitForSelector('text=Scan, or type');
+    await page.waitForTimeout(600);
+    await page.keyboard.type('6281000000014', { delay: 5 });
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.total:has-text("2.50 SAR")');
+    await page.fill('input[placeholder="Customer phone (optional)"]', '0500000001');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('text=Credit customer: Ahmed');
+    await page.fill('input[aria-label="cash received"]', '1');
+    await page.waitForSelector('text=Paid now 1.00 · On account 1.50');
+    await page.click('button:has-text("Credit (rest on account)")');
+    await page.waitForSelector('text=SAVED INV-00000004');
+    await page.waitForTimeout(500);
+    const html = readFileSync(receipt, 'utf8');
+    assert.match(html, /Remaining on account/);
+    assert.match(html, /PARTIALLY PAID/);
+    // later: Ahmed pays the 1.50
+    await page.click('.top button:has-text("Customers")');
+    await page.fill('input[aria-label="customer search"]', 'Ahmed');
+    await page.locator('td:has-text("Ahmed")').first().click();
+    await acc.waitFor();
+    assert.match(await acc.locator('table.list').first().innerText(), /INV-00000004[\s\S]*1\.50[\s\S]*(Partially paid|Due soon)/);
+    await acc.locator('input[aria-label="payment amount"]').fill('1.50');
+    await acc.locator('button:has-text("Suggest: oldest first")').click();
+    await acc.locator('button:has-text("Record payment")').click();
+    await page.waitForSelector('text=Payment RC-000001 recorded.');
+    assert.match(await acc.locator('.kpi:has-text("Owed now")').innerText(), /0\.00/);
+    await page.waitForTimeout(500);
+    assert.match(readFileSync(receipt, 'utf8'), /PAYMENT RECEIPT[\s\S]*INV-00000004/);
+    await page.click('.top button:has-text("Accounting")');
+    await page.waitForSelector('text=Money position');
+    assert.match(await page.locator('.kpi:has-text("Customers owe the store")').innerText(), /0\.00/);
   });
 
   await step('Arabic UI switches to right-to-left and back', async () => {

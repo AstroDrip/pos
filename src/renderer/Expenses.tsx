@@ -4,6 +4,7 @@ import { storeDay } from '../core/store-time';
 import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, VatClass } from '../services/expenses';
 import { call } from './api';
 import { useI18n } from './i18n';
+import { StatusBadge } from './StatusBadge';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 const todayDay = () => storeDay(new Date().toISOString());
@@ -142,7 +143,7 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
           {rows.map((r) => (
             <tr key={r.id} onClick={() => setOpenId(r.id)} style={{ cursor: 'pointer' }} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOpenId(r.id)}>
               <td>{r.expenseNo}</td><td>{r.expenseDate}</td><td>{r.description}</td><td>{catName(r.categoryId)}</td><td>{r.payee}</td>
-              <td className="num">{formatSar(r.gross)}</td><td className="num">{formatSar(r.paid)}</td><td><span className={`tag ${r.payState}`}>{t(r.payState)}</span></td>
+              <td className="num">{formatSar(r.gross)}</td><td className="num">{formatSar(r.paid)}</td><td><StatusBadge status={r.payState} /></td>
             </tr>
           ))}
         </tbody>
@@ -352,7 +353,7 @@ function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: stri
   const e = d.expense;
   return (
     <div className="card" role="dialog" aria-label="expense detail" style={{ maxWidth: 720, margin: '16px 0' }}>
-      <h3>{e.expenseNo} · <span className={`tag ${e.payState}`}>{t(e.payState)}</span></h3>
+      <h3>{e.expenseNo} · <StatusBadge status={e.payState} /></h3>
       <table className="list"><tbody>
         <tr><td>{t('Description')}</td><td>{e.description}</td></tr>
         <tr><td>{t('Category')}</td><td>{t(e.category)}</td></tr>

@@ -33,7 +33,9 @@ function removeScannedText(el: HTMLInputElement, code: string) {
   el.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-export function Sell({ canDiscount }: { canDiscount: boolean }) {
+type CreditInfo = { id: number; creditEnabled: boolean; limit: number | null; outstanding: number; advance: number; available: number | null };
+
+export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean; canCredit?: boolean }) {
   const { t } = useI18n();
   const [shift, setShift] = useState<ShiftSummary | null | undefined>(undefined);
   const [float, setFloat] = useState('0');
@@ -47,6 +49,8 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [custSearch, setCustSearch] = useState('');
   const [approver, setApprover] = useState({ username: '', pin: '' });
+  const [creditApprover, setCreditApprover] = useState({ username: '', pin: '' });
+  const [credit, setCredit] = useState<CreditInfo | null>(null);
   // One key per bill: a retry after an error re-sends the same key, so it can never create a second sale.
   const billKey = useRef<string>(crypto.randomUUID());
   const scanner = useRef(new ScanBuffer());
@@ -85,6 +89,12 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   }, [step, busy, focusTick]);
 
   const loadHeld = () => call<HeldBill[]>('hold.list').then(setHeld);
+  // The customer's credit position, shown before any credit sale (balance, limit, what is still available).
+  useEffect(() => {
+    if (!customer || !canCredit) return setCredit(null);
+    call<CreditInfo[]>('credit.find', { text: String(customer.id) }).then((r) => setCredit(r.find((c) => c.id === customer.id) ?? null), () => setCredit(null));
+  }, [customer, canCredit, lastSaleId]);
+  const creditOverLimit = (amount: number) => credit !== null && credit.available !== null && amount > credit.available;
   useEffect(() => {
     void call<ShiftSummary | null>('shift.current').then(setShift);
     void loadHeld();
@@ -180,15 +190,26 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
     setCardPart('');
     setCustomer(null);
     setApprover({ username: '', pin: '' });
+    setCreditApprover({ username: '', pin: '' });
   };
 
-  const pay = async (tender: 'cash' | 'card') => {
+  const pay = async (tender: 'cash' | 'card' | 'credit') => {
     if (!totals || busyRef.current) return;
-    let payments: { tender: 'cash' | 'card'; amount: number }[];
+    let payments: { tender: 'cash' | 'card' | 'account'; amount: number }[];
     try {
       const card = cardPart.trim() ? parseSar(cardPart) : 0;
       if (tender === 'card') payments = [{ tender: 'card', amount: totals.totalIncl }];
-      else {
+      else if (tender === 'credit') {
+        // Credit sale: whatever is paid now (cash box, card part); the rest goes on the customer's account.
+        if (!customer) return setMsg({ kind: 'warn', text: t('Attach the customer first (phone box) to sell on credit.') });
+        const cashNow = cash.trim() ? parseSar(cash) : 0;
+        const onAccount = totals.totalIncl - cashNow - card;
+        if (onAccount <= 0) return setMsg({ kind: 'warn', text: t('Nothing is left to put on account. Use Cash or Card.') });
+        if (creditOverLimit(onAccount) && (!creditApprover.username || !creditApprover.pin)) {
+          return setMsg({ kind: 'warn', text: t('This goes over the credit limit. A supervisor must enter their name and PIN below.') });
+        }
+        payments = [...(cashNow > 0 ? [{ tender: 'cash' as const, amount: cashNow }] : []), ...(card > 0 ? [{ tender: 'card' as const, amount: card }] : []), { tender: 'account' as const, amount: onAccount }];
+      } else {
         // Cash, optionally with part of the bill on card ("split").
         const cashAmount = cash.trim() ? parseSar(cash) : totals.totalIncl - card;
         payments = [...(card > 0 ? [{ tender: 'card' as const, amount: card }] : []), ...(cashAmount > 0 ? [{ tender: 'cash' as const, amount: cashAmount }] : [])];
@@ -206,6 +227,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
         lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty, discount: l.discount || undefined, expectedUnitPrice: l.product.priceIncl, scanCode: l.scanCode })),
         payments,
         approver: needsApproval ? approver : undefined,
+        creditApprover: payments.some((p) => p.tender === 'account') && creditApprover.username ? creditApprover : undefined,
         customerId: customer?.id,
       });
       resetBill();
@@ -475,6 +497,38 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
             <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>{t('Card')} <span className="kbd">Ctrl+Enter</span></button>
           </div>
           {step === 'pay' && <small className="ar" style={{ direction: 'inherit' }}>{t('Card: record only after the bank terminal shows APPROVED.')} {t('Esc = back to the bill')}</small>}
+          {canCredit && customer && credit && (
+            <div className="msg" role="group" aria-label="credit sale" style={{ border: '1px solid var(--border)', marginTop: 8 }}>
+              {!credit.creditEnabled ? (
+                <span>{t('{0} is not set up for credit.', customer.name)}</span>
+              ) : (
+                <>
+                  <div>{t('Credit customer: {0}', customer.name)}</div>
+                  <div className="row" style={{ fontSize: 14 }}>
+                    <span>{t('Owes now')}: <strong>{formatSar(credit.outstanding)}</strong></span>
+                    <span>{t('Available')}: <strong>{credit.limit === null ? t('No fixed limit') : formatSar(Math.max(credit.available ?? 0, 0))}</strong></span>
+                  </div>
+                  {totals && (() => {
+                    let now = 0;
+                    try { now = (cash.trim() ? parseSar(cash) : 0) + (cardPart.trim() ? parseSar(cardPart) : 0); } catch { now = 0; }
+                    const onAcc = Math.max(totals.totalIncl - now, 0);
+                    return (
+                      <>
+                        <div style={{ fontSize: 14 }}>{t('Paid now {0} · On account {1}', formatSar(Math.min(now, totals.totalIncl)), formatSar(onAcc))}</div>
+                        {creditOverLimit(onAcc) && (
+                          <div className="row" style={{ marginTop: 4 }}>
+                            <input placeholder={t('Supervisor username')} aria-label="credit supervisor" value={creditApprover.username} onChange={(e) => setCreditApprover({ ...creditApprover, username: e.target.value })} />
+                            <input placeholder={t('PIN')} type="password" aria-label="credit supervisor pin" value={creditApprover.pin} onChange={(e) => setCreditApprover({ ...creditApprover, pin: e.target.value })} />
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <button className="primary" style={{ marginTop: 6, width: '100%' }} disabled={busy || !totals || lines.length === 0} onClick={() => pay('credit')}>{t('Credit (rest on account)')}</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
         <div className="row">
           <button disabled={busy || lines.length === 0} onClick={hold}>{t('Hold bill')}</button>

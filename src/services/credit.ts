@@ -523,3 +523,33 @@ export function creditControls(ctx: Ctx) {
 }
 
 export type { PostingLine };
+
+/** Customer payment receipt content, from the stored receipt only. */
+export function creditReceiptData(ctx: Ctx, receiptId: number) {
+  const r = ctx.db
+    .prepare(`SELECT c.receipt_no, c.created_at, c.amount, c.method, c.reference, c.customer_id, cu.name AS customer, u.display_name AS cashier
+              FROM customer_receipts c JOIN customers cu ON cu.id = c.customer_id JOIN users u ON u.id = c.user_id WHERE c.id = ?`)
+    .get(receiptId) as { receipt_no: string; created_at: string; amount: number; method: string; reference: string | null; customer_id: number; customer: string; cashier: string } | undefined;
+  if (!r) throw new DomainError('NOT_FOUND', 'Payment not found');
+  const allocations = ctx.db
+    .prepare('SELECT s.invoice_no AS invoiceNo, SUM(a.amount) AS amount FROM receipt_allocations a JOIN sales s ON s.id = a.sale_id WHERE a.receipt_id = ? GROUP BY a.sale_id HAVING SUM(a.amount) <> 0')
+    .all(receiptId) as { invoiceNo: string; amount: number }[];
+  const chk = creditCheck(ctx, r.customer_id, 0);
+  return {
+    kind: 'payment' as const,
+    invoiceNo: r.receipt_no,
+    uuid: '',
+    createdAt: r.created_at,
+    cashier: r.cashier,
+    customerName: r.customer,
+    allocations,
+    remainingOnAccount: chk.outstanding - chk.advance,
+    lines: [],
+    totalExcl: r.amount,
+    totalVat: 0,
+    totalIncl: r.amount,
+    totalDiscount: 0,
+    payments: [{ tender: r.method, amount: r.amount }],
+    changeGiven: 0,
+  };
+}

@@ -199,8 +199,12 @@ function getSaleResult(ctx: Ctx, saleId: number): Omit<SaleResult, 'replayed'> {
 }
 
 export interface ReceiptData {
-  /** 'refund' = credit note; invoiceNo then holds the credit note number. */
-  kind?: 'sale' | 'refund';
+  /** 'refund' = credit note; 'payment' = customer payment receipt. invoiceNo then holds that document's number. */
+  kind?: 'sale' | 'refund' | 'payment';
+  customerName?: string;
+  /** Credit sale: what is left on the customer's account after this bill. Payment receipt: balance still owed. */
+  remainingOnAccount?: number;
+  allocations?: { invoiceNo: string; amount: number }[];
   originalInvoiceNo?: string;
   reason?: string;
   approver?: string;
@@ -222,11 +226,12 @@ export function receiptData(ctx: Ctx, saleId: number): ReceiptData {
   const s = ctx.db
     .prepare(
       `SELECT s.invoice_no, s.uuid, s.created_at, u.display_name AS cashier, s.total_excl, s.total_vat, s.total_incl,
-              s.total_discount, s.change_given
-       FROM sales s JOIN users u ON u.id = s.user_id WHERE s.id = ?`,
+              s.total_discount, s.change_given, c.name AS customer_name,
+              (SELECT amount FROM receivables r WHERE r.sale_id = s.id) AS on_account
+       FROM sales s JOIN users u ON u.id = s.user_id LEFT JOIN customers c ON c.id = s.customer_id WHERE s.id = ?`,
     )
     .get(saleId) as
-    | { invoice_no: string; uuid: string; created_at: string; cashier: string; total_excl: number; total_vat: number; total_incl: number; total_discount: number; change_given: number }
+    | { invoice_no: string; uuid: string; created_at: string; cashier: string; total_excl: number; total_vat: number; total_incl: number; total_discount: number; change_given: number; customer_name: string | null; on_account: number | null }
     | undefined;
   if (!s) throw new DomainError('NOT_FOUND', 'Sale not found');
   return {
@@ -243,5 +248,7 @@ export function receiptData(ctx: Ctx, saleId: number): ReceiptData {
     totalDiscount: s.total_discount,
     payments: ctx.db.prepare('SELECT tender, amount FROM payments WHERE sale_id = ? ORDER BY id').all(saleId) as ReceiptData['payments'],
     changeGiven: s.change_given,
+    customerName: s.customer_name ?? undefined,
+    remainingOnAccount: s.on_account ?? undefined,
   };
 }

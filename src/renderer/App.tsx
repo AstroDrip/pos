@@ -5,6 +5,7 @@ import { call } from './api';
 import { LangToggle, useI18n } from './i18n';
 import { Accounting } from './Accounting';
 import { Expenses } from './Expenses';
+import { Customers } from './Customers';
 import { Products } from './Products';
 import { Purchases } from './Purchases';
 import { Refund } from './Refund';
@@ -15,11 +16,12 @@ import { Stock } from './Stock';
 import { ThemeSelect } from './theme';
 
 type Status = { needsSetup: boolean; user: User | null };
-type Tab = 'sell' | 'refund' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
+type Tab = 'sell' | 'refund' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
 
 const TABS: { id: Tab; label: string; perm?: string }[] = [
   { id: 'sell', label: 'Sell' },
   { id: 'refund', label: 'Refund' },
+  { id: 'customers', label: 'Customers', perm: 'customer.payment.record' },
   { id: 'stock', label: 'Stock', perm: 'stock.receive' },
   { id: 'products', label: 'Products', perm: 'product.manage' },
   { id: 'reports', label: 'Reports', perm: 'reports.view' },
@@ -83,11 +85,12 @@ export function App() {
         <button onClick={() => call('auth.logout').then(refresh)}>{t('Log out')}</button>
       </div>
       {can('reports.view') && <HealthBanner />}
-      {tab === 'sell' && <Sell canDiscount={can('sale.discount')} />}
+      {tab === 'sell' && <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} />}
       {tab === 'refund' && <Refund canApprove={can('sale.refund')} />}
       {tab === 'stock' && <Stock can={can} />}
       {tab === 'products' && <Products />}
       {tab === 'reports' && <Reports />}
+      {tab === 'customers' && <Customers can={can} />}
       {tab === 'purchases' && <Purchases can={can} />}
       {tab === 'expenses' && <Expenses can={can} />}
       {tab === 'accounting' && <Accounting />}

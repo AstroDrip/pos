@@ -99,5 +99,6 @@ See the task ledger (`docs/IMPLEMENTATION_TASK_LEDGER.md`) for the per-task stat
 | F Financial report integration | **VERIFIED, PROVISIONAL** | `services/financials.ts`, `renderer/Accounting.tsx` | — | reconciliation test (P&L = sales − refunds, COGS, BS balanced, TB balanced, GL, KPIs = P&L) | Accountant approval; no period close | 2026-11-05 |
 
 | G Purchasing + VAT summary | **VERIFIED, PROVISIONAL accounting** | `services/purchasing.ts`, `services/vat-report.ts`, `renderer/Purchases.tsx`, Accounting VAT section | 9 | `purchasing.test.ts` (12), permission matrix, e2e | Accountant approval; supplier-payment reverse button not on screen; purchase invoice printing | 2026-11-06 |
+| H Customer & supplier credit (AR/AP) | **VERIFIED, PROVISIONAL accounting** | `services/credit.ts`, `core/status.ts`, `services/purchasing.ts` (allocations), `renderer/Customers.tsx`, `StatusBadge.tsx`, Sell credit panel | 10 | `credit.test.ts` (17), permission matrix, e2e | Accountant approval; decisions C-1…C-7 | 2026-11-06 |
 
 Found and fixed during this work: BUG-015 (cost of units sold below zero stock), BUG-016 (default capital category), BUG-017/018 (keyboard focus). See `docs/audit/BUG_REGISTER.md`.

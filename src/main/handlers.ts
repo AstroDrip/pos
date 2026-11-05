@@ -24,6 +24,11 @@ import {
   supplierAgeing, supplierBalances, supplierStatement, uninvoicedGrns,
 } from '../services/purchasing';
 import { vatSummary } from '../services/vat-report';
+import {
+  applyCustomerAdvance, creditControls, creditReceiptData, customerAccount, customerStatement, findCreditCustomers, receivablesAgeing,
+  recordCustomerReceipt, reverseCustomerReceipt, setInvoiceDispute, suggestCustomerAllocation, updateCustomerCredit, writeOffInvoice,
+} from '../services/credit';
+import { applySupplierAdvance, setSupplierNotes, supplierAccount, supplierControls } from '../services/purchasing';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
 import { closeShift, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
@@ -113,7 +118,8 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'sale.finalize': (p, s) => {
       let discountApproverId: number | undefined;
       if (p.approver) discountApproverId = authenticate(ctx, p.approver.username, p.approver.pin).id;
-      return finalizeSale(ctx, userId(s), { idempotencyKey: p.idempotencyKey, lines: p.lines, payments: p.payments, discountApproverId, customerId: p.customerId });
+      const creditApproverId = p.creditApprover ? authenticate(ctx, p.creditApprover.username, p.creditApprover.pin).id : undefined;
+      return finalizeSale(ctx, userId(s), { idempotencyKey: p.idempotencyKey, lines: p.lines, payments: p.payments, discountApproverId, creditApproverId, customerId: p.customerId });
     },
     'sale.receipt': (p) => receiptData(ctx, p.saleId),
     'sale.print': async (p, s) => {
@@ -206,6 +212,31 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'purchase.register': (p, s) => purchaseRegister(ctx, userId(s), p.fromDay, p.toDay),
     'purchase.balances': (_p, s) => supplierBalances(ctx, userId(s)),
     'finance.vat': (p, s) => vatSummary(ctx, userId(s), p.fromDay, p.toDay),
+    'credit.find': (p, s) => findCreditCustomers(ctx, userId(s), p.text),
+    'credit.account': (p, s) => customerAccount(ctx, userId(s), p.customerId),
+    'credit.settings': (p, s) => updateCustomerCredit(ctx, userId(s), p),
+    'credit.receipt': (p, s) => recordCustomerReceipt(ctx, userId(s), p),
+    'credit.suggest': (p, s) => suggestCustomerAllocation(ctx, userId(s), p.customerId, p.amount),
+    'credit.applyAdvance': (p, s) => applyCustomerAdvance(ctx, userId(s), p.customerId, p.allocations),
+    'credit.reverseReceipt': (p, s) => reverseCustomerReceipt(ctx, userId(s), p.receiptId, p.requestKey, p.reason),
+    'credit.writeOff': (p, s) => writeOffInvoice(ctx, userId(s), p),
+    'credit.dispute': (p, s) => setInvoiceDispute(ctx, userId(s), p.saleId, p.disputed, p.note),
+    'credit.statement': (p, s) => customerStatement(ctx, userId(s), p.customerId),
+    'credit.ageing': (_p, s) => receivablesAgeing(ctx, userId(s)),
+    'credit.printReceipt': async (p, s) => {
+      requirePermission(ctx, userId(s), 'customer.payment.record');
+      const data = creditReceiptData(ctx, p.receiptId);
+      if (p.copy) appendAudit(ctx, { userId: userId(s), action: 'customer.receipt_reprint', entity: 'customer_receipt', entityId: p.receiptId, details: { receiptNo: data.invoiceNo } });
+      await printer.printReceipt(data, p.copy);
+      return null;
+    },
+    'credit.controls': (_p, s) => {
+      requirePermission(ctx, userId(s), 'finance.view');
+      return { customers: creditControls(ctx), suppliers: supplierControls(ctx) };
+    },
+    'purchase.account': (p, s) => supplierAccount(ctx, userId(s), p.supplierId),
+    'purchase.applyAdvance': (p, s) => applySupplierAdvance(ctx, userId(s), p.supplierId, p.allocations),
+    'purchase.notes': (p, s) => setSupplierNotes(ctx, userId(s), p.supplierId, p.notes),
     'dashboard.health': (_p, s) => {
       requirePermission(ctx, userId(s), 'settings.manage');
       return syncHealth(ctx);

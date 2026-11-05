@@ -28,6 +28,16 @@
   --badge-bad: #c4320a;
   --shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
   --disabled-opacity: 0.5;
+  /* financial status (core/status.ts): text colour on a soft background */
+  --st-paid: #0b6e4f; --st-paid-bg: #e3f4ec;
+  --st-partial: #8a5a00; --st-partial-bg: #fff4d6;
+  --st-unpaid: #9f3a38; --st-unpaid-bg: #fbeeed;
+  --st-overdue: #b42318; --st-overdue-bg: #fde0dd;
+  --st-duesoon: #b54708; --st-duesoon-bg: #fff0e3;
+  --st-nodue: #475467; --st-nodue-bg: #eef1f5;
+  --st-advance: #175cd3; --st-advance-bg: #e6efff;
+  --st-disputed: #6941c6; --st-disputed-bg: #f1ebff;
+  --st-reversed: #667085; --st-reversed-bg: #f2f4f7;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -57,6 +67,15 @@
   --badge-bad: #ff8a80;
   --shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
   --disabled-opacity: 0.45;
+  --st-paid: #5ad3a4; --st-paid-bg: #12332a;
+  --st-partial: #f5c76b; --st-partial-bg: #3a2e12;
+  --st-unpaid: #f0a6a0; --st-unpaid-bg: #33201f;
+  --st-overdue: #ff8a80; --st-overdue-bg: #4a1714;
+  --st-duesoon: #ffb366; --st-duesoon-bg: #3d2610;
+  --st-nodue: #b5bfcc; --st-nodue-bg: #252b34;
+  --st-advance: #84adff; --st-advance-bg: #182640;
+  --st-disputed: #c4a8ff; --st-disputed-bg: #2a1f45;
+  --st-reversed: #9aa1ad; --st-reversed-bg: #23272e;
 }
 :root {
   font: 16px/1.4 'Segoe UI', Tahoma, Arial, sans-serif;
@@ -135,3 +154,17 @@ h2, h3, h4 { color: var(--text); }
 ::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; border: 3px solid var(--bg); }
 ::-webkit-scrollbar-track { background: var(--bg); }
+
+/* status badges: icon + word; colour is a secondary cue */
+.st { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; white-space: nowrap; }
+.st-paid { color: var(--st-paid); background: var(--st-paid-bg); }
+.st-partial { color: var(--st-partial); background: var(--st-partial-bg); }
+.st-unpaid { color: var(--st-unpaid); background: var(--st-unpaid-bg); }
+.st-overdue { color: var(--st-overdue); background: var(--st-overdue-bg); border-width: 2px; }
+.st-due_soon { color: var(--st-duesoon); background: var(--st-duesoon-bg); }
+.st-no_due { color: var(--st-nodue); background: var(--st-nodue-bg); }
+.st-advance, .st-overpaid { color: var(--st-advance); background: var(--st-advance-bg); }
+.st-disputed { color: var(--st-disputed); background: var(--st-disputed-bg); }
+.st-reversed, .st-draft { color: var(--st-reversed); background: var(--st-reversed-bg); }
+.legend summary { cursor: pointer; color: var(--text-2); font-size: 13px; margin: 6px 0; }
+.amounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
