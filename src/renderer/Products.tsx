@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { formatSar, parseSar } from '../core/money';
 import type { Product } from '../services/catalog';
 import { call } from './api';
+import { PageHeader } from './PageHeader';
 import { ProductName, useI18n } from './i18n';
 
 const empty = { sku: '', nameAr: '', nameEn: '', sellMode: 'unit' as 'unit' | 'weight', vat: '15', price: '', barcode: '', plu: '' };
@@ -43,8 +44,10 @@ export function Products() {
   };
 
   return (
-    <div className="page row" style={{ alignItems: 'flex-start' }}>
-      <form className="card" style={{ margin: 0 }} onSubmit={save}>
+    <div className="page">
+      <PageHeader title={t('Products')} desc={t('Add products, change prices, other names for search, deactivate.')} />
+      <div className="grid-cards">
+      <form className="card" onSubmit={save}>
         <h3>{t('New product')}</h3>
         <label>SKU</label><input value={form.sku} onChange={set('sku')} />
         <label>{t('Name (Arabic)')}</label><input dir="rtl" value={form.nameAr} onChange={set('nameAr')} />
@@ -79,6 +82,7 @@ export function Products() {
         </table>
         {editing && <EditProduct key={editing.id} product={editing} onDone={() => { setEditing(null); void load(search); }} />}
       </div>
+      </div>
     </div>
   );
 }
@@ -100,7 +104,7 @@ function EditProduct({ product, onDone }: { product: Product; onDone: () => void
     }
   };
   return (
-    <div className="card" style={{ margin: '12px 0' }}>
+    <div className="card section">
       <h3>{product.nameEn} · {product.sku}</h3>
       <label>{product.sellMode === 'weight' ? t('Shelf price incl. VAT (SAR per kg)') : t('Shelf price incl. VAT (SAR)')}</label>
       <div className="row">

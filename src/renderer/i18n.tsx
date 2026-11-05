@@ -647,6 +647,26 @@ const AR: Record<string, string> = {
   'What do the statuses mean?': 'ماذا تعني الحالات؟',
   'A credit sale needs a customer': 'البيع الآجل يحتاج عميلاً',
   'Type a credit limit, or tick "No fixed limit" for a trusted customer.': 'اكتب حد الائتمان، أو اختر "بدون حد ثابت" لعميل موثوق.',
+  // UI polish
+  'Owner overview, profit and loss, balance sheet and ledgers (provisional until the accountant approves).': 'نظرة المالك والأرباح والخسائر والميزانية ودفاتر الأستاذ (مبدئية حتى يعتمدها المحاسب).',
+  'Backups, users, suppliers, imports and device settings.': 'النسخ الاحتياطي والمستخدمون والموردون والاستيراد وإعدادات الأجهزة.',
+  'Credit accounts: what each customer owes, payments, statements.': 'حسابات الآجل: مستحق كل عميل والدفعات والكشوف.',
+  'Last purchase': 'آخر شراء',
+  'Rent, bills, salaries and other store costs: owed, paid and overdue.': 'الإيجار والفواتير والرواتب وتكاليف المتجر الأخرى: المستحق والمدفوع والمتأخر.',
+  'No expenses in this period. Use New expense to add one.': 'لا توجد مصروفات في هذه الفترة. استخدم مصروف جديد لإضافة واحد.',
+  'No recurring expenses yet.': 'لا توجد مصروفات متكررة بعد.',
+  'Add products, change prices, other names for search, deactivate.': 'إضافة الأصناف وتغيير الأسعار والأسماء البديلة للبحث والإيقاف.',
+  'Supplier invoices, returns, what the store owes and payments.': 'فواتير الموردين والمرتجعات والمستحق والدفعات.',
+  'Find the sale by its receipt number, choose what comes back, pay the cash.': 'ابحث عن البيع برقم الإيصال، اختر ما يُرجع، وادفع النقد.',
+  'Sales, refunds, cashiers and stock changes for any dates (Saudi time).': 'المبيعات والمرتجعات والكاشير وتغيرات المخزون لأي تاريخ (بتوقيت السعودية).',
+  'No refunds in these dates.': 'لا توجد مرتجعات في هذه التواريخ.',
+  'No wastage or count differences in these dates.': 'لا يوجد هدر أو فروقات جرد في هذه التواريخ.',
+  'Nothing was removed from a bill in these dates.': 'لم تُحذف أصناف من أي فاتورة في هذه التواريخ.',
+  'Customer (optional)': 'العميل (اختياري)',
+  'Receive deliveries, record wastage, count the shelves.': 'استلام التوريدات وتسجيل الهدر وجرد الرفوف.',
+  'Nothing is at or below its reorder level.': 'لا يوجد صنف عند حد إعادة الطلب أو أقل.',
+  'No products yet.': 'لا توجد أصناف بعد.',
+  '{0} draft expense(s) in this period are not posted yet': '{0} مصروف (مسودة) في هذه الفترة لم يُرحّل بعد',
   // appearance
   Appearance: 'المظهر',
   Light: 'فاتح',
@@ -730,7 +750,7 @@ export function ProductName({ en, ar }: { en: string; ar: string }) {
   return (
     <>
       {main}
-      <div className="ar" dir={subDir}>{sub}</div>
+      <div className="sub-name" dir={subDir}>{sub}</div>
     </>
   );
 }

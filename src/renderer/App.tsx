@@ -18,18 +18,19 @@ import { ThemeSelect } from './theme';
 type Status = { needsSetup: boolean; user: User | null };
 type Tab = 'sell' | 'refund' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
 
-const TABS: { id: Tab; label: string; perm?: string }[] = [
-  { id: 'sell', label: 'Sell' },
-  { id: 'refund', label: 'Refund' },
-  { id: 'customers', label: 'Customers', perm: 'customer.payment.record' },
-  { id: 'stock', label: 'Stock', perm: 'stock.receive' },
-  { id: 'products', label: 'Products', perm: 'product.manage' },
-  { id: 'reports', label: 'Reports', perm: 'reports.view' },
-  { id: 'purchases', label: 'Purchases', perm: 'purchase.view' },
-  { id: 'expenses', label: 'Expenses', perm: 'expense.view' },
-  { id: 'accounting', label: 'Accounting', perm: 'finance.view' },
-  { id: 'shift', label: 'Shift' },
-  { id: 'admin', label: 'Admin', perm: 'backup.run' },
+// Grouped by workflow: till · goods · money · day and settings. A thin separator is drawn between groups.
+const TABS: { id: Tab; label: string; perm?: string; group: number }[] = [
+  { id: 'sell', label: 'Sell', group: 1 },
+  { id: 'refund', label: 'Refund', group: 1 },
+  { id: 'customers', label: 'Customers', perm: 'customer.payment.record', group: 1 },
+  { id: 'stock', label: 'Stock', perm: 'stock.receive', group: 2 },
+  { id: 'products', label: 'Products', perm: 'product.manage', group: 2 },
+  { id: 'purchases', label: 'Purchases', perm: 'purchase.view', group: 2 },
+  { id: 'expenses', label: 'Expenses', perm: 'expense.view', group: 3 },
+  { id: 'accounting', label: 'Accounting', perm: 'finance.view', group: 3 },
+  { id: 'reports', label: 'Reports', perm: 'reports.view', group: 3 },
+  { id: 'shift', label: 'Shift', group: 4 },
+  { id: 'admin', label: 'Admin', perm: 'backup.run', group: 4 },
 ];
 
 export function App() {
@@ -62,7 +63,7 @@ export function App() {
   if (!status.user) {
     return (
       <>
-        <div className="top"><strong>POS</strong><span className="spacer" /><ThemeSelect /><LangToggle /></div>
+        <div className="top"><strong className="brand">POS</strong><span className="spacer" /><div className="utils"><ThemeSelect /><LangToggle /></div></div>
         <Login onDone={refresh} />
       </>
     );
@@ -73,16 +74,22 @@ export function App() {
   return (
     <>
       <div className="top">
-        <strong>POS</strong>
-        {TABS.filter((tb) => !tb.perm || can(tb.perm)).map((tb) => (
-          <button key={tb.id} className={tab === tb.id ? 'active' : ''} onClick={() => setTab(tb.id)}>{t(tb.label)}</button>
-        ))}
-        <span className="spacer" />
-        <BackupBadge />
-        <ThemeSelect />
-        <LangToggle />
-        <span>{user.displayName}</span>
-        <button onClick={() => call('auth.logout').then(refresh)}>{t('Log out')}</button>
+        <strong className="brand">POS</strong>
+        <nav aria-label="main">
+          {TABS.filter((tb) => !tb.perm || can(tb.perm)).map((tb, i, shown) => (
+            <span key={tb.id} style={{ display: 'contents' }}>
+              {i > 0 && shown[i - 1]!.group !== tb.group && <span className="sep" aria-hidden="true" />}
+              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => setTab(tb.id)}>{t(tb.label)}</button>
+            </span>
+          ))}
+        </nav>
+        <div className="utils">
+          <BackupBadge />
+          <ThemeSelect />
+          <LangToggle />
+          <span className="who" title={user.displayName}>{user.displayName}</span>
+          <button onClick={() => call('auth.logout').then(refresh)}>{t('Log out')}</button>
+        </div>
       </div>
       {can('reports.view') && <HealthBanner />}
       {tab === 'sell' && <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} />}
@@ -106,7 +113,7 @@ function HealthBanner() {
   const [h, setH] = useState<{ auditChainOk: boolean; firstBrokenAuditId: number | null } | null>(null);
   useEffect(() => void call<typeof h>('system.health').then(setH, () => setH(null)), []);
   if (!h || h.auditChainOk) return null;
-  return <div className="msg error" style={{ margin: 8 }}>{t('WARNING: the audit log has been altered outside the app (first bad record #{0}). Keep a copy of the database and contact support.', h.firstBrokenAuditId ?? '?')}</div>;
+  return <div className="msg error" style={{ margin: 'var(--sp-2) var(--sp-4) 0' }}>{t('WARNING: the audit log has been altered outside the app (first bad record #{0}). Keep a copy of the database and contact support.', h.firstBrokenAuditId ?? '?')}</div>;
 }
 
 /** Always-visible backup state (plan §J): green under 24 h, amber older, red never/failed. */
@@ -124,7 +131,7 @@ function BackupBadge() {
   const ageH = last ? (Date.now() - Date.parse(last.at)) / 3_600_000 : Infinity;
   const cls = s.lastFailure || !last ? 'badge-bad' : ageH > 24 ? 'badge-warn' : 'badge-ok';
   const text = !s.keyConfigured ? t('Backup not set up') : last ? (ageH < 1 ? t('Backup less than 1h ago (local only)') : t('Backup {0}h ago (local only)', Math.floor(ageH))) : t('No backup yet');
-  return <span className={cls} style={{ marginInlineEnd: 12 }} title={s.lastFailure?.error}>● {text}</span>;
+  return <span className={`backup ${cls}`} title={s.lastFailure?.error ?? text}><span className="dot" aria-hidden="true" />{text}</span>;
 }
 
 function Login({ setup = false, onDone }: { setup?: boolean; onDone: () => void }) {

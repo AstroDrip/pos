@@ -4,6 +4,7 @@ import type { Product } from '../services/catalog';
 import type { Supplier } from '../services/parties';
 import type { StockRow } from '../services/reports';
 import { call } from './api';
+import { EmptyRow, PageHeader } from './PageHeader';
 import { ProductName, useI18n } from './i18n';
 
 interface GrnLine {
@@ -59,9 +60,11 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   };
 
   return (
-    <div className="page row" style={{ alignItems: 'flex-start' }}>
+    <div className="page">
+      <PageHeader title={t('Stock')} desc={t('Receive deliveries, record wastage, count the shelves.')} />
+      <div className="grid-cards">
       {can('stock.receive') && (
-        <div className="card" style={{ margin: 0, maxWidth: 560 }}>
+        <div className="card section">
           <h3>{t('Receive goods')}</h3>
           <label>{t('Supplier')}</label>
           <select value={supplierId} onChange={(e) => setSupplierId(Number(e.target.value))}>
@@ -103,20 +106,22 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
       {can('reports.view') && (
         <div>
           <h3>{t('Stock on hand')}</h3>
-          <label><input type="checkbox" style={{ width: 'auto' }} checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> {t('Only at or below reorder level')}</label>
+          <label><input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> {t('Only at or below reorder level')}</label>
           <table className="list">
             <thead><tr><th>SKU</th><th>{t('Product')}</th><th className="num">{t('Qty')}</th><th className="num">{t('Reorder at')}</th><th className="num">{t('Avg cost')}</th></tr></thead>
             <tbody>
+              {rows.length === 0 && <EmptyRow cols={5} text={onlyLow ? t('Nothing is at or below its reorder level.') : t('No products yet.')} />}
               {rows.map((r) => (
-                <tr key={r.productId} style={r.qty < 0 ? { color: 'var(--danger)' } : undefined}>
+                <tr key={r.productId}>
                   <td>{r.sku}</td><td><ProductName en={r.nameEn} ar={r.nameAr} /></td>
-                  <td className="num">{formatQty(r.qty)}</td><td className="num">{formatQty(r.reorderLevel)}</td><td className="num">{formatSar(r.avgCost)}</td>
+                  <td className={`num${r.qty < 0 ? ' neg' : ''}`}>{formatQty(r.qty)}</td><td className="num">{formatQty(r.reorderLevel)}</td><td className="num">{formatSar(r.avgCost)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -179,7 +184,7 @@ function AdjustCard({ kind, onDone }: { kind: 'waste' | 'count'; onDone: () => v
   };
 
   return (
-    <div className="card" style={{ margin: '0 0 12px 0', maxWidth: 480 }}>
+    <div className="card section">
       <h3>{kind === 'waste' ? t('Record wastage') : t('Stock count')}</h3>
       {kind === 'count' && <p style={{ opacity: 0.8 }}>{t('Count when the shop is closed. Enter what is on the shelf; stock is set to it.')}</p>}
       <label>{t('Reason')}</label>

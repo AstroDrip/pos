@@ -17,6 +17,8 @@ Only commands that were actually run are recorded here.
 | 2026-11-06 | `feature/owner-tools` (credit) | `npx vitest run` | 19 files, **200 passed**, 0 failed |
 | 2026-11-06 | `feature/owner-tools` (credit) | `node e2e/smoke.mjs` | **29/29** |
 | 2026-11-06 | red-green | refund offset disabled on purpose → credit test fails; restored → passes | confirmed |
+| 2026-11-06 | `feature/owner-tools` (UI polish) | typecheck / lint / vitest / e2e | 0 / 0 / **200 passed** / **29/29** |
+| 2026-11-06 | UI polish | `node scripts/ui-shots.mjs` before and after | 45 + 45 screenshots in `ui-shots/` (not committed) |
 
 Earlier during T2–T4 the e2e scanner step failed twice on the first run straight after a build. Playwright's 5 ms "scanner"
 keystrokes arrived slower than the 35 ms burst limit while the app was still warming up. It passed on every later run,

@@ -421,7 +421,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             onEmptyKey={(e) => onStepKey('search', e)}
             onFocusBox={() => goStep('search', false)}
           />
-          <small className="ar" style={{ direction: 'inherit' }}>{t('Empty box: Enter = payment · + = one more of the last item')}</small>
+          <small className="hint">{t('Empty box: Enter = payment · + = one more of the last item')}</small>
         </div>
         {step === 'qty' && pending && (
           <div className="step current" role="group" aria-label="quantity step">
@@ -440,7 +440,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
               }, 200)}
             />
             {pending.error && <div className="msg error">{t(pending.error)}</div>}
-            <small className="ar" style={{ direction: 'inherit' }}>{t('Enter = add · + = one more · Esc = cancel')}</small>
+            <small className="hint">{t('Enter = add · + = one more · Esc = cancel')}</small>
           </div>
         )}
         <div className="row">
@@ -448,15 +448,18 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             <span>{t('Customer:')} <strong>{customer.name}</strong> <button onClick={() => setCustomer(null)}>✕</button></span>
           ) : (
             <form onSubmit={(e) => { e.preventDefault(); if (custSearch.trim()) void findCustomer(); }} className="row">
-              <input placeholder={t('Customer phone (optional)')} value={custSearch} onChange={(e) => setCustSearch(e.target.value)} />
+              <div style={{ width: '100%' }}>
+                <label htmlFor="customer-phone" style={{ marginTop: 0 }}>{t('Customer (optional)')}</label>
+                <input id="customer-phone" placeholder={t('Customer phone (optional)')} value={custSearch} onChange={(e) => setCustSearch(e.target.value)} />
+              </div>
             </form>
           )}
         </div>
         <div>
           {totals ? (
             <>
-              <div className="row"><span>{t('Excl. VAT')}</span><span className="num">{formatSar(totals.totalExcl)}</span></div>
-              <div className="row"><span>{t('VAT')}</span><span className="num">{formatSar(totals.totalVat)}</span></div>
+              <div className="totals-line"><span>{t('Excl. VAT')}</span><span className="num">{formatSar(totals.totalExcl)}</span></div>
+              <div className="totals-line"><span>{t('VAT')}</span><span className="num">{formatSar(totals.totalVat)}</span></div>
               {hasDiscount && <div className="row"><span>{t('Discount')}</span><span className="num">-{formatSar(totals.totalDiscount)}</span></div>}
               <div className="total">{formatSar(totals.totalIncl)} {t('SAR')}</div>
             </>
@@ -496,7 +499,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>{t('Cash')} <span className="kbd">Enter</span></button>
             <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>{t('Card')} <span className="kbd">Ctrl+Enter</span></button>
           </div>
-          {step === 'pay' && <small className="ar" style={{ direction: 'inherit' }}>{t('Card: record only after the bank terminal shows APPROVED.')} {t('Esc = back to the bill')}</small>}
+          {step === 'pay' && <small className="hint">{t('Card: record only after the bank terminal shows APPROVED.')} {t('Esc = back to the bill')}</small>}
           {canCredit && customer && credit && (
             <div className="msg" role="group" aria-label="credit sale" style={{ border: '1px solid var(--border)', marginTop: 8 }}>
               {!credit.creditEnabled ? (

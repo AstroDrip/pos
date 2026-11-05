@@ -6,6 +6,7 @@ import type { Supplier } from '../services/parties';
 import type { AgeingRow, StatementLine, SupplierAccount, UninvoicedGrn } from '../services/purchasing';
 import { StatusBadge, StatusLegend } from './StatusBadge';
 import { call } from './api';
+import { PageHeader } from './PageHeader';
 import { ProductName, useI18n } from './i18n';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -34,11 +35,17 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
   ];
   return (
     <div className="page">
-      <div className="row" style={{ maxWidth: 900, flexWrap: 'wrap' }}>
-        {tabs.filter((x) => x.show).map((x) => (
-          <button key={x.id} className={section === x.id ? 'primary' : ''} onClick={() => setSection(x.id)}>{t(x.label)}</button>
-        ))}
-      </div>
+      <PageHeader
+        title={t('Purchases')}
+        desc={t('Supplier invoices, returns, what the store owes and payments.')}
+        actions={
+          <div className="seg" role="group" aria-label="purchases section">
+            {tabs.filter((x) => x.show).map((x) => (
+              <button key={x.id} className={section === x.id ? 'on' : ''} onClick={() => setSection(x.id)}>{t(x.label)}</button>
+            ))}
+          </div>
+        }
+      />
       <p className="msg warn" style={{ maxWidth: 900 }}>{t('Purchase accounting is provisional until your accountant approves it.')}</p>
       {section === 'invoice' && <InvoiceForm suppliers={suppliers} />}
       {section === 'return' && <ReturnForm suppliers={suppliers} />}
@@ -107,9 +114,9 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
   };
 
   return (
-    <div className="card" style={{ maxWidth: 820, margin: '8px 0' }}>
+    <div className="card section">
       <h3>{t('Enter a supplier invoice')}</h3>
-      <p className="ar" style={{ direction: 'inherit' }}>{t('Receive the goods first (Stock tab), then match the receipts to the supplier invoice here.')}</p>
+      <p className="hint">{t('Receive the goods first (Stock tab), then match the receipts to the supplier invoice here.')}</p>
       <label>{t('Supplier')}</label>
       <SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} />
       {supplierId > 0 && (
@@ -118,7 +125,7 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
           {grns.length === 0 ? <p>{t('None for this supplier.')}</p> : (
             <table className="list"><tbody>{grns.map((g) => (
               <tr key={g.grnId}>
-                <td><input type="checkbox" aria-label={`grn ${g.grnNo}`} style={{ width: 'auto' }} checked={picked.includes(g.grnId)} onChange={(e) => setPicked(e.target.checked ? [...picked, g.grnId] : picked.filter((x) => x !== g.grnId))} /></td>
+                <td><input type="checkbox" aria-label={`grn ${g.grnNo}`} checked={picked.includes(g.grnId)} onChange={(e) => setPicked(e.target.checked ? [...picked, g.grnId] : picked.filter((x) => x !== g.grnId))} /></td>
                 <td>{g.grnNo}</td><td>{g.reference}</td><td>{new Date(g.receivedAt).toLocaleDateString()}</td><td className="num">{formatSar(g.totalCost)}</td>
               </tr>
             ))}</tbody></table>
@@ -135,15 +142,15 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
               <label>{t('VAT on invoice (SAR)')}</label>
               <div className="row">
                 <input aria-label="invoice vat" value={f.vat} onChange={(e) => setF({ ...f, vat: e.target.value })} />
-                <button type="button" style={{ flex: '0 0 auto' }} disabled={!(net > 0)} title={t('Suggests 15% of the net. Check it against the invoice.')} onClick={() => setF({ ...f, vat: formatSar(roundDiv(net * 15, 100)) })}>15%</button>
+                <button type="button" disabled={!(net > 0)} title={t('Suggests 15% of the net. Check it against the invoice.')} onClick={() => setF({ ...f, vat: formatSar(roundDiv(net * 15, 100)) })}>15%</button>
               </div>
             </div>
           </div>
-          <label><input type="checkbox" style={{ width: 'auto' }} checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('Input VAT is recoverable (tax invoice with supplier VAT number)')}</label>
+          <label><input type="checkbox" checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('Input VAT is recoverable (tax invoice with supplier VAT number)')}</label>
           <p>{t('Goods received (cost): {0} · Invoice net: {1} · Difference: {2}', formatSar(goods), Number.isNaN(net) ? '—' : formatSar(net), formatSar(diff))}</p>
           {diff !== 0 && <><label>{t('Reason for the difference')}</label><input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></>}
           <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label style={{ flex: '0 0 auto' }}><input type="checkbox" style={{ width: 'auto' }} checked={f.noDue} onChange={(e) => setF({ ...f, noDue: e.target.checked })} /> {t('No due date (informal credit)')}</label>
+            <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noDue} onChange={(e) => setF({ ...f, noDue: e.target.checked })} /> {t('No due date (informal credit)')}</label>
             <div style={{ flex: 2 }}><label>{t('Arrangement (e.g. supplier collects at the next delivery)')}</label><input value={f.arrangement} onChange={(e) => setF({ ...f, arrangement: e.target.value })} /></div>
           </div>
           <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -192,7 +199,7 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
     }
   };
   return (
-    <div className="card" style={{ maxWidth: 820, margin: '8px 0' }}>
+    <div className="card section">
       <h3>{t('Return goods to a supplier')}</h3>
       <label>{t('Supplier')}</label>
       <SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} />
@@ -217,7 +224,7 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
         <div><label>{t('Credit net, excl. VAT (SAR)')}</label><input value={f.net} onChange={(e) => setF({ ...f, net: e.target.value })} /></div>
         <div><label>{t('VAT on the credit (SAR)')}</label><input value={f.vat} onChange={(e) => setF({ ...f, vat: e.target.value })} /></div>
       </div>
-      <label><input type="checkbox" style={{ width: 'auto' }} checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('The VAT was claimed as input VAT (reverse it)')}</label>
+      <label><input type="checkbox" checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('The VAT was claimed as input VAT (reverse it)')}</label>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       <p><button className="primary" disabled={busy || !supplierId || lines.length === 0 || lines.some((l) => !l.qty.trim()) || !f.reason.trim()} onClick={save}>{t('Save return')}</button></p>
     </div>
@@ -276,14 +283,14 @@ function Balances({ suppliers, can }: { suppliers: Supplier[]; can: (p: string) 
       )}
       {can('purchase.pay') && <SupplierPay suppliers={suppliers} onDone={(m) => { setMsg(m); void load(); }} />}
       {can('purchase.manage') && (
-        <div className="card" style={{ maxWidth: 820, margin: '12px 0' }}>
+        <div className="card section">
           <h4>{t('Opening balance (what you owed on day one)')}</h4>
           <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div><label>{t('Supplier')}</label><SupplierSelect suppliers={suppliers} value={ob.supplierId} onChange={(id) => setOb({ ...ob, supplierId: id })} /></div>
             <div><label>{t('Amount (SAR)')}</label><input value={ob.amount} onChange={(e) => setOb({ ...ob, amount: e.target.value })} /></div>
             <div><label>{t('As of')}</label><input type="date" value={ob.date} onChange={(e) => setOb({ ...ob, date: e.target.value })} /></div>
             <div><label>{t('Reference')}</label><input value={ob.ref} onChange={(e) => setOb({ ...ob, ref: e.target.value })} /></div>
-            <button style={{ flex: '0 0 auto' }} disabled={busy || !ob.supplierId || !(sar(ob.amount) > 0)}
+            <button disabled={busy || !ob.supplierId || !(sar(ob.amount) > 0)}
               onClick={() => act(() => call('purchase.opening', { supplierId: ob.supplierId, amount: sar(ob.amount), asOf: ob.date, reference: ob.ref || undefined }), t('Opening balance saved'))}>
               {t('Save opening balance')}
             </button>
@@ -305,7 +312,7 @@ function Ageing() {
   return (
     <div style={{ maxWidth: 900 }}>
       <div style={{ maxWidth: 220 }}><label>{t('As of')}</label><input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></div>
-      <p className="ar" style={{ direction: 'inherit' }}>{t('Payments and returns settle the oldest invoices first.')}</p>
+      <p className="hint">{t('Payments and returns settle the oldest invoices first.')}</p>
       <table className="list">
         <thead><tr><th>{t('Supplier')}</th>{cols.map(([k, l]) => <th key={k} className="num">{t(l)}</th>)}</tr></thead>
         <tbody>
@@ -365,11 +372,11 @@ function ReverseButton({ paymentId, onDone }: { paymentId: number; onDone: () =>
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [err, setErr] = useState('');
-  if (!open) return <button style={{ padding: '2px 8px' }} onClick={() => setOpen(true)}>{t('Reverse')}</button>;
+  if (!open) return <button onClick={() => setOpen(true)}>{t('Reverse')}</button>;
   return (
     <span className="row" style={{ display: 'inline-flex', gap: 4 }}>
       <input placeholder={t('Why is this payment being reversed?')} value={reason} onChange={(e) => setReason(e.target.value)} style={{ width: 200 }} />
-      <button className="danger" style={{ padding: '2px 8px' }} disabled={!reason.trim()} onClick={async () => {
+      <button className="danger" disabled={!reason.trim()} onClick={async () => {
         try {
           await call('purchase.reversePayment', { paymentId, requestKey: crypto.randomUUID(), reason });
           setOpen(false);
@@ -452,7 +459,7 @@ function SupplierPay({ suppliers, onDone }: { suppliers: Supplier[]; onDone: (m:
     }
   };
   return (
-    <div className="card" role="group" aria-label="pay supplier" style={{ maxWidth: 900, margin: '12px 0' }}>
+    <div className="card section" role="group" aria-label="pay supplier" style={{ marginTop: 'var(--sp-4)' }}>
       <h4>{t('Pay a supplier')}</h4>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div><label>{t('Supplier')}</label><SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} /></div>
@@ -460,7 +467,7 @@ function SupplierPay({ suppliers, onDone }: { suppliers: Supplier[]; onDone: (m:
         <div><label>{t('From')}</label><select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value as 'bank' | 'till' })}><option value="bank">{t('Bank')}</option><option value="till">{t('Till cash (open shift)')}</option></select></div>
         <div><label>{t('Payment date')}</label><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
         <div><label>{t('Reference')}</label><input value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} /></div>
-        <button style={{ flex: '0 0 auto' }} disabled={!(amt > 0) || open.length === 0} onClick={suggest}>{t('Suggest: oldest first')}</button>
+        <button disabled={!(amt > 0) || open.length === 0} onClick={suggest}>{t('Suggest: oldest first')}</button>
       </div>
       {open.length > 0 && (
         <table className="list">
@@ -472,7 +479,7 @@ function SupplierPay({ suppliers, onDone }: { suppliers: Supplier[]; onDone: (m:
         </table>
       )}
       <p>{t('Applied to invoices: {0} · Not applied: {1}', formatSar(allocated), formatSar(Math.max(leftover, 0)))}</p>
-      {leftover > 0 && <label><input type="checkbox" style={{ width: 'auto' }} checked={f.advance} onChange={(e) => setF({ ...f, advance: e.target.checked })} /> {t('Record the rest as an advance to this supplier')}</label>}
+      {leftover > 0 && <label><input type="checkbox" checked={f.advance} onChange={(e) => setF({ ...f, advance: e.target.checked })} /> {t('Record the rest as an advance to this supplier')}</label>}
       {err && <p className="msg error">{err}</p>}
       <p><button className="primary" disabled={busy || !supplierId || !(amt > 0) || bad} onClick={save}>{t('Record payment')}</button></p>
     </div>

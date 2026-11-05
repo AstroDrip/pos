@@ -4,8 +4,9 @@ import { storeDateTime } from '../core/store-time';
 import type { FinStatus } from '../core/status';
 import type { ArAgeingRow, CreditInvoice, CustomerAccount, StatementLine } from '../services/credit';
 import { call } from './api';
+import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
-import { StatusBadge, StatusLegend } from './StatusBadge';
+import { StatusBadge, StatusLegend, statusLabel } from './StatusBadge';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 type Found = { id: number; name: string; phone: string | null; creditEnabled: boolean; limit: number | null; outstanding: number; advance: number; available: number | null };
@@ -38,11 +39,17 @@ export function Customers({ can }: { can: (p: string) => boolean }) {
 
   return (
     <div className="page">
-      <div className="row" style={{ maxWidth: 900, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div style={{ flex: 2 }}><label>{t('Find a customer (name, phone or ID)')}</label><input aria-label="customer search" value={text} onChange={(e) => setText(e.target.value)} /></div>
-        <button className={view === 'accounts' ? 'primary' : ''} style={{ flex: '0 0 auto' }} onClick={() => setView('accounts')}>{t('Accounts')}</button>
-        {can('customer.statements') && <button className={view === 'ageing' ? 'primary' : ''} style={{ flex: '0 0 auto' }} onClick={() => setView('ageing')}>{t('Ageing')}</button>}
-      </div>
+      <PageHeader
+        title={t('Customers')}
+        desc={t('Credit accounts: what each customer owes, payments, statements.')}
+        actions={can('customer.statements') && (
+          <div className="seg">
+            <button className={view === 'accounts' ? 'on' : ''} onClick={() => setView('accounts')}>{t('Accounts')}</button>
+            <button className={view === 'ageing' ? 'on' : ''} onClick={() => setView('ageing')}>{t('Ageing')}</button>
+          </div>
+        )}
+      />
+      <div style={{ maxWidth: 520 }}><label>{t('Find a customer (name, phone or ID)')}</label><input aria-label="customer search" value={text} onChange={(e) => setText(e.target.value)} /></div>
       <StatusLegend />
       {view === 'ageing' ? <Ageing onOpen={(id) => { setView('accounts'); setOpenId(id); }} /> : (
         <>
@@ -62,7 +69,7 @@ export function Customers({ can }: { can: (p: string) => boolean }) {
             <div className="row" style={{ maxWidth: 600, alignItems: 'flex-end', marginTop: 8 }}>
               <div><label>{t('New customer name')}</label><input value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} /></div>
               <div><label>{t('Phone')}</label><input value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} /></div>
-              <button style={{ flex: '0 0 auto' }} disabled={!newCust.name.trim()} onClick={async () => {
+              <button disabled={!newCust.name.trim()} onClick={async () => {
                 try {
                   const id = await call<number>('customer.create', { name: newCust.name, phone: newCust.phone || undefined });
                   setNewCust({ name: '', phone: '' });
@@ -81,8 +88,8 @@ export function Customers({ can }: { can: (p: string) => boolean }) {
   );
 }
 
-function Amount({ l, v, bad }: { l: string; v: string; bad?: boolean }) {
-  return <div className="kpi"><div className="l">{l}</div><div className={`v${bad ? ' neg' : ''}`}>{v}</div></div>;
+function Amount({ l, v, bad, small }: { l: string; v: string; bad?: boolean; small?: boolean }) {
+  return <div className="kpi"><div className="l">{l}</div><div className={`v${bad ? ' neg' : ''}${small ? ' sm' : ''}`} title={v}>{v}</div></div>;
 }
 
 function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean; onClose: () => void }) {
@@ -119,10 +126,10 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
   };
 
   return (
-    <div className="card" role="region" aria-label="customer account" style={{ maxWidth: 1000, margin: '12px 0' }}>
+    <div className="card section" role="region" aria-label="customer account" style={{ marginTop: 'var(--sp-4)' }}>
       <div className="row" style={{ alignItems: 'center' }}>
         <h3 style={{ margin: 0 }}>{a.name} <small>#{a.id} · {a.phone}</small></h3>
-        <button style={{ flex: '0 0 auto' }} onClick={onClose}>{t('Close')}</button>
+        <button onClick={onClose}>{t('Close')}</button>
       </div>
       <div className="amounts" style={{ marginTop: 8 }}>
         <Amount l={t('Owed now')} v={formatSar(a.outstanding)} />
@@ -134,13 +141,14 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
         <Amount l={t('Unpaid / partly paid invoices')} v={`${a.unpaidCount} / ${a.partialCount}`} />
         <Amount l={t('Lifetime purchases')} v={formatSar(a.lifetimePurchases)} />
         <Amount l={t('Lifetime payments')} v={formatSar(a.lifetimePayments)} />
-        <Amount l={t('Last purchase / payment')} v={`${a.lastPurchase ? storeDateTime(a.lastPurchase).slice(0, 10) : '—'} / ${a.lastPayment ? storeDateTime(a.lastPayment).slice(0, 10) : '—'}`} />
+        <div className="kpi"><div className="l">{t('Last purchase / payment')}</div>
+          <div className="v sm"><span className="line">{a.lastPurchase ? storeDateTime(a.lastPurchase).slice(0, 10) : '—'}</span><span className="line">{a.lastPayment ? storeDateTime(a.lastPayment).slice(0, 10) : '—'}</span></div></div>
       </div>
-      {a.notes && <p className="ar" style={{ direction: 'inherit' }}>{t('Notes')}: {a.notes}</p>}
+      {a.notes && <p className="hint">{t('Notes')}: {a.notes}</p>}
 
       <h4>{t('Credit invoices')}</h4>
-      <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
-        {FILTERS.map((f) => <button key={f} className={filter === f ? 'primary' : ''} style={{ flex: '0 0 auto', padding: '4px 10px' }} onClick={() => setFilter(f)}>{t(f === 'all' ? 'All' : f === 'open' ? 'Still owed' : f)}</button>)}
+      <div className="seg" role="group" aria-label="filter invoices">
+        {FILTERS.map((f) => <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{t(f === 'all' ? 'All' : f === 'open' ? 'Still owed' : statusLabel(f))}</button>)}
       </div>
       <InvoiceTable rows={shown} can={can} busy={busy} onAct={act} />
 
@@ -154,9 +162,9 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
           <tr key={r.id}>
             <td>{r.receiptNo}</td><td>{storeDateTime(r.at)}</td><td>{t(r.method)}</td><td className={`num${r.amount < 0 ? ' neg' : ''}`}>{formatSar(r.amount)}</td>
             <td>{r.allocations.map((x) => `${x.invoiceNo}: ${formatSar(x.amount)}`).join(', ') || (r.amount > 0 ? t('Advance') : r.notes)}</td><td>{r.user}</td>
-            <td>
+            <td className="actions">
               {r.reversed && <StatusBadge status="reversed" />}
-              {r.amount > 0 && <button style={{ padding: '2px 8px' }} onClick={() => act(() => call('credit.printReceipt', { receiptId: r.id, copy: true }), t('Receipt printed'))}>{t('Reprint')}</button>}
+              {r.amount > 0 && <button onClick={() => act(() => call('credit.printReceipt', { receiptId: r.id, copy: true }), t('Receipt printed'))}>{t('Reprint')}</button>}
               {r.amount > 0 && !r.reversed && can('customer.payment.reverse') && <Reason label={t('Reverse')} q={t('Why is this payment being reversed?')} onConfirm={(reason) => act(() => call('credit.reverseReceipt', { receiptId: r.id, requestKey: crypto.randomUUID(), reason }), t('Payment reversed'))} />}
             </td>
           </tr>
@@ -167,8 +175,8 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
         <>
           <div className="row" style={{ alignItems: 'center', marginTop: 12 }}>
             <h4 style={{ margin: 0 }}>{t('Statement')}</h4>
-            <button style={{ flex: '0 0 auto' }} onClick={async () => setSt(await call('credit.statement', { customerId: id }))}>{st ? t('Refresh') : t('Show statement')}</button>
-            {st && <button style={{ flex: '0 0 auto' }} onClick={copyStatement}>{t('Copy as CSV')}</button>}
+            <button onClick={async () => setSt(await call('credit.statement', { customerId: id }))}>{st ? t('Refresh') : t('Show statement')}</button>
+            {st && <button onClick={copyStatement}>{t('Copy as CSV')}</button>}
           </div>
           {st && (
             <table className="list">
@@ -196,7 +204,7 @@ function InvoiceTable({ rows, can, busy, onAct }: { rows: CreditInvoice[]; can: 
           <td>{i.invoiceNo}</td><td>{storeDateTime(i.saleAt).slice(0, 10)}</td><td className="num">{formatSar(i.saleTotal)}</td>
           <td className="num">{formatSar(i.saleTotal - i.open)}</td><td className="num"><strong>{formatSar(i.open)}</strong></td>
           <td>{i.dueDate ?? t('No due date')}</td><td><StatusBadge status={i.status} /></td>
-          <td>
+          <td className="actions">
             {i.open > 0 && can('customer.credit.manage') && <Reason label={i.disputed ? t('Clear dispute') : t('Dispute')} q={t('Note')} onConfirm={(note) => onAct(() => call('credit.dispute', { saleId: i.saleId, disputed: !i.disputed, note }), t('Saved'))} />}
             {i.open > 0 && can('customer.writeoff') && !busy && <Reason label={t('Write off')} q={t('Why is this debt being written off? (whole remaining amount)')} onConfirm={(reason) => onAct(() => call('credit.writeOff', { requestKey: crypto.randomUUID(), saleId: i.saleId, amount: i.open, reason }), t('Written off'))} />}
           </td>
@@ -211,12 +219,12 @@ function Reason({ label, q, onConfirm }: { label: string; q: string; onConfirm: 
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [v, setV] = useState('');
-  if (!open) return <button style={{ padding: '2px 8px' }} onClick={() => setOpen(true)}>{label}</button>;
+  if (!open) return <button onClick={() => setOpen(true)}>{label}</button>;
   return (
     <span className="row" style={{ gap: 4, display: 'inline-flex' }}>
       <input aria-label={q} placeholder={q} value={v} onChange={(e) => setV(e.target.value)} style={{ width: 200 }} />
-      <button className="danger" style={{ padding: '2px 8px' }} disabled={!v.trim()} onClick={() => { onConfirm(v.trim()); setOpen(false); setV(''); }}>{t('Confirm')}</button>
-      <button style={{ padding: '2px 8px' }} onClick={() => setOpen(false)}>✕</button>
+      <button className="danger" disabled={!v.trim()} onClick={() => { onConfirm(v.trim()); setOpen(false); setV(''); }}>{t('Confirm')}</button>
+      <button onClick={() => setOpen(false)}>✕</button>
     </span>
   );
 }
@@ -259,7 +267,7 @@ function Collect({ account, can, onDone }: { account: CustomerAccount; can: (p: 
     }
   };
   return (
-    <div className="card" role="group" aria-label="collect payment" style={{ maxWidth: 900, margin: '12px 0' }}>
+    <div className="subpanel" role="group" aria-label="collect payment">
       <h4>{t('Receive a payment')}</h4>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div><label>{t('Amount received (SAR)')}</label><input aria-label="payment amount" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
@@ -269,7 +277,7 @@ function Collect({ account, can, onDone }: { account: CustomerAccount; can: (p: 
           </select>
         </div>
         <div><label>{t('Reference')}</label><input value={ref} onChange={(e) => setRef(e.target.value)} /></div>
-        <button style={{ flex: '0 0 auto' }} disabled={!(amt > 0) || open.length === 0} onClick={suggest}>{t('Suggest: oldest first')}</button>
+        <button disabled={!(amt > 0) || open.length === 0} onClick={suggest}>{t('Suggest: oldest first')}</button>
       </div>
       {open.length > 0 && (
         <table className="list">
@@ -294,7 +302,7 @@ function ApplyAdvance({ account, onDone }: { account: CustomerAccount; onDone: (
   const [alloc, setAlloc] = useState<Record<number, string>>({});
   const total = open.reduce((s, i) => s + (sar(alloc[i.saleId] ?? '') || 0), 0);
   return (
-    <div className="card" style={{ maxWidth: 900, margin: '12px 0' }}>
+    <div className="subpanel">
       <h4>{t('Use the advance ({0}) for invoices', formatSar(account.advance))}</h4>
       <table className="list"><tbody>{open.map((i) => (
         <tr key={i.saleId}><td>{i.invoiceNo}</td><td className="num">{formatSar(i.open)}</td>
@@ -321,14 +329,14 @@ function Settings({ account, onDone }: { account: CustomerAccount; onDone: (m: M
     noDue: account.paymentTermsDays === null, terms: account.paymentTermsDays === null ? '' : String(account.paymentTermsDays), address: account.address ?? '', notes: account.notes ?? '',
   });
   return (
-    <div className="card" style={{ maxWidth: 900, margin: '12px 0' }}>
+    <div className="subpanel">
       <h4>{t('Credit settings')}</h4>
-      <label><input type="checkbox" style={{ width: 'auto' }} checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> {t('Allowed to buy on credit')}</label>
+      <label><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> {t('Allowed to buy on credit')}</label>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div><label>{t('Credit limit (SAR)')}</label><input disabled={f.noLimit} value={f.limit} onChange={(e) => setF({ ...f, limit: e.target.value })} /></div>
-        <label style={{ flex: '0 0 auto' }}><input type="checkbox" style={{ width: 'auto' }} checked={f.noLimit} onChange={(e) => setF({ ...f, noLimit: e.target.checked })} /> {t('No fixed limit (trusted customer)')}</label>
+        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noLimit} onChange={(e) => setF({ ...f, noLimit: e.target.checked })} /> {t('No fixed limit (trusted customer)')}</label>
         <div><label>{t('Pay within (days)')}</label><input disabled={f.noDue} value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} /></div>
-        <label style={{ flex: '0 0 auto' }}><input type="checkbox" style={{ width: 'auto' }} checked={f.noDue} onChange={(e) => setF({ ...f, noDue: e.target.checked })} /> {t('No due date')}</label>
+        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noDue} onChange={(e) => setF({ ...f, noDue: e.target.checked })} /> {t('No due date')}</label>
       </div>
       <div className="row">
         <div><label>{t('Address')}</label><input value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>

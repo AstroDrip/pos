@@ -38,6 +38,9 @@ const ICON: Record<string, ReactElement> = {
 };
 const CLASS: Record<string, string> = { unpaid_expense: 'unpaid', cancelled: 'reversed' };
 
+/** English label of a status (pass through t() to translate); the same words as the badges. */
+export const statusLabel = (s: string) => LABEL[(s in LABEL ? s : 'unpaid') as keyof typeof LABEL];
+
 export function StatusBadge({ status }: { status: FinStatus | 'unpaid_expense' | 'cancelled' | string }) {
   const { t } = useI18n();
   const key = (status in LABEL ? status : 'unpaid') as keyof typeof LABEL;

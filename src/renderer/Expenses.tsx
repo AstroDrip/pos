@@ -3,6 +3,7 @@ import { formatSar, parseSar, roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, VatClass } from '../services/expenses';
 import { call } from './api';
+import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { StatusBadge } from './StatusBadge';
 
@@ -67,6 +68,7 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
 
   return (
     <div className="page">
+      <PageHeader title={t('Expenses')} desc={t('Rent, bills, salaries and other store costs: owed, paid and overdue.')} actions={can('expense.create') && <button className="primary" onClick={() => setEditing('new')}>{t('New expense')}</button>} />
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', maxWidth: 1100 }}>
         <div>
           <label>{t('Period')}</label>
@@ -98,7 +100,6 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
           </select>
         </div>
         <div><label>{t('Payee')}</label><input value={filter.payee} onChange={(e) => setFilter({ ...filter, payee: e.target.value })} /></div>
-        {can('expense.create') && <button className="primary" style={{ flex: '0 0 auto' }} onClick={() => setEditing('new')}>{t('New expense')}</button>}
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
 
@@ -135,11 +136,12 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
 
       <div className="row" style={{ alignItems: 'center', marginTop: 12 }}>
         <h4 style={{ margin: 0 }}>{t('Expenses ({0})', rows.length)}</h4>
-        <button style={{ flex: '0 0 auto' }} onClick={copyCsv} disabled={rows.length === 0}>{t('Copy as CSV')}</button>
+        <button onClick={copyCsv} disabled={rows.length === 0}>{t('Copy as CSV')}</button>
       </div>
       <table className="list">
         <thead><tr><th>{t('No.')}</th><th>{t('Date')}</th><th>{t('Description')}</th><th>{t('Category')}</th><th>{t('Payee')}</th><th className="num">{t('Amount')}</th><th className="num">{t('Paid')}</th><th>{t('Status')}</th></tr></thead>
         <tbody>
+          {rows.length === 0 && <EmptyRow cols={8} text={t('No expenses in this period. Use New expense to add one.')} />}
           {rows.map((r) => (
             <tr key={r.id} onClick={() => setOpenId(r.id)} style={{ cursor: 'pointer' }} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOpenId(r.id)}>
               <td>{r.expenseNo}</td><td>{r.expenseDate}</td><td>{r.description}</td><td>{catName(r.categoryId)}</td><td>{r.payee}</td>
@@ -164,7 +166,7 @@ function Kpi({ l, v, bad }: { l: string; v: string; bad?: boolean }) {
 /** Simple labelled bars: every bar also shows its number, so nothing depends on reading the bar length. */
 export function Bars({ data }: { data: { label: string; value: number }[] }) {
   const max = Math.max(1, ...data.map((d) => Math.abs(d.value)));
-  if (data.length === 0) return <p className="ar" style={{ direction: 'inherit' }}>—</p>;
+  if (data.length === 0) return <p className="hint">—</p>;
   return (
     <table className="list">
       <tbody>
@@ -246,7 +248,7 @@ function ExpenseForm({ cats, can, initial, onClose }: { cats: ExpenseCategory[];
 
   const set = (p: Partial<typeof f>) => setF({ ...f, ...p });
   return (
-    <div className="card" role="dialog" aria-label="expense form" style={{ maxWidth: 720, margin: '16px 0' }}>
+    <div className="card section" role="dialog" aria-label="expense form" style={{ marginTop: 'var(--sp-4)' }}>
       <h3>{initial ? t('Edit draft {0}', initial.expenseNo) : t('New expense')}</h3>
       <div className="row" style={{ flexWrap: 'wrap' }}>
         <div>
@@ -280,16 +282,16 @@ function ExpenseForm({ cats, can, initial, onClose }: { cats: ExpenseCategory[];
             <label>{t('VAT amount from the invoice (SAR)')}</label>
             <div className="row">
               <input value={f.vatAmount} onChange={(e) => set({ vatAmount: e.target.value })} />
-              <button type="button" style={{ flex: '0 0 auto' }} title={t('Suggests 15/115 of the total. Check it against the invoice.')} disabled={!(gross > 0)}
+              <button type="button" title={t('Suggests 15/115 of the total. Check it against the invoice.')} disabled={!(gross > 0)}
                 onClick={() => set({ vatAmount: formatSar(roundDiv(gross * 15, 115)) })}>15%</button>
             </div>
           </div>
         )}
       </div>
       {f.vatClass === 'standard' && (
-        <label><input type="checkbox" style={{ width: 'auto' }} checked={f.vatRecoverable} onChange={(e) => set({ vatRecoverable: e.target.checked })} /> {t('Input VAT is recoverable (tax invoice with supplier VAT number)')}</label>
+        <label><input type="checkbox" checked={f.vatRecoverable} onChange={(e) => set({ vatRecoverable: e.target.checked })} /> {t('Input VAT is recoverable (tax invoice with supplier VAT number)')}</label>
       )}
-      <label><input type="checkbox" style={{ width: 'auto' }} checked={f.prepaid} onChange={(e) => set({ prepaid: e.target.checked })} /> {t('Covers several months (prepaid, e.g. yearly rent)')}</label>
+      <label><input type="checkbox" checked={f.prepaid} onChange={(e) => set({ prepaid: e.target.checked })} /> {t('Covers several months (prepaid, e.g. yearly rent)')}</label>
       {f.prepaid && (
         <div className="row">
           <div><label>{t('First month')}</label><input type="month" value={f.periodStart} onChange={(e) => set({ periodStart: e.target.value })} /></div>
@@ -352,7 +354,7 @@ function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: stri
   if (!d) return null;
   const e = d.expense;
   return (
-    <div className="card" role="dialog" aria-label="expense detail" style={{ maxWidth: 720, margin: '16px 0' }}>
+    <div className="card section" role="dialog" aria-label="expense detail" style={{ marginTop: 'var(--sp-4)' }}>
       <h3>{e.expenseNo} · <StatusBadge status={e.payState} /></h3>
       <table className="list"><tbody>
         <tr><td>{t('Description')}</td><td>{e.description}</td></tr>
@@ -390,7 +392,7 @@ function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: stri
           <div><label>{t('From')}</label><select value={pay.method} onChange={(x) => setPay({ ...pay, method: x.target.value as PayMethod })}><option value="bank">{t('Bank')}</option><option value="till">{t('Till cash (open shift)')}</option></select></div>
           <div><label>{t('Payment date')}</label><input type="date" value={pay.paidOn} onChange={(x) => setPay({ ...pay, paidOn: x.target.value })} /></div>
           <div><label>{t('Reference')}</label><input value={pay.reference} onChange={(x) => setPay({ ...pay, reference: x.target.value })} /></div>
-          <button className="primary" style={{ flex: '0 0 auto' }} disabled={busy || Number.isNaN(sarOrZero(pay.amount)) || sarOrZero(pay.amount) <= 0}
+          <button className="primary" disabled={busy || Number.isNaN(sarOrZero(pay.amount)) || sarOrZero(pay.amount) <= 0}
             onClick={() => act(() => call('expense.pay', { id, requestKey: payKey.current, amount: sarOrZero(pay.amount), method: pay.method, paidOn: pay.paidOn, reference: pay.reference || undefined }), t('Payment recorded'))}>
             {t('Record payment')}
           </button>
@@ -401,8 +403,8 @@ function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: stri
           <label>{asking.q}</label>
           <div className="row">
             <input aria-label="reason text" autoFocus value={reason} onChange={(x) => setReason(x.target.value)} />
-            <button className="danger" style={{ flex: '0 0 auto' }} disabled={!reason.trim() || busy} onClick={() => { asking.run(reason.trim()); setAsking(null); }}>{t('Confirm')}</button>
-            <button style={{ flex: '0 0 auto' }} onClick={() => setAsking(null)}>{t('Close')}</button>
+            <button className="danger" disabled={!reason.trim() || busy} onClick={() => { asking.run(reason.trim()); setAsking(null); }}>{t('Confirm')}</button>
+            <button onClick={() => setAsking(null)}>{t('Close')}</button>
           </div>
         </div>
       )}
@@ -423,7 +425,7 @@ type RecurringRow = { id: number; name: string; categoryId: number; category: st
 function Recurring({ cats, can, onChange }: { cats: ExpenseCategory[]; can: (p: string) => boolean; onChange: () => void }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<RecurringRow[]>([]);
-  const empty = { id: 0, name: '', categoryId: cats[0]?.id ?? 0, expected: '', variableAmount: false, interval: 'monthly' as RecurringRow['interval'], startDate: todayDay(), endDate: '', dueDay: '1', payee: '', vatClass: 'out_of_scope' as VatClass, vatRecoverable: false, active: true };
+  const empty = { id: 0, name: '', categoryId: 0, expected: '', variableAmount: false, interval: 'monthly' as RecurringRow['interval'], startDate: todayDay(), endDate: '', dueDay: '1', payee: '', vatClass: 'out_of_scope' as VatClass, vatRecoverable: false, active: true };
   const [f, setF] = useState(empty);
   const [msg, setMsg] = useState<Msg>(null);
   const load = () => call<RecurringRow[]>('expense.recurring').then(setRows);
@@ -432,7 +434,7 @@ function Recurring({ cats, can, onChange }: { cats: ExpenseCategory[]; can: (p: 
     setMsg(null);
     try {
       await call('expense.saveRecurring', {
-        id: f.id || undefined, name: f.name, categoryId: f.categoryId || cats[0]!.id, expectedGross: sarOrZero(f.expected), variableAmount: f.variableAmount, interval: f.interval,
+        id: f.id || undefined, name: f.name, categoryId: f.categoryId, expectedGross: sarOrZero(f.expected), variableAmount: f.variableAmount, interval: f.interval,
         startDate: f.startDate, endDate: f.endDate || undefined, dueDay: Number(f.dueDay), payee: f.payee || undefined, vatClass: f.vatClass, vatRecoverable: f.vatClass === 'standard' && f.vatRecoverable, active: f.active,
       });
       setF(empty);
@@ -448,7 +450,7 @@ function Recurring({ cats, can, onChange }: { cats: ExpenseCategory[]; can: (p: 
       <h4>{t('Recurring expenses')}</h4>
       <table className="list">
         <thead><tr><th>{t('Name')}</th><th>{t('Category')}</th><th>{t('Every')}</th><th className="num">{t('Expected')}</th><th>{t('Due day')}</th><th>{t('Status')}</th><th /></tr></thead>
-        <tbody>{rows.map((r) => (
+        <tbody>{rows.length === 0 && <EmptyRow cols={7} text={t('No recurring expenses yet.')} />}{rows.map((r) => (
           <tr key={r.id}>
             <td>{r.name}{r.variableAmount ? ` (${t('variable')})` : ''}</td><td>{t(r.category)}</td><td>{t(r.interval)}</td><td className="num">{formatSar(r.expectedGross)}</td><td>{r.dueDay}</td><td>{r.active ? t('Active') : t('Off')}</td>
             <td>{can('expense.approve') && <button onClick={() => setF({ id: r.id, name: r.name, categoryId: r.categoryId, expected: formatSar(r.expectedGross), variableAmount: !!r.variableAmount, interval: r.interval, startDate: r.startDate, endDate: r.endDate ?? '', dueDay: String(r.dueDay), payee: r.payee ?? '', vatClass: r.vatClass, vatRecoverable: !!r.vatRecoverable, active: !!r.active })}>{t('Edit')}</button>}</td>
@@ -456,10 +458,10 @@ function Recurring({ cats, can, onChange }: { cats: ExpenseCategory[]; can: (p: 
         ))}</tbody>
       </table>
       {can('expense.approve') && (
-        <div className="card" style={{ maxWidth: 720, margin: '8px 0' }}>
+        <div className="card section">
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <div><label>{t('Name')}</label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
-            <div><label>{t('Category')}</label><select value={f.categoryId} onChange={(e) => setF({ ...f, categoryId: Number(e.target.value) })}>{cats.map((c) => <option key={c.id} value={c.id}>{t(c.nameEn)}</option>)}</select></div>
+            <div><label>{t('Category')}</label><select value={f.categoryId} onChange={(e) => setF({ ...f, categoryId: Number(e.target.value) })}><option value={0}>{t('— choose —')}</option>{cats.map((c) => <option key={c.id} value={c.id}>{t(c.nameEn)}</option>)}</select></div>
             <div><label>{t('Expected amount (SAR)')}</label><input value={f.expected} onChange={(e) => setF({ ...f, expected: e.target.value })} /></div>
           </div>
           <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -472,10 +474,10 @@ function Recurring({ cats, can, onChange }: { cats: ExpenseCategory[]; can: (p: 
             <div><label>{t('Payee')}</label><input value={f.payee} onChange={(e) => setF({ ...f, payee: e.target.value })} /></div>
             <div><label>{t('VAT treatment')}</label><select value={f.vatClass} onChange={(e) => setF({ ...f, vatClass: e.target.value as VatClass })}>{VAT.map((v) => <option key={v} value={v}>{t(VAT_LABEL[v])}</option>)}</select></div>
           </div>
-          <label><input type="checkbox" style={{ width: 'auto' }} checked={f.variableAmount} onChange={(e) => setF({ ...f, variableAmount: e.target.checked })} /> {t('Amount changes each time (e.g. electricity)')}</label>
-          <label><input type="checkbox" style={{ width: 'auto' }} checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
+          <label><input type="checkbox" checked={f.variableAmount} onChange={(e) => setF({ ...f, variableAmount: e.target.checked })} /> {t('Amount changes each time (e.g. electricity)')}</label>
+          <label><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
           {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
-          <p><button className="primary" disabled={!f.name.trim() || !(sarOrZero(f.expected) > 0)} onClick={save}>{f.id ? t('Update') : t('Add recurring expense')}</button></p>
+          <p><button className="primary" disabled={!f.name.trim() || !f.categoryId || !(sarOrZero(f.expected) > 0)} onClick={save}>{f.id ? t('Update') : t('Add recurring expense')}</button></p>
         </div>
       )}
     </div>
@@ -510,8 +512,8 @@ function Categories({ cats, onChange }: { cats: ExpenseCategory[]; onChange: () 
         <div><label>{t('Name (English)')}</label><input value={f.nameEn} onChange={(e) => setF({ ...f, nameEn: e.target.value })} /></div>
         <div><label>{t('Name (Arabic)')}</label><input value={f.nameAr} onChange={(e) => setF({ ...f, nameAr: e.target.value })} /></div>
         <div><label>{t('Account')}</label><select value={f.accountCode} onChange={(e) => setF({ ...f, accountCode: e.target.value })}>{accounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.nameEn}</option>)}</select></div>
-        <label style={{ flex: '0 0 auto' }}><input type="checkbox" style={{ width: 'auto' }} checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
-        <button style={{ flex: '0 0 auto' }} disabled={!f.nameEn.trim()} onClick={save}>{f.id ? t('Update') : t('Add category')}</button>
+        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
+        <button disabled={!f.nameEn.trim()} onClick={save}>{f.id ? t('Update') : t('Add category')}</button>
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
     </div>

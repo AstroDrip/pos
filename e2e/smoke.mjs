@@ -374,7 +374,7 @@ try {
     await acc.waitFor();
     await acc.locator('label:has-text("Allowed to buy on credit") input').check();
     await acc.locator('div:has(> label:text("Credit limit (SAR)")) input').fill('10');
-    await acc.locator('.card:has(h4:text("Credit settings")) label:has-text("No due date") input').uncheck(); // new customers start with no due date
+    await acc.locator('.subpanel:has(h4:text("Credit settings")) label:has-text("No due date") input').uncheck(); // new customers start with no due date
     await acc.locator('div:has(> label:text("Pay within (days)")) input').fill('30');
     await acc.locator('button:has-text("Save credit settings")').click();
     await page.waitForSelector('text=Saved');

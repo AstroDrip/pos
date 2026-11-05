@@ -6,19 +6,24 @@ import type { Supplier } from '../services/parties';
 import type { SyncHealth } from '../services/dashboard-sync';
 import { formatQty } from '../core/money';
 import { call } from './api';
+import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
 export function Admin({ can }: { can: (p: string) => boolean }) {
+  const { t } = useI18n();
   return (
-    <div className="page row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+    <div className="page">
+      <PageHeader title={t('Admin')} desc={t('Backups, users, suppliers, imports and device settings.')} />
+      <div className="grid-cards">
       {can('backup.run') && <Backup canSetup={can('settings.manage')} canRestore={can('backup.restore')} />}
       {can('user.manage') && <Users />}
       {can('supplier.manage') && <Suppliers />}
       {(can('product.manage') || can('supplier.manage')) && <Import />}
       {can('settings.manage') && <ScaleLabels />}
       {can('settings.manage') && <DashboardHealth />}
+      </div>
     </div>
   );
 }
@@ -44,7 +49,7 @@ function Backup({ canSetup, canRestore }: { canSetup: boolean; canRestore: boole
   };
 
   return (
-    <div className="card" style={{ margin: 0 }}>
+    <div className="card">
       <h3>{t('Backup')}</h3>
       {s && (
         <>
@@ -133,7 +138,7 @@ function Users() {
     }
   };
   return (
-    <form className="card" style={{ margin: 0 }} onSubmit={save}>
+    <form className="card" onSubmit={save}>
       <h3>{t('Users')}</h3>
       <label>{t('Username')}</label><input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
       <label>{t('Display name')}</label><input value={f.displayName} onChange={(e) => setF({ ...f, displayName: e.target.value })} />
@@ -175,7 +180,7 @@ function Suppliers() {
   };
 
   return (
-    <form className="card" style={{ margin: 0 }} onSubmit={save}>
+    <form className="card" onSubmit={save}>
       <h3>{t('Suppliers')}</h3>
       <label>{t('Name')}</label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
       <label>{t('Phone')}</label><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
@@ -223,7 +228,7 @@ function Import() {
   };
 
   return (
-    <div className="card" style={{ margin: 0 }}>
+    <div className="card">
       <h3>{t('Import from CSV')}</h3>
       <select value={kind} onChange={(e) => { setKind(e.target.value as 'products' | 'suppliers'); setDry(null); }}>
         <option value="products">{t('Products')}</option>
@@ -242,7 +247,7 @@ function Import() {
           ))}
           {dry.issues.length === 0 && (
             <>
-              {dry.warnings.length > 0 && <label><input type="checkbox" style={{ width: 'auto' }} checked={accept} onChange={(e) => setAccept(e.target.checked)} /> {t('I have checked the warnings')}</label>}
+              {dry.warnings.length > 0 && <label><input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} /> {t('I have checked the warnings')}</label>}
               <p><button className="primary" disabled={dry.warnings.length > 0 && !accept} onClick={commit}>{t('Import {0} rows', dry.valid.length)}</button></p>
             </>
           )}
@@ -289,7 +294,7 @@ function ScaleLabels() {
   };
 
   return (
-    <div className="card" style={{ margin: 8, maxWidth: 520 }}>
+    <div className="card section">
       <h3>{t('Scale labels')}</h3>
       <p className="msg warn">{t('The real label layout is not confirmed yet. Scan a real label below and check product and weight before using it.')}</p>
       <table className="list">
@@ -312,12 +317,12 @@ function ScaleLabels() {
         <option value="plu">PLU</option>
         <option value="sku">SKU</option>
       </select>
-      <label><input type="checkbox" style={{ width: 'auto' }} checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
+      <label><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
       <p><button className="primary" disabled={!f.name.trim()} onClick={save}>{f.id ? t('Update layout') : t('Add layout')}</button></p>
       <label>{t('Test a label (scan or type it)')}</label>
       <div className="row">
         <input aria-label="test label" value={test} onChange={(e) => setTest(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void tryLabel()} />
-        <button style={{ flex: '0 0 auto' }} disabled={!test.trim()} onClick={tryLabel}>{t('Test')}</button>
+        <button disabled={!test.trim()} onClick={tryLabel}>{t('Test')}</button>
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
     </div>
@@ -331,7 +336,7 @@ function DashboardHealth() {
   useEffect(() => void call<SyncHealth>('dashboard.health').then(setH, () => setH(null)), []);
   if (!h) return null;
   return (
-    <div className="card" style={{ margin: 8, maxWidth: 420 }}>
+    <div className="card section">
       <h3>{t('Owner phone dashboard')}</h3>
       {!h.enabled ? (
         <p className="msg warn">{t('Not set up. It needs an online dashboard service; choose a provider first. Nothing is sent anywhere until then.')}</p>

@@ -3,6 +3,7 @@ import { formatQty, formatSar, parseQty, roundDiv } from '../core/money';
 import { storeDateTime } from '../core/store-time';
 import type { RefundableSale, RefundResult } from '../services/refunds';
 import { call } from './api';
+import { PageHeader } from './PageHeader';
 import { ProductName, useI18n } from './i18n';
 
 // Owner policy (D1): receipt required, within the refund window, cash only, supervisor approval for every refund.
@@ -91,6 +92,7 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
 
   return (
     <div className="page">
+      <PageHeader title={t('Refund')} desc={t('Find the sale by its receipt number, choose what comes back, pay the cash.')} />
       <form className="row" style={{ maxWidth: 520 }} onSubmit={find}>
         <div style={{ flex: 1 }}>
           <label>{t('Invoice number from the receipt')}</label>
@@ -106,7 +108,7 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
       )}
 
       {sale && (
-        <div className="card" style={{ margin: 0, maxWidth: 900 }}>
+        <div className="card section">
           <h3>{sale.invoiceNo}</h3>
           <p>
             {t('Sold {0} by {1}, total {2}', storeDateTime(sale.createdAt), sale.cashier, formatSar(sale.totalIncl))}
@@ -141,7 +143,7 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
                       <td>
                         {l.remainingQty > 0 && (
                           <label title={t('Untick for damaged or expired goods: they are not put back in stock.')}>
-                            <input type="checkbox" style={{ width: 'auto' }} checked={picks[l.saleLineNo]?.restock ?? true} onChange={(e) => setPick(l.saleLineNo, { restock: e.target.checked })} />
+                            <input type="checkbox" checked={picks[l.saleLineNo]?.restock ?? true} onChange={(e) => setPick(l.saleLineNo, { restock: e.target.checked })} />
                           </label>
                         )}
                       </td>

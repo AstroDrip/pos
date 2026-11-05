@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { formatQty, formatSar } from '../core/money';
-import { storeDay } from '../core/store-time';
+import { storeDateTime, storeDay } from '../core/store-time';
 import type { AdjustmentRow, CashierActivity, RefundRow, SalesSummary, VoidRow } from '../services/reports';
 import { call } from './api';
+import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 
 const today = () => storeDay(new Date().toISOString());
@@ -30,6 +31,7 @@ export function Reports() {
 
   return (
     <div className="page">
+      <PageHeader title={t('Reports')} desc={t('Sales, refunds, cashiers and stock changes for any dates (Saudi time).')} />
       <div className="row" style={{ maxWidth: 420 }}>
         <div><label>{t('From')}</label><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
         <div><label>{t('To')}</label><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
@@ -62,7 +64,7 @@ export function Reports() {
             <tbody>{r.topProducts.map((p) => <tr key={p.productId}><td>{p.nameEn}</td><td className="num">{formatQty(p.qty)}</td><td className="num">{formatSar(p.totalIncl)}</td></tr>)}</tbody>
           </table>
           <h4>{t('Activity by cashier')}</h4>
-          <p className="ar" style={{ direction: 'inherit' }}>{t('Facts for review, not accusations: high numbers can have innocent reasons.')}</p>
+          <p className="hint">{t('Facts for review, not accusations: high numbers can have innocent reasons.')}</p>
           <table className="list">
             <thead><tr><th>{t('User')}</th><th className="num">{t('Sales')}</th><th className="num">{t('Total')}</th><th className="num">{t('Cash')}</th><th className="num">{t('Card')}</th>
               <th className="num">{t('Discounts')}</th><th className="num">{t('Removed')}</th><th className="num">{t('Reprints')}</th><th className="num">{t('Refunds')}</th><th className="num">{t('Refunds approved')}</th><th className="num">{t('Cash out')}</th><th className="num">{t('Over / short')}</th></tr></thead>
@@ -79,22 +81,22 @@ export function Reports() {
           <h4>{t('Refunds ({0})', refunds.length)}</h4>
           <table className="list">
             <thead><tr><th>{t('Time')}</th><th>{t('Credit note')}</th><th>{t('Invoice')}</th><th>{t('Cashier')}</th><th>{t('Approved by')}</th><th>{t('Reason')}</th><th className="num">{t('Items')}</th><th className="num">{t('Back on shelf')}</th><th className="num">{t('Value')}</th></tr></thead>
-            <tbody>{refunds.map((x) => <tr key={x.refundId}><td>{new Date(x.at).toLocaleString()}</td><td>{x.refundNo}</td><td>{x.invoiceNo}</td><td>{x.cashier}</td><td>{x.approver}</td><td>{t(x.reason)}</td><td className="num">{x.items}</td><td className="num">{x.restockedItems}</td><td className="num">{formatSar(x.total)}</td></tr>)}</tbody>
+            <tbody>{refunds.length === 0 && <EmptyRow cols={9} text={t('No refunds in these dates.')} />}{refunds.map((x) => <tr key={x.refundId}><td>{storeDateTime(x.at)}</td><td>{x.refundNo}</td><td>{x.invoiceNo}</td><td>{x.cashier}</td><td>{x.approver}</td><td>{t(x.reason)}</td><td className="num">{x.items}</td><td className="num">{x.restockedItems}</td><td className="num">{formatSar(x.total)}</td></tr>)}</tbody>
           </table>
           <h4>{t('Wastage and stock count differences ({0})', adjustments.length)}</h4>
           <table className="list">
             <thead><tr><th>{t('Time')}</th><th>{t('Document')}</th><th>{t('Type')}</th><th>{t('Reason')}</th><th>{t('User')}</th><th>{t('Product')}</th><th className="num">{t('System qty')}</th><th className="num">{t('Counted')}</th><th className="num">{t('Change')}</th><th className="num">{t('Value')}</th></tr></thead>
-            <tbody>{adjustments.map((a, i) => (
-              <tr key={i} style={a.value < 0 ? { color: 'var(--danger)' } : undefined}>
-                <td>{new Date(a.at).toLocaleString()}</td><td>{a.adjNo}</td><td>{a.kind === 'waste' ? t('Wastage') : t('Stock count')}</td><td>{t(a.reason)}</td><td>{a.user}</td>
-                <td>{a.nameEn}</td><td className="num">{formatQty(a.systemQty)}</td><td className="num">{a.countedQty === null ? '—' : formatQty(a.countedQty)}</td><td className="num">{formatQty(a.qty)}</td><td className="num">{formatSar(a.value)}</td>
+            <tbody>{adjustments.length === 0 && <EmptyRow cols={10} text={t('No wastage or count differences in these dates.')} />}{adjustments.map((a, i) => (
+              <tr key={i}>
+                <td>{storeDateTime(a.at)}</td><td>{a.adjNo}</td><td>{a.kind === 'waste' ? t('Wastage') : t('Stock count')}</td><td>{t(a.reason)}</td><td>{a.user}</td>
+                <td>{a.nameEn}</td><td className="num">{formatQty(a.systemQty)}</td><td className="num">{a.countedQty === null ? '—' : formatQty(a.countedQty)}</td><td className="num">{formatQty(a.qty)}</td><td className={`num${a.value < 0 ? ' neg' : ''}`}>{formatSar(a.value)}</td>
               </tr>
             ))}</tbody>
           </table>
           <h4>{t('Items removed before payment ({0})', voids.length)}</h4>
           <table className="list">
             <thead><tr><th>{t('Time')}</th><th>{t('User')}</th><th>{t('Invoice')}</th><th>{t('Type')}</th><th className="num">{t('Items')}</th><th className="num">{t('Value')}</th></tr></thead>
-            <tbody>{voids.map((v, i) => <tr key={i}><td>{new Date(v.at).toLocaleString()}</td><td>{v.user}</td><td>{v.invoiceNo ?? t('Not paid')}</td><td>{v.kind === 'bill_cleared' ? t('Bill cleared') : t('Line removed')}</td><td className="num">{v.items}</td><td className="num">{formatSar(v.total)}</td></tr>)}</tbody>
+            <tbody>{voids.length === 0 && <EmptyRow cols={6} text={t('Nothing was removed from a bill in these dates.')} />}{voids.map((v, i) => <tr key={i}><td>{storeDateTime(v.at)}</td><td>{v.user}</td><td>{v.invoiceNo ?? t('Not paid')}</td><td>{v.kind === 'bill_cleared' ? t('Bill cleared') : t('Line removed')}</td><td className="num">{v.items}</td><td className="num">{formatSar(v.total)}</td></tr>)}</tbody>
           </table>
         </>
       )}

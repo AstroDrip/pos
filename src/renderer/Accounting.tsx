@@ -4,6 +4,7 @@ import { storeDay } from '../core/store-time';
 import type { BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
 import type { VatSummary } from '../services/vat-report';
 import { call } from './api';
+import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 
 const todayDay = () => storeDay(new Date().toISOString());
@@ -42,6 +43,7 @@ export function Accounting() {
 
   return (
     <div className="page">
+      <PageHeader title={t('Accounting')} desc={t('Owner overview, profit and loss, balance sheet and ledgers (provisional until the accountant approves).')} />
       <div className="row" style={{ maxWidth: 420 }}>
         <div><label>{t('From')}</label><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
         <div><label>{t('To')}</label><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
@@ -66,7 +68,7 @@ export function Accounting() {
             <Tile l={t('Products at/below reorder level')} v={String(k.lowStockCount)} />
           </div>
           <h4>{t('Money position (right now)')}</h4>
-          <p className="ar" style={{ direction: 'inherit' }}>{t('Cash and bank is money the store has. Money customers owe is not cash until they pay; money owed to suppliers is not yet paid out.')}</p>
+          <p className="hint">{t('Cash and bank is money the store has. Money customers owe is not cash until they pay; money owed to suppliers is not yet paid out.')}</p>
           <div className="kpis">
             <Tile l={t('Cash and bank (books)')} v={formatSar(k.cashAndBank)} />
             <Tile l={t('Customers owe the store')} v={formatSar(k.receivablesOutstanding)} sub={t('{0} customers · overdue {1} · due soon {2}', k.customersWithBalance, formatSar(k.receivablesOverdue), formatSar(k.receivablesDueSoon))} />
@@ -84,21 +86,21 @@ export function Accounting() {
           <h3>{t('Profit and loss')} <span className="tag">{t('accrual basis')}</span></h3>
           <div className="msg warn">
             <strong>{t('Provisional figures')}</strong>
-            <ul style={{ margin: '4px 0 0' }}>{pl.provisionalReasons.map((r) => <li key={r}>{t(r)}</li>)}</ul>
+            <ul style={{ margin: 'var(--sp-1) 0 0' }}>{pl.provisionalReasons.map((r) => { const m = /^(\d+) draft/.exec(r); return <li key={r}>{m ? t('{0} draft expense(s) in this period are not posted yet', m[1]!) : t(r)}</li>; })}</ul>
           </div>
           <table className="list" style={{ maxWidth: 560 }}>
             <tbody>
               <Line l={t('Sales (excl. VAT)')} v={pl.salesGross} />
               <Line l={t('Less sales returns')} v={pl.returns} neg />
               <Line l={t('Net sales')} v={pl.netSales} strong />
-              <tr><td colSpan={2} className="ar" style={{ direction: 'inherit' }}>{t('Discounts given ({0}) are already deducted from sales.', formatSar(pl.discountsGiven))}</td></tr>
+              <tr><td colSpan={2} className="hint">{t('Discounts given ({0}) are already deducted from sales.', formatSar(pl.discountsGiven))}</td></tr>
               <Line l={t('Cost of goods sold')} v={pl.cogs} neg />
               <Line l={t('Gross profit')} v={pl.grossProfit} strong />
               {pl.grossMarginBp !== null && <tr><td>{t('Gross margin')}</td><td className="num">{formatSar(pl.grossMarginBp)}%{/* basis points shown as a percentage with 2 decimals */}</td></tr>}
               {pl.operating.map((o) => <Line key={o.code} l={`${o.code} ${name(o)}`} v={o.amount} neg />)}
               <Line l={t('Total operating expenses')} v={pl.totalOperating} neg />
               <Line l={t('Net profit')} v={pl.netProfit} strong />
-              <tr><td colSpan={2} className="ar" style={{ direction: 'inherit' }}>{t('VAT is not income or cost: output VAT {0}, recoverable input VAT {1}.', formatSar(pl.outputVat), formatSar(pl.inputVat))}</td></tr>
+              <tr><td colSpan={2} className="hint">{t('VAT is not income or cost: output VAT {0}, recoverable input VAT {1}.', formatSar(pl.outputVat), formatSar(pl.inputVat))}</td></tr>
             </tbody>
           </table>
         </>
@@ -120,7 +122,7 @@ export function Accounting() {
               <tr><td>{t('Expenses (recoverable VAT)')}</td><td className="num">{formatSar(vat.expensesRecoverable.net - vat.expensesReversedRecoverable.net)}</td><td className="num">{formatSar(vat.expensesRecoverable.vat - vat.expensesReversedRecoverable.vat)}</td></tr>
               <tr><td><strong>{t('Input VAT')}</strong></td><td /><td className="num"><strong>{formatSar(vat.inputVat)}</strong></td></tr>
               <tr><td><strong>{vat.netVatDue >= 0 ? t('Net VAT payable') : t('Net VAT refundable')}</strong></td><td /><td className="num"><strong>{formatSar(Math.abs(vat.netVatDue))}</strong></td></tr>
-              {vat.purchasesNonRecoverableVat !== 0 && <tr><td colSpan={3} className="ar" style={{ direction: 'inherit' }}>{t('VAT paid but not recoverable (treated as cost): {0}', formatSar(vat.purchasesNonRecoverableVat))}</td></tr>}
+              {vat.purchasesNonRecoverableVat !== 0 && <tr><td colSpan={3} className="hint">{t('VAT paid but not recoverable (treated as cost): {0}', formatSar(vat.purchasesNonRecoverableVat))}</td></tr>}
             </tbody>
           </table>
         </>
