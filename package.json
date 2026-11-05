@@ -15,7 +15,8 @@
     "rebuild:electron": "electron-builder install-app-deps",
     "audit": "npm audit --omit=dev",
     "e2e": "npm run build && node e2e/smoke.mjs",
-    "dist": "npm run build && electron-builder --win nsis --x64"
+    "dist": "npm run build && electron-builder --win nsis --x64",
+    "demo": "npm run build && node scripts/demo.cjs"
   },
   "engines": {
     "node": ">=22"

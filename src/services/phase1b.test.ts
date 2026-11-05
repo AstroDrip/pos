@@ -68,10 +68,10 @@ describe('suppliers and customers', () => {
 
 describe('held bills', () => {
   it('hold creates no sale; recall returns the cart once', () => {
-    const id = holdBill(ctx, u.cashier, 'Lady in blue', { lines: [{ productId: water, qty: 2000 }] });
+    const id = holdBill(ctx, u.cashier, 'Lady in blue', { lines: [{ productId: water, qty: 2000 }], billKey: 'key-held-xxxx' });
     expect(listHeldBills(ctx)).toMatchObject([{ id, label: 'Lady in blue', lineCount: 1 }]);
     expect((ctx.db.prepare('SELECT count(*) AS n FROM sales').get() as { n: number }).n).toBe(0);
-    expect(recallBill(ctx, u.cashier, id)).toEqual({ lines: [{ productId: water, qty: 2000 }] });
+    expect(recallBill(ctx, u.cashier, id)).toEqual({ lines: [{ productId: water, qty: 2000 }], billKey: 'key-held-xxxx' });
     expect(code(() => recallBill(ctx, u.cashier, id))).toBe('NOT_FOUND');
   });
 });
@@ -277,8 +277,17 @@ describe('gap fixes', () => {
 
   it('removed lines are audited and appear in the voids report on the Saudi day', () => {
     t.advance(13 * 3_600_000 + 30 * 60_000); // 21:30 UTC = 00:30 next day in Riyadh
-    recordRemoval(ctx, u.cashier, 'line_removed', [{ productId: water, qty: 1000, amount: 250 }]);
-    expect(voidsReport(ctx, u.admin, '2026-11-06', '2026-11-06')).toMatchObject([{ user: 'Cashier', kind: 'line_removed', items: 1, total: 250 }]);
+    openShift(ctx, u.cashier, 0);
+    // A line removed from a bill that is then paid: the report shows that bill's invoice number.
+    recordRemoval(ctx, u.cashier, 'line_removed', 'key-paid-xxxx', [{ productId: water, qty: 1000, amount: 250 }]);
+    sell('paid');
+    // A whole bill cleared and never paid.
+    recordRemoval(ctx, u.cashier, 'bill_cleared', 'key-gone-xxxx', [{ productId: water, qty: 2000, amount: 500 }]);
+    expect(voidsReport(ctx, u.admin, '2026-11-06', '2026-11-06')).toMatchObject([
+      { user: 'Cashier', kind: 'line_removed', invoiceNo: 'INV-00000001', items: 1, total: 250 },
+      { user: 'Cashier', kind: 'bill_cleared', invoiceNo: null, items: 1, total: 500 },
+    ]);
+    expect(code(() => recordRemoval(ctx, u.cashier, 'line_removed', 'bad key!', [{ productId: water, qty: 1000, amount: 250 }]))).toBe('VALIDATION');
     expect(voidsReport(ctx, u.admin, '2026-11-05', '2026-11-05')).toEqual([]);
     expect(code(() => voidsReport(ctx, u.cashier, '2026-11-06', '2026-11-06'))).toBe('PERMISSION_DENIED');
   });

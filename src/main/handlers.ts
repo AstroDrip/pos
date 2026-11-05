@@ -98,12 +98,12 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       await printer.printReceipt(receiptData(ctx, p.saleId), p.copy);
       return null;
     },
-    'hold.create': (p, s) => holdBill(ctx, userId(s), p.label, { lines: p.lines, customerId: p.customerId }),
+    'hold.create': (p, s) => holdBill(ctx, userId(s), p.label, { lines: p.lines, customerId: p.customerId, billKey: p.billKey }),
     'hold.list': () => listHeldBills(ctx),
     'hold.recall': (p, s) => {
       const bill = recallBill(ctx, userId(s), p.id);
       // Current product data; prices are the live ones, as for any new bill.
-      return { customerId: bill.customerId, lines: bill.lines.map((l) => ({ product: getProduct(ctx, l.productId), qty: l.qty })).filter((l) => l.product?.active) };
+      return { customerId: bill.customerId, billKey: bill.billKey, lines: bill.lines.map((l) => ({ product: getProduct(ctx, l.productId), qty: l.qty })).filter((l) => l.product?.active) };
     },
     'supplier.list': () => listSuppliers(ctx),
     'supplier.create': (p, s) => createSupplier(ctx, userId(s), p),
@@ -121,7 +121,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       }
     },
     'import.commit': (p, s) => (p.kind === 'products' ? importProducts(ctx, userId(s), p.csv, p.acceptWarnings) : importSuppliers(ctx, userId(s), p.csv)),
-    'bill.removed': (p, s) => recordRemoval(ctx, userId(s), p.kind, p.lines),
+    'bill.removed': (p, s) => recordRemoval(ctx, userId(s), p.kind, p.billKey, p.lines),
     'report.voids': (p, s) => voidsReport(ctx, userId(s), p.fromDay, p.toDay),
     'user.list': (_p, s) => {
       requirePermission(ctx, userId(s), 'user.manage');

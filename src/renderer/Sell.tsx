@@ -33,7 +33,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const [custSearch, setCustSearch] = useState('');
   const [approver, setApprover] = useState({ username: '', pin: '' });
   // One key per bill: a retry after an error re-sends the same key, so it can never create a second sale.
-  const billKey = useRef(crypto.randomUUID());
+  const billKey = useRef<string>(crypto.randomUUID());
   const scanner = useRef(new ScanBuffer());
 
   const loadHeld = () => call<HeldBill[]>('hold.list').then(setHeld);
@@ -139,14 +139,16 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   /** Every removal before payment is audited (voids report). The line goes even if logging fails, but staff are told. */
   const removeLines = (kind: 'line_removed' | 'bill_cleared', idx: number[]) => {
     const gone = idx.map((i) => ({ productId: lines[i]!.product.id, qty: lines[i]!.qty, amount: totals ? totals.lines[i]!.lineIncl : 0 }));
+    const billRef = billKey.current;
     setLines(lines.filter((_, k) => !idx.includes(k)));
-    call('bill.removed', { kind, lines: gone }).catch((e: Error) => setMsg({ kind: 'warn', text: t('Removed, but the removal could not be logged: {0}', e.message) }));
+    if (kind === 'bill_cleared') billKey.current = crypto.randomUUID(); // the cleared bill is finished; the next one is new
+    call('bill.removed', { kind, lines: gone, billKey: billRef }).catch((e: Error) => setMsg({ kind: 'warn', text: t('Removed, but the removal could not be logged: {0}', e.message) }));
   };
 
   const hold = async () => {
     const label = customer?.name ?? `Bill ${new Date().toLocaleTimeString()}`;
     try {
-      await call('hold.create', { label, lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty })), customerId: customer?.id });
+      await call('hold.create', { label, lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty })), customerId: customer?.id, billKey: billKey.current });
       resetBill();
       setMsg({ kind: 'ok', text: t('Held: {0}. Discounts are not kept on held bills.', label) });
       void loadHeld();
@@ -158,7 +160,8 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const recall = async (id: number) => {
     if (lines.length) return setMsg({ kind: 'warn', text: t('Finish or hold the current bill first.') });
     try {
-      const r = await call<{ lines: { product: Product; qty: number }[] }>('hold.recall', { id });
+      const r = await call<{ billKey?: string; lines: { product: Product; qty: number }[] }>('hold.recall', { id });
+      if (r.billKey) billKey.current = r.billKey; // removals made before holding stay linked to this bill
       setLines(r.lines.map((l) => ({ ...l, discount: 0 })));
       void loadHeld();
     } catch (e) {

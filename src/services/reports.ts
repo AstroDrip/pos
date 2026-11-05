@@ -82,6 +82,7 @@ export interface VoidRow {
   at: string;
   user: string;
   kind: string;
+  invoiceNo: string | null; // null = the bill was never paid (cleared, or still open/held)
   items: number;
   total: number;
 }
@@ -92,13 +93,13 @@ export function voidsReport(ctx: Ctx, userId: number, fromDay: string, toDay: st
   return (
     ctx.db
       .prepare(
-        `SELECT a.at, COALESCE(u.display_name, '?') AS user, a.action AS kind, a.details_json
-         FROM audit_log a LEFT JOIN users u ON u.id = a.user_id
+        `SELECT a.at, COALESCE(u.display_name, '?') AS user, a.action AS kind, a.details_json, s.invoice_no
+         FROM audit_log a LEFT JOIN users u ON u.id = a.user_id LEFT JOIN sales s ON s.idempotency_key = a.entity_id
          WHERE a.action IN ('sale.line_removed', 'sale.bill_cleared') AND a.at >= ? AND a.at < ? ORDER BY a.id`,
       )
-      .all(storeDayStartUtc(fromDay), storeDayStartUtc(nextDay(toDay))) as { at: string; user: string; kind: string; details_json: string }[]
+      .all(storeDayStartUtc(fromDay), storeDayStartUtc(nextDay(toDay))) as { at: string; user: string; kind: string; details_json: string; invoice_no: string | null }[]
   ).map((r) => {
     const d = JSON.parse(r.details_json) as { lines: unknown[]; total: number };
-    return { at: r.at, user: r.user, kind: r.kind.replace('sale.', ''), items: d.lines.length, total: d.total };
+    return { at: r.at, user: r.user, kind: r.kind.replace('sale.', ''), invoiceNo: r.invoice_no, items: d.lines.length, total: d.total };
   });
 }

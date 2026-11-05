@@ -8,6 +8,8 @@ import { requirePermission } from './users';
 const payloadSchema = z.object({
   lines: z.array(z.object({ productId: z.number().int().positive(), qty: z.number().int().positive() })).min(1).max(500),
   customerId: z.number().int().positive().optional(),
+  /** The bill's key, kept so a recalled bill finishes under the same key and removals stay linked to it. */
+  billKey: z.string().regex(/^[\w-]{8,64}$/).optional(),
 });
 export type HeldPayload = z.infer<typeof payloadSchema>;
 
@@ -52,11 +54,14 @@ export function recallBill(ctx: Ctx, userId: number, id: number): HeldPayload {
 export type RemovalKind = 'line_removed' | 'bill_cleared';
 
 /**
- * Records items taken off a bill before payment (a "void"). Not blocked, but always audited
- * so the owner can review them in the voids report. Whether cashiers need approval is decision §Q-10.
+ * Records items taken off a bill before payment (a "void"). Not blocked: owner decision Q-10 (2026-11-05)
+ * is no supervisor approval, but every removal is audited with the cashier and the bill it came from.
+ * `billKey` is the bill's idempotency key; if the bill is later paid, the sale carries the same key,
+ * so the report can show its invoice number.
  */
-export function recordRemoval(ctx: Ctx, userId: number, kind: RemovalKind, lines: { productId: number; qty: number; amount: number }[]): void {
+export function recordRemoval(ctx: Ctx, userId: number, kind: RemovalKind, billKey: string, lines: { productId: number; qty: number; amount: number }[]): void {
   requirePermission(ctx, userId, 'sale.create');
+  if (!/^[\w-]{8,64}$/.test(billKey)) throw new DomainError('VALIDATION', 'Invalid bill reference');
   if (lines.length === 0) return;
-  appendAudit(ctx, { userId, action: `sale.${kind}`, entity: 'bill', details: { lines, total: lines.reduce((s, l) => s + l.amount, 0) } });
+  appendAudit(ctx, { userId, action: `sale.${kind}`, entity: 'bill', entityId: billKey, details: { lines, total: lines.reduce((s, l) => s + l.amount, 0) } });
 }
