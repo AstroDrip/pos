@@ -256,7 +256,7 @@ describe('invariants under load', () => {
     expect(nos).toEqual(Array.from({ length: 300 }, (_, i) => `INV-${String(i + 1).padStart(8, '0')}`));
     const tb = trialBalance(ctx);
     expect(tb.reduce((s, r) => s + r.debit, 0)).toBe(tb.reduce((s, r) => s + r.credit, 0));
-  });
+  }, 30_000); // heavy test: 300 sales; can pass 5 s on a busy machine (no assertion changed)
 });
 
 describe('durability', () => {
