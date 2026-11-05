@@ -73,6 +73,8 @@ export function applyMovement(ctx: Ctx, m: MovementInput): MovementResult {
 }
 
 export interface GrnInput {
+  /** One key per receiving screen. Re-sending it returns the first receipt instead of receiving twice. */
+  requestKey?: string;
   supplierId: number;
   reference?: string;
   lines: { productId: number; qty: number; unitCost: number }[];
@@ -83,6 +85,10 @@ export function receiveGoods(ctx: Ctx, userId: number, input: GrnInput): { grnId
   requirePermission(ctx, userId, 'stock.receive');
   if (input.lines.length === 0) throw new DomainError('VALIDATION', 'GRN needs at least one line');
   return ctx.db.transaction(() => {
+    if (input.requestKey) {
+      const done = ctx.db.prepare('SELECT id, grn_no FROM goods_receipts WHERE request_key = ?').get(input.requestKey) as { id: number; grn_no: string } | undefined;
+      if (done) return { grnId: done.id, grnNo: done.grn_no };
+    }
     const supplier = ctx.db.prepare('SELECT id FROM suppliers WHERE id = ? AND active = 1').get(input.supplierId);
     if (!supplier) throw new DomainError('NOT_FOUND', 'Supplier not found');
     const n = (ctx.db.prepare("UPDATE invoice_counters SET next_value = next_value + 1 WHERE series = 'GRN' RETURNING next_value - 1 AS v").get() as { v: number }).v;
@@ -95,8 +101,8 @@ export function receiveGoods(ctx: Ctx, userId: number, input: GrnInput): { grnId
     }
     const grnId = Number(
       ctx.db
-        .prepare('INSERT INTO goods_receipts (grn_no, supplier_id, reference, total_cost, user_id, received_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(grnNo, input.supplierId, input.reference ?? null, total, userId, ctx.now()).lastInsertRowid,
+        .prepare('INSERT INTO goods_receipts (grn_no, supplier_id, reference, total_cost, user_id, received_at, request_key) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(grnNo, input.supplierId, input.reference ?? null, total, userId, ctx.now(), input.requestKey ?? null).lastInsertRowid,
     );
     input.lines.forEach((l, i) => {
       ctx.db.prepare('INSERT INTO grn_lines (grn_id, line_no, product_id, qty, unit_cost) VALUES (?, ?, ?, ?, ?)').run(grnId, i + 1, l.productId, l.qty, l.unitCost);

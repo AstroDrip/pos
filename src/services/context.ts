@@ -22,7 +22,9 @@ export type ErrorCode =
   | 'SHIFT_ALREADY_OPEN'
   | 'INSUFFICIENT_PAYMENT'
   | 'NEGATIVE_STOCK'
-  | 'CONFLICT';
+  | 'CONFLICT'
+  | 'PRICE_CHANGED'
+  | 'CLOCK_WRONG';
 
 /** Expected business errors. Their message is safe to show to staff. */
 export class DomainError extends Error {

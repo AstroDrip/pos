@@ -103,3 +103,63 @@ export function voidsReport(ctx: Ctx, userId: number, fromDay: string, toDay: st
     return { at: r.at, user: r.user, kind: r.kind.replace('sale.', ''), invoiceNo: r.invoice_no, items: d.lines.length, total: d.total };
   });
 }
+
+export interface CashierActivity {
+  userId: number;
+  user: string;
+  sales: number;
+  salesTotal: number;
+  cashNet: number;
+  card: number;
+  discountCount: number;
+  discountTotal: number;
+  removals: number;
+  removedValue: number;
+  reprints: number;
+  cashOutCount: number;
+  cashOutTotal: number;
+  shiftsClosed: number;
+  overShortTotal: number; // counted - expected over closed shifts (negative = short)
+}
+
+/**
+ * Per-cashier activity for store days fromDay..toDay (audit Part 14). These are facts for the owner to review,
+ * not accusations: a high number can have an innocent reason.
+ */
+export function cashierActivity(ctx: Ctx, userId: number, fromDay: string, toDay: string): CashierActivity[] {
+  requirePermission(ctx, userId, 'reports.view');
+  const from = storeDayStartUtc(fromDay);
+  const to = storeDayStartUtc(nextDay(toDay));
+  const users = ctx.db.prepare('SELECT id, display_name FROM users ORDER BY display_name').all() as { id: number; display_name: string }[];
+  const one = (sql: string, ...args: unknown[]) => ctx.db.prepare(sql).get(...args) as Record<string, number>;
+  return users
+    .map((u) => {
+      const s = one(
+        `SELECT count(*) AS n, COALESCE(SUM(total_incl),0) AS total, COALESCE(SUM(total_discount),0) AS disc,
+                COALESCE(SUM(CASE WHEN total_discount > 0 THEN 1 ELSE 0 END),0) AS discN, COALESCE(SUM(change_given),0) AS change
+         FROM sales WHERE user_id = ? AND created_at >= ? AND created_at < ?`, u.id, from, to);
+      const pay = (t: string) => one(`SELECT COALESCE(SUM(p.amount),0) AS v FROM payments p JOIN sales s ON s.id = p.sale_id WHERE s.user_id = ? AND p.tender = ? AND s.created_at >= ? AND s.created_at < ?`, u.id, t, from, to).v!;
+      const audit = (actions: string) => ctx.db.prepare(`SELECT details_json FROM audit_log WHERE user_id = ? AND action IN (${actions}) AND at >= ? AND at < ?`).all(u.id, from, to) as { details_json: string }[];
+      const removed = audit("'sale.line_removed','sale.bill_cleared'");
+      const out = one(`SELECT count(*) AS n, COALESCE(SUM(amount),0) AS v FROM cash_movements WHERE user_id = ? AND kind = 'out' AND at >= ? AND at < ?`, u.id, from, to);
+      const shifts = one(`SELECT count(*) AS n, COALESCE(SUM(counted_cash - expected_cash),0) AS v FROM register_shifts WHERE closed_by = ? AND closed_at >= ? AND closed_at < ?`, u.id, from, to);
+      return {
+        userId: u.id,
+        user: u.display_name,
+        sales: s.n!,
+        salesTotal: s.total!,
+        cashNet: pay('cash') - s.change!,
+        card: pay('card'),
+        discountCount: s.discN!,
+        discountTotal: s.disc!,
+        removals: removed.length,
+        removedValue: removed.reduce((sum, r) => sum + ((JSON.parse(r.details_json) as { total?: number }).total ?? 0), 0),
+        reprints: audit("'sale.reprint'").length,
+        cashOutCount: out.n!,
+        cashOutTotal: out.v!,
+        shiftsClosed: shifts.n!,
+        overShortTotal: shifts.v!,
+      };
+    })
+    .filter((a) => a.sales + a.removals + a.reprints + a.cashOutCount + a.shiftsClosed > 0);
+}

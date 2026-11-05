@@ -2,6 +2,7 @@ import { MILLI_PER_UNIT, extendPrice } from '../core/money';
 import { parseScaleBarcode, type ScaleBarcodeFormat } from '../core/scale-barcode';
 import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
+import { indexProduct, searchProducts as indexedSearch } from './search';
 import { requirePermission } from './users';
 
 export interface Product {
@@ -28,6 +29,7 @@ export interface ProductInput {
   reorderLevel?: number;
   barcodes?: string[];
   plu?: string;
+  aliases?: string[];
 }
 
 const SELECT_PRODUCT = `
@@ -72,8 +74,51 @@ export function createProduct(ctx: Ctx, userId: number, input: ProductInput): nu
     ctx.db.prepare('INSERT INTO price_history (product_id, old_price, new_price, changed_by, changed_at) VALUES (?, NULL, ?, ?, ?)').run(id, input.priceIncl, userId, now);
     for (const code of input.barcodes ?? []) addBarcodeTx(ctx, id, code);
     if (input.plu) addPluTx(ctx, id, input.plu);
+    for (const a of cleanAliases(input.aliases)) ctx.db.prepare('INSERT INTO product_aliases (product_id, alias) VALUES (?, ?)').run(id, a);
+    indexProduct(ctx, id);
     appendAudit(ctx, { userId, action: 'product.create', entity: 'product', entityId: id, details: { ...input } });
     return id;
+  })();
+}
+
+function cleanAliases(list: string[] | undefined): string[] {
+  const out = [...new Set((list ?? []).map((a) => a.trim()).filter(Boolean))];
+  if (out.some((a) => a.length > 80) || out.length > 20) throw new DomainError('VALIDATION', 'Too many or too long other names');
+  return out;
+}
+
+/** Replaces a product's approved other names (synonyms) used by search. */
+export function setAliases(ctx: Ctx, userId: number, productId: number, aliases: string[]): void {
+  requirePermission(ctx, userId, 'product.manage');
+  const list = cleanAliases(aliases);
+  ctx.db.transaction(() => {
+    if (!getProduct(ctx, productId)) throw new DomainError('NOT_FOUND', 'Product not found');
+    const old = (ctx.db.prepare('SELECT alias FROM product_aliases WHERE product_id = ? ORDER BY alias').all(productId) as { alias: string }[]).map((r) => r.alias);
+    ctx.db.prepare('DELETE FROM product_aliases WHERE product_id = ?').run(productId);
+    for (const a of list) ctx.db.prepare('INSERT INTO product_aliases (product_id, alias) VALUES (?, ?)').run(productId, a);
+    indexProduct(ctx, productId);
+    appendAudit(ctx, { userId, action: 'product.aliases', entity: 'product', entityId: productId, details: { old, new: list } });
+  })();
+}
+
+export function getAliases(ctx: Ctx, productId: number): string[] {
+  return (ctx.db.prepare('SELECT alias FROM product_aliases WHERE product_id = ? ORDER BY alias').all(productId) as { alias: string }[]).map((r) => r.alias);
+}
+
+/**
+ * Deactivates or reactivates a product. Products are never deleted: past sales keep referring to them.
+ * An inactive product cannot be sold or found in search; scanning it says so (audit scenario 3.2).
+ */
+export function setProductActive(ctx: Ctx, userId: number, productId: number, active: boolean, reason: string): void {
+  requirePermission(ctx, userId, 'product.manage');
+  if (!reason.trim()) throw new DomainError('VALIDATION', 'A reason is required');
+  ctx.db.transaction(() => {
+    const p = getProduct(ctx, productId);
+    if (!p) throw new DomainError('NOT_FOUND', 'Product not found');
+    if (p.active === active) return;
+    ctx.db.prepare('UPDATE products SET active = ?, updated_at = ? WHERE id = ?').run(active ? 1 : 0, ctx.now(), productId);
+    indexProduct(ctx, productId);
+    appendAudit(ctx, { userId, action: active ? 'product.activate' : 'product.deactivate', entity: 'product', entityId: productId, details: { reason: reason.trim() } });
   })();
 }
 
@@ -119,39 +164,64 @@ export interface LookupResult {
 /**
  * Resolves scanned or typed input: product barcode → PLU → scale label barcode → SKU.
  * Scale item codes are matched against PLUs (leading zeros ignored).
+ * An inactive product is reported as such, never silently replaced by another (audit 3.2).
  */
 export function lookup(ctx: Ctx, code: string): LookupResult | null {
   const c = code.trim();
   if (!c) return null;
 
   const bc = ctx.db.prepare('SELECT product_id, qty_per_scan FROM product_barcodes WHERE barcode = ?').get(c) as { product_id: number; qty_per_scan: number } | undefined;
-  if (bc) return active(getProduct(ctx, bc.product_id), bc.qty_per_scan, 'barcode');
+  if (bc) return mustBeActive(getProduct(ctx, bc.product_id), bc.qty_per_scan, 'barcode');
 
   const plu = ctx.db.prepare('SELECT product_id FROM plu_codes WHERE plu = ?').get(c) as { product_id: number } | undefined;
   if (plu) {
     const p = getProduct(ctx, plu.product_id);
-    // A typed PLU for a weighed item needs a weight from the scale; qty 0 tells the UI to ask.
-    return active(p, p?.sellMode === 'weight' ? 0 : MILLI_PER_UNIT, 'plu');
+    // A typed PLU for a weighed item needs a weight from a scale label; qty 0 tells the UI to ask for the label.
+    return mustBeActive(p, p?.sellMode === 'weight' ? 0 : MILLI_PER_UNIT, 'plu');
   }
 
-  const scale = parseScaleBarcode(c, scaleFormats(ctx));
-  if (scale) {
+  const formats = scaleFormats(ctx);
+  if (/^\d{13}$/.test(c) && formats.some((f) => c.startsWith(f.prefix))) {
+    // Looks like a scale label: from here on it is either a valid label or a clear error, never a guess.
+    const scale = parseScaleBarcode(c, formats);
+    if (!scale) throw new DomainError('VALIDATION', 'Scale label barcode is damaged (check digit wrong). Re-scan or reprint the label.');
     const row = ctx.db.prepare('SELECT product_id FROM plu_codes WHERE CAST(plu AS INTEGER) = ?').get(Number(scale.itemCode)) as { product_id: number } | undefined;
-    const p = row ? getProduct(ctx, row.product_id) : null;
-    if (!p || !p.active) return null;
-    if (scale.weightGrams !== undefined) return { product: p, qty: scale.weightGrams, source: 'scale' };
-    const qty = qtyForLabelPrice(p.priceIncl, scale.priceHalalas!);
+    if (!row) throw new DomainError('NOT_FOUND', `Scale label product code ${scale.itemCode} is not set up as a PLU`);
+    const p = getProduct(ctx, row.product_id)!;
+    if (!p.active) throw new DomainError('VALIDATION', `${p.nameEn} is inactive and cannot be sold`);
+    if (p.sellMode !== 'weight') throw new DomainError('VALIDATION', `${p.nameEn} is not a weighed product; its PLU should not be on a scale label`);
+    const limits = scaleLimits(ctx);
+    if (scale.weightGrams !== undefined) {
+      if (scale.weightGrams <= 0) throw new DomainError('VALIDATION', 'Scale label shows zero weight. Reweigh the item.');
+      if (scale.weightGrams > limits.maxGrams) throw new DomainError('VALIDATION', `Scale label weight ${scale.weightGrams} g is above the allowed ${limits.maxGrams} g. Check the label.`);
+      return { product: p, qty: scale.weightGrams, source: 'scale' };
+    }
+    const price = scale.priceHalalas!;
+    if (price <= 0) throw new DomainError('VALIDATION', 'Scale label shows zero price. Reweigh the item.');
+    if (price > limits.maxHalalas) throw new DomainError('VALIDATION', 'Scale label price is above the allowed maximum. Check the label.');
+    // Price labels: the printed price is authoritative. The POS only accepts the label if some exact weight at
+    // today's shelf price gives that price; otherwise the label is out of date and must be reprinted.
+    const qty = qtyForLabelPrice(p.priceIncl, price);
     if (qty === null) throw new DomainError('VALIDATION', 'Label price does not match the current shelf price. Reweigh the item.');
+    // The weight implied by the price must be possible too (e.g. 999.99 SAR of bananas = 167 kg).
+    if (qty > limits.maxGrams) throw new DomainError('VALIDATION', `Scale label price implies ${qty} g, above the allowed ${limits.maxGrams} g. Check the label.`);
     return { product: p, qty, source: 'scale' };
   }
 
   const sku = ctx.db.prepare('SELECT id FROM products WHERE sku = ?').get(c) as { id: number } | undefined;
-  if (sku) return active(getProduct(ctx, sku.id), MILLI_PER_UNIT, 'sku');
+  if (sku) return mustBeActive(getProduct(ctx, sku.id), MILLI_PER_UNIT, 'sku');
   return null;
 }
 
-function active(p: Product | null, qty: number, source: LookupResult['source']): LookupResult | null {
-  return p && p.active ? { product: p, qty, source } : null;
+function mustBeActive(p: Product | null, qty: number, source: LookupResult['source']): LookupResult | null {
+  if (!p) return null;
+  if (!p.active) throw new DomainError('VALIDATION', `${p.nameEn} is inactive and cannot be sold`);
+  return { product: p, qty, source };
+}
+
+export function scaleLimits(ctx: Ctx): { maxGrams: number; maxHalalas: number } {
+  const get = (k: string, d: number) => Number((ctx.db.prepare('SELECT value FROM settings WHERE key = ?').get(k) as { value: string } | undefined)?.value ?? d);
+  return { maxGrams: get('scale_label_max_grams', 30_000), maxHalalas: get('scale_label_max_halalas', 100_000) };
 }
 
 /** Weight (grams) whose price equals the printed label price exactly, or null if none does. */
@@ -164,9 +234,10 @@ export function qtyForLabelPrice(unitPrice: number, labelPrice: number): number 
   return null;
 }
 
+/** Product list for back-office screens: indexed search when text is given, otherwise the first products by name. */
 export function searchProducts(ctx: Ctx, text: string, limit = 20): Product[] {
-  const like = `%${text.trim().replace(/[%_]/g, '')}%`;
-  return (
-    ctx.db.prepare(`${SELECT_PRODUCT} WHERE p.active = 1 AND (p.name_en LIKE ? OR p.name_ar LIKE ? OR p.sku LIKE ?) ORDER BY p.name_en LIMIT ?`).all(like, like, like, limit) as never[]
-  ).map((r) => toProduct(r)!);
+  if (!text.trim()) {
+    return (ctx.db.prepare(`${SELECT_PRODUCT} WHERE p.active = 1 ORDER BY p.name_en LIMIT ?`).all(limit) as never[]).map((r) => toProduct(r)!);
+  }
+  return indexedSearch(ctx, text, limit).map((h) => h.product);
 }

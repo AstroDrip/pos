@@ -228,6 +228,11 @@ describe('CSV import', () => {
 function rollBackToV1(db: ReturnType<typeof openDatabase>) {
   db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
   db.exec("DROP TABLE backup_jobs; DROP TABLE restore_events; DELETE FROM accounts WHERE code = '2900';");
+  // undo migration 4
+  db.exec(`DROP TABLE product_fts; DROP TABLE product_aliases;
+    DROP INDEX ix_products_name_en_norm; DROP INDEX ix_products_name_ar_norm; DROP INDEX ux_goods_receipts_request_key;
+    ALTER TABLE products DROP COLUMN name_en_norm; ALTER TABLE products DROP COLUMN name_ar_norm; ALTER TABLE goods_receipts DROP COLUMN request_key;
+    DELETE FROM settings WHERE key IN ('scale_label_max_grams', 'scale_label_max_halalas', 'search_index_version');`);
 }
 
 describe('pre-migration snapshot', () => {

@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import * as m001 from './migrations/001_initial';
 import * as m002 from './migrations/002_backups';
 import * as m003 from './migrations/003_suspense_and_voids';
+import * as m004 from './migrations/004_search_and_safety';
 
 export interface Migration {
   version: number;
@@ -15,6 +16,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'initial', sql: m001.sql },
   { version: 2, name: 'backups', sql: m002.sql },
   { version: 3, name: 'suspense_and_voids', sql: m003.sql },
+  { version: 4, name: 'search_and_safety', sql: m004.sql },
 ];
 
 /** Versions not yet applied to this database (empty for a brand-new file before migrate()). */

@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { ensureSearchIndex } from '../services/search';
 import { migrate, pendingMigrations } from './migrations';
 
 export type Db = Database.Database;
@@ -41,6 +42,7 @@ export function openDatabase(path: string, opts: OpenOptions = {}): Db {
     else db.prepare('VACUUM INTO ?').run(`${path}.pre-v${pending[0]}-${Date.now()}.db`);
   }
   migrate(db);
+  ensureSearchIndex({ db, now: () => new Date().toISOString(), uuid: () => '' });
   const fk = db.pragma('foreign_key_check') as unknown[];
   if (fk.length > 0) throw new Error(`Foreign key violations found at startup: ${fk.length}`);
   return db;

@@ -56,6 +56,23 @@ export function listUsers(ctx: Ctx): { id: number; username: string; displayName
   ).map((u) => ({ ...u, active: u.active === 1 }));
 }
 
+/** Deactivated users cannot log in or approve anything. Users are never deleted (their records stay attributable). */
+export function setUserActive(ctx: Ctx, actorId: number, userId: number, active: boolean): void {
+  requirePermission(ctx, actorId, 'user.manage');
+  if (actorId === userId && !active) throw new DomainError('VALIDATION', 'You cannot deactivate your own account');
+  ctx.db.transaction(() => {
+    const u = ctx.db.prepare('SELECT active FROM users WHERE id = ?').get(userId) as { active: number } | undefined;
+    if (!u) throw new DomainError('NOT_FOUND', 'User not found');
+    if (!active) {
+      // Never lock the store out: at least one active administrator must remain.
+      const admins = (ctx.db.prepare("SELECT count(*) AS n FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.code = 'admin' AND u.active = 1 AND u.id <> ?").get(userId) as { n: number }).n;
+      if (admins === 0) throw new DomainError('VALIDATION', 'At least one active administrator must remain');
+    }
+    ctx.db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, userId);
+    appendAudit(ctx, { userId: actorId, action: active ? 'user.activate' : 'user.deactivate', entity: 'user', entityId: userId });
+  })();
+}
+
 export function userCount(ctx: Ctx): number {
   return (ctx.db.prepare('SELECT count(*) AS n FROM users').get() as { n: number }).n;
 }

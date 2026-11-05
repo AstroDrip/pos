@@ -1,5 +1,9 @@
 import { storeDay } from '../core/store-time';
+import { formatSar } from '../core/money';
 import { computeInvoice } from '../core/vat';
+
+/** Small backwards clock adjustments (Windows time sync) are tolerated. */
+const CLOCK_TOLERANCE_MS = 10 * 60_000;
 import { appendAudit } from './audit';
 import { getProduct } from './catalog';
 import { DomainError, type Ctx } from './context';
@@ -11,6 +15,8 @@ export interface SaleLineInput {
   productId: number;
   qty: number; // milli-units
   discount?: number; // halalas off this line
+  /** The unit price the cashier saw. If the shelf price changed since, the sale is refused (BUG-001). */
+  expectedUnitPrice?: number;
 }
 
 export interface PaymentInput {
@@ -68,10 +74,19 @@ export function finalizeSale(ctx: Ctx, userId: number, input: SaleInput): SaleRe
       approver = input.discountApproverId;
     }
 
+    // The clock must not run backwards: invoice dates would go out of order (BUG-009).
+    const last = ctx.db.prepare('SELECT created_at FROM sales ORDER BY id DESC LIMIT 1').get() as { created_at: string } | undefined;
+    if (last && Date.parse(ctx.now()) < Date.parse(last.created_at) - CLOCK_TOLERANCE_MS) {
+      throw new DomainError('CLOCK_WRONG', `The computer clock is earlier than the last sale (${last.created_at}). Fix the Windows date and time before selling.`);
+    }
+
     // Snapshot product data at sale time.
     const products = input.lines.map((l) => {
       const p = getProduct(ctx, l.productId);
       if (!p || !p.active) throw new DomainError('NOT_FOUND', `Product ${l.productId} not available`);
+      if (l.expectedUnitPrice !== undefined && l.expectedUnitPrice !== p.priceIncl) {
+        throw new DomainError('PRICE_CHANGED', `The price of ${p.nameEn} changed from ${formatSar(l.expectedUnitPrice)} to ${formatSar(p.priceIncl)}. Check the new price with the customer.`);
+      }
       if (!Number.isSafeInteger(l.qty) || l.qty <= 0) throw new DomainError('VALIDATION', 'Quantity must be positive');
       if (p.sellMode === 'unit' && l.qty % 1000 !== 0) throw new DomainError('VALIDATION', `${p.nameEn} is sold by whole units`);
       return p;
