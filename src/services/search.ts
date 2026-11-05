@@ -1,5 +1,6 @@
 import { normalizeForSearch, tokens } from '../core/search-normalize';
 import type { Product } from './catalog';
+import type { Statement } from 'better-sqlite3';
 import type { Ctx } from './context';
 
 // Indexed product search (audit Part 2). Every query below uses an index; see SEARCH_PERFORMANCE_REPORT.md
@@ -24,22 +25,30 @@ const toProduct = (r: Row): Product => ({
   vatRateBp: r.vatRateBp, priceIncl: r.priceIncl, reorderLevel: r.reorderLevel, active: r.active === 1,
 });
 
+// Prepared statements are cached per connection: compiling them for every product made a 100k rebuild take ~40 s.
+const stmtCache = new WeakMap<object, Map<string, Statement>>();
+function stmt(ctx: Ctx, sql: string): Statement {
+  let m = stmtCache.get(ctx.db);
+  if (!m) stmtCache.set(ctx.db, (m = new Map()));
+  let st = m.get(sql);
+  if (!st) m.set(sql, (st = ctx.db.prepare(sql)));
+  return st;
+}
+
 /** Writes the normalised names and the FTS row for one product. Call inside the product's write transaction. */
 export function indexProduct(ctx: Ctx, productId: number): void {
-  const p = ctx.db
-    .prepare('SELECT p.name_en, p.name_ar, p.active, c.name_en AS cat_en, c.name_ar AS cat_ar FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ?')
+  const p = stmt(ctx, 'SELECT p.name_en, p.name_ar, p.active, c.name_en AS cat_en, c.name_ar AS cat_ar FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ?')
     .get(productId) as { name_en: string; name_ar: string; active: number; cat_en: string | null; cat_ar: string | null } | undefined;
-  ctx.db.prepare('DELETE FROM product_fts WHERE rowid = ?').run(productId);
+  stmt(ctx, 'DELETE FROM product_fts WHERE rowid = ?').run(productId);
   if (!p) return;
   const en = normalizeForSearch(p.name_en);
   const ar = normalizeForSearch(p.name_ar);
-  ctx.db.prepare('UPDATE products SET name_en_norm = ?, name_ar_norm = ? WHERE id = ?').run(en, ar, productId);
+  stmt(ctx, 'UPDATE products SET name_en_norm = ?, name_ar_norm = ? WHERE id = ?').run(en, ar, productId);
   if (!p.active) return; // inactive products are not offered in search
-  const aliases = (ctx.db.prepare('SELECT alias FROM product_aliases WHERE product_id = ?').all(productId) as { alias: string }[])
+  const aliases = (stmt(ctx, 'SELECT alias FROM product_aliases WHERE product_id = ?').all(productId) as { alias: string }[])
     .map((a) => normalizeForSearch(a.alias))
     .join(' ');
-  ctx.db
-    .prepare('INSERT INTO product_fts (rowid, names, aliases, category) VALUES (?, ?, ?, ?)')
+  stmt(ctx, 'INSERT INTO product_fts (rowid, names, aliases, category) VALUES (?, ?, ?, ?)')
     .run(productId, `${en} ${ar}`, aliases, normalizeForSearch(`${p.cat_en ?? ''} ${p.cat_ar ?? ''}`));
 }
 
@@ -100,11 +109,11 @@ export function searchProducts(ctx: Ctx, text: string, limit = 20): SearchHit[] 
     if (words.length) {
       const q = ftsQuery(words);
       const inNames = ctx.db
-        .prepare(`SELECT ${PRODUCT_COLUMNS} FROM product_fts f JOIN products p ON p.id = f.rowid JOIN units u ON u.id = p.unit_id WHERE product_fts MATCH ? ORDER BY rank LIMIT ?`)
-        .all(`names : (${q})`, limit * 2) as Row[];
+        .prepare(`SELECT ${PRODUCT_COLUMNS} FROM product_fts f JOIN products p ON p.id = f.rowid JOIN units u ON u.id = p.unit_id WHERE product_fts MATCH ? LIMIT ?`)
+        .all(`names : (${q})`, limit * 2) as Row[]; // no bm25 sort over every match: results are re-ranked below
       add(inNames, 5, 'word_prefix');
       const elsewhere = ctx.db
-        .prepare(`SELECT ${PRODUCT_COLUMNS} FROM product_fts f JOIN products p ON p.id = f.rowid JOIN units u ON u.id = p.unit_id WHERE product_fts MATCH ? ORDER BY rank LIMIT ?`)
+        .prepare(`SELECT ${PRODUCT_COLUMNS} FROM product_fts f JOIN products p ON p.id = f.rowid JOIN units u ON u.id = p.unit_id WHERE product_fts MATCH ? LIMIT ?`)
         .all(`{aliases category} : (${q})`, limit) as Row[];
       add(elsewhere, 6, 'alias');
     }

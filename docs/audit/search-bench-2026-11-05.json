@@ -1,0 +1,319 @@
+{
+  "node": "24.19.0",
+  "sqlite": "3.53.4",
+  "report": [
+    {
+      "products": 1000,
+      "dbBytes": 876544,
+      "insertMs": 10,
+      "indexBuildMs": 25,
+      "results": {
+        "barcode exact": {
+          "p50": 0.522,
+          "p95": 1.078,
+          "max": 1.936,
+          "results": 1,
+          "top": "barcode: Al Safi Juice Classic 2kg"
+        },
+        "SKU exact": {
+          "p50": 0.528,
+          "p95": 1.083,
+          "max": 1.261,
+          "results": 1,
+          "top": "sku: Al Safi Juice Classic 2kg"
+        },
+        "SKU prefix \"SKU0001\"": {
+          "p50": 0.516,
+          "p95": 1.087,
+          "max": 8.849,
+          "results": 20,
+          "top": "sku_prefix: Almarai Tea Family Pack 2L"
+        },
+        "name 3 letters \"ban\"": {
+          "p50": 0.535,
+          "p95": 1.081,
+          "max": 1.449,
+          "results": 20,
+          "top": "word_prefix: Nadec Banana Bunch 250g"
+        },
+        "name 2 letters Arabic \"مو\"": {
+          "p50": 0.57,
+          "p95": 1.249,
+          "max": 1.583,
+          "results": 20,
+          "top": "name_prefix: Al Safi Banana Fresh 250g"
+        },
+        "word prefix \"prem\"": {
+          "p50": 0.535,
+          "p95": 1.153,
+          "max": 1.263,
+          "results": 20,
+          "top": "word_prefix: Nadec Lamb Premium 2L"
+        },
+        "two words \"almarai milk\"": {
+          "p50": 0.702,
+          "p95": 1.454,
+          "max": 1.769,
+          "results": 12,
+          "top": "name_prefix: Almarai Milk Bunch 2kg"
+        },
+        "Arabic \"ارز\"": {
+          "p50": 0.535,
+          "p95": 1.094,
+          "max": 1.656,
+          "results": 20,
+          "top": "name_prefix: Al Safi Rice Fresh 5kg"
+        },
+        "no results \"zzzq\"": {
+          "p50": 0.444,
+          "p95": 0.854,
+          "max": 1.057,
+          "results": 0,
+          "top": null
+        }
+      }
+    },
+    {
+      "products": 10000,
+      "dbBytes": 5693440,
+      "insertMs": 91,
+      "indexBuildMs": 251,
+      "results": {
+        "barcode exact": {
+          "p50": 0.447,
+          "p95": 0.926,
+          "max": 1.265,
+          "results": 1,
+          "top": "barcode: Afia Juice Classic 2kg #9999"
+        },
+        "SKU exact": {
+          "p50": 0.452,
+          "p95": 1.409,
+          "max": 2.223,
+          "results": 1,
+          "top": "sku: Afia Juice Classic 2kg #9999"
+        },
+        "SKU prefix \"SKU0001\"": {
+          "p50": 0.484,
+          "p95": 1.358,
+          "max": 2.541,
+          "results": 20,
+          "top": "sku_prefix: Almarai Tea Family Pack 2L"
+        },
+        "name 3 letters \"ban\"": {
+          "p50": 0.517,
+          "p95": 1.212,
+          "max": 1.646,
+          "results": 20,
+          "top": "word_prefix: Nadec Banana Bunch 250g"
+        },
+        "name 2 letters Arabic \"مو\"": {
+          "p50": 0.6,
+          "p95": 1.18,
+          "max": 1.697,
+          "results": 20,
+          "top": "name_prefix: Afia Banana Bunch 250g"
+        },
+        "word prefix \"prem\"": {
+          "p50": 0.541,
+          "p95": 1.289,
+          "max": 1.37,
+          "results": 20,
+          "top": "word_prefix: Nadec Lamb Premium 2L"
+        },
+        "two words \"almarai milk\"": {
+          "p50": 0.852,
+          "p95": 1.504,
+          "max": 1.888,
+          "results": 20,
+          "top": "name_prefix: Almarai Milk Bunch 2kg"
+        },
+        "Arabic \"ارز\"": {
+          "p50": 0.506,
+          "p95": 1.292,
+          "max": 1.556,
+          "results": 20,
+          "top": "name_prefix: Afia Rice Bunch 5kg"
+        },
+        "no results \"zzzq\"": {
+          "p50": 0.404,
+          "p95": 1.689,
+          "max": 2.544,
+          "results": 0,
+          "top": null
+        }
+      }
+    },
+    {
+      "products": 50000,
+      "dbBytes": 27848704,
+      "insertMs": 801,
+      "indexBuildMs": 4431,
+      "results": {
+        "barcode exact": {
+          "p50": 1.781,
+          "p95": 2.675,
+          "max": 3.313,
+          "results": 1,
+          "top": "barcode: Bayara Onion Bunch 2L #49999"
+        },
+        "SKU exact": {
+          "p50": 1.931,
+          "p95": 2.686,
+          "max": 3.675,
+          "results": 1,
+          "top": "sku: Bayara Onion Bunch 2L #49999"
+        },
+        "SKU prefix \"SKU0001\"": {
+          "p50": 1.886,
+          "p95": 2.51,
+          "max": 2.677,
+          "results": 20,
+          "top": "sku_prefix: Almarai Tea Family Pack 2L"
+        },
+        "name 3 letters \"ban\"": {
+          "p50": 2.139,
+          "p95": 3.15,
+          "max": 4.228,
+          "results": 20,
+          "top": "word_prefix: Nadec Banana Bunch 250g"
+        },
+        "name 2 letters Arabic \"مو\"": {
+          "p50": 2.176,
+          "p95": 3.354,
+          "max": 3.92,
+          "results": 20,
+          "top": "name_prefix: Afia Banana Bunch 250g"
+        },
+        "word prefix \"prem\"": {
+          "p50": 2.844,
+          "p95": 3.998,
+          "max": 7.565,
+          "results": 20,
+          "top": "word_prefix: Nadec Lamb Premium 2L"
+        },
+        "two words \"almarai milk\"": {
+          "p50": 3.46,
+          "p95": 4.843,
+          "max": 5.218,
+          "results": 20,
+          "top": "name_prefix: Almarai Milk Bunch 2kg"
+        },
+        "Arabic \"ارز\"": {
+          "p50": 1.876,
+          "p95": 2.726,
+          "max": 2.872,
+          "results": 20,
+          "top": "name_prefix: Afia Rice Large 12 pack"
+        },
+        "no results \"zzzq\"": {
+          "p50": 1.848,
+          "p95": 2.808,
+          "max": 4.42,
+          "results": 0,
+          "top": null
+        }
+      }
+    },
+    {
+      "products": 100000,
+      "dbBytes": 55320576,
+      "insertMs": 3280,
+      "indexBuildMs": 14132,
+      "results": {
+        "barcode exact": {
+          "p50": 2.466,
+          "p95": 3.398,
+          "max": 4.057,
+          "results": 1,
+          "top": "barcode: Farm Juice Classic 2kg #99999"
+        },
+        "SKU exact": {
+          "p50": 1.841,
+          "p95": 2.872,
+          "max": 3.302,
+          "results": 1,
+          "top": "sku: Farm Juice Classic 2kg #99999"
+        },
+        "SKU prefix \"SKU0001\"": {
+          "p50": 2.292,
+          "p95": 3.525,
+          "max": 4.063,
+          "results": 20,
+          "top": "sku_prefix: Almarai Tea Family Pack 2L"
+        },
+        "name 3 letters \"ban\"": {
+          "p50": 1.916,
+          "p95": 2.915,
+          "max": 3.169,
+          "results": 20,
+          "top": "word_prefix: Nadec Banana Bunch 250g"
+        },
+        "name 2 letters Arabic \"مو\"": {
+          "p50": 1.937,
+          "p95": 3.867,
+          "max": 4.496,
+          "results": 20,
+          "top": "name_prefix: Afia Banana Bunch 250g"
+        },
+        "word prefix \"prem\"": {
+          "p50": 2.149,
+          "p95": 4.788,
+          "max": 7.309,
+          "results": 20,
+          "top": "word_prefix: Nadec Lamb Premium 2L"
+        },
+        "two words \"almarai milk\"": {
+          "p50": 4.196,
+          "p95": 5.461,
+          "max": 5.9,
+          "results": 20,
+          "top": "name_prefix: Almarai Milk Bunch 2kg"
+        },
+        "Arabic \"ارز\"": {
+          "p50": 2.768,
+          "p95": 4.102,
+          "max": 4.479,
+          "results": 20,
+          "top": "name_prefix: Afia Rice Large 12 pack"
+        },
+        "no results \"zzzq\"": {
+          "p50": 2.692,
+          "p95": 3.834,
+          "max": 5.232,
+          "results": 0,
+          "top": null
+        }
+      }
+    }
+  ],
+  "plans": {
+    "barcode": [
+      "SEARCH b USING INDEX sqlite_autoindex_product_barcodes_1 (barcode=?)",
+      "SEARCH p USING INTEGER PRIMARY KEY (rowid=?)"
+    ],
+    "sku": [
+      "SEARCH p USING INDEX sqlite_autoindex_products_1 (sku=?)"
+    ],
+    "plu": [
+      "SEARCH c USING INDEX sqlite_autoindex_plu_codes_1 (plu=?)",
+      "SEARCH p USING INTEGER PRIMARY KEY (rowid=?)"
+    ],
+    "nameEnPrefix": [
+      "SEARCH p USING COVERING INDEX ix_products_name_en_norm (name_en_norm>? AND name_en_norm<?)"
+    ],
+    "nameArPrefix": [
+      "SEARCH p USING COVERING INDEX ix_products_name_ar_norm (name_ar_norm>? AND name_ar_norm<?)"
+    ],
+    "ftsWordPrefix": [
+      "SCAN f VIRTUAL TABLE INDEX 0:M3",
+      "SEARCH p USING INTEGER PRIMARY KEY (rowid=?)"
+    ],
+    "skuPrefix": [
+      "SEARCH p USING INDEX sqlite_autoindex_products_1 (sku>? AND sku<?)"
+    ],
+    "oldLikeSearchForComparison": [
+      "SCAN products USING COVERING INDEX ix_products_name_en"
+    ]
+  }
+}

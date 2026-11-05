@@ -191,3 +191,13 @@ describe('permission matrix over IPC (audit 5.4: the backend enforces roles, not
     expect(n('SELECT count(*) AS n FROM sales')).toBe(1);
   });
 });
+
+describe('BUG-010: audit-log tampering is detected by the app', () => {
+  it('system.health reports a broken hash chain after a row is forged outside the app', async () => {
+    await dispatch('auth.setupAdmin', { username: 'owner', displayName: 'Owner', pin: '4321' }, s);
+    expect(await dispatch('system.health', null, s)).toMatchObject({ ok: true, data: { auditChainOk: true } });
+    // Someone with the database file inserts a fake audit row (UPDATE/DELETE are blocked by triggers, INSERT is not).
+    t.ctx.db.prepare("INSERT INTO audit_log (at, user_id, action, entity, entity_id, details_json, prev_hash, hash) VALUES ('2026-01-01', NULL, 'fake', 'x', NULL, '{}', 'x', 'y')").run();
+    expect(await dispatch('system.health', null, s)).toMatchObject({ ok: true, data: { auditChainOk: false } });
+  });
+});
