@@ -170,6 +170,11 @@ describe('permission matrix over IPC (audit 5.4: the backend enforces roles, not
       ['backup.run', null],
       ['restore.prepare', {}],
       ['restore.apply', null],
+      ['refund.create', { requestKey: 'abcdefgh-r1', invoiceNo: 'INV-00000001', reason: 'x', lines: [{ saleLineNo: 1, qty: 1000, restock: true }] }],
+      ['stock.waste', { requestKey: 'abcdefgh-w1', reason: 'x', lines: [{ productId: 1, qty: 1000 }] }],
+      ['stock.count', { requestKey: 'abcdefgh-c1', reason: 'x', lines: [{ productId: 1, countedQty: 0 }] }],
+      ['report.refunds', day],
+      ['report.adjustments', day],
     ];
     for (const [ch, payload] of forbidden) {
       const r = await dispatch(ch, payload, c);
@@ -189,6 +194,28 @@ describe('permission matrix over IPC (audit 5.4: the backend enforces roles, not
     const n = (sql: string) => (t.ctx.db.prepare(sql).get() as { n: number }).n;
     expect(n("SELECT count(*) AS n FROM audit_log WHERE action = 'sale.reprint'")).toBe(2);
     expect(n('SELECT count(*) AS n FROM sales')).toBe(1);
+  });
+});
+
+describe('refunds over IPC', () => {
+  it('cashier refund with a supervisor PIN prints a credit note; a wrong PIN refunds nothing', async () => {
+    await dispatch('auth.setupAdmin', { username: 'owner', displayName: 'Owner', pin: '4321' }, s);
+    await dispatch('catalog.create', { sku: 'W', nameAr: 'ماء', nameEn: 'Water', unitCode: 'PCS', sellMode: 'unit', vatRateBp: 1500, priceIncl: 250 }, s);
+    createUser(t.ctx, s.user!.id, { username: 'sup', displayName: 'Sup', pin: '2222', roles: ['supervisor'] });
+    createUser(t.ctx, s.user!.id, { username: 'cashier', displayName: 'C', pin: '1111', roles: ['cashier'] });
+    const c: Session = { user: null };
+    await dispatch('auth.login', { username: 'cashier', pin: '1111' }, c);
+    await dispatch('shift.open', { openingFloat: 1000 }, c);
+    await dispatch('sale.finalize', { idempotencyKey: 'abcdefgh-s1', lines: [{ productId: 1, qty: 2000 }], payments: [{ tender: 'cash', amount: 500 }] }, c);
+    expect(await dispatch('refund.find', { invoiceNo: 'inv-00000001' }, c)).toMatchObject({ ok: true, data: { withinWindow: true, lines: [{ remainingQty: 2000 }] } });
+    const base = { invoiceNo: 'INV-00000001', reason: 'Wrong item', lines: [{ saleLineNo: 1, qty: 1000, restock: true }] };
+    expect(await dispatch('refund.create', { ...base, requestKey: 'abcdefgh-r2', approver: { username: 'sup', pin: '0000' } }, c)).toMatchObject({ ok: false, code: 'AUTH_FAILED' });
+    expect(await dispatch('refund.create', { ...base, requestKey: 'abcdefgh-r3', approver: { username: 'sup', pin: '2222' } }, c)).toMatchObject({ ok: true, data: { refundNo: 'CN-00000001', totalIncl: 250 } });
+    const before = printed;
+    expect(await dispatch('refund.print', { refundId: 1, copy: false }, c)).toMatchObject({ ok: true });
+    expect(printed).toBe(before + 1);
+    expect(await dispatch('shift.current', null, c)).toMatchObject({ ok: true, data: { cashRefunds: 250, expectedCash: 1000 + 500 - 250 } });
+    expect((t.ctx.db.prepare('SELECT count(*) AS n FROM refunds').get() as { n: number }).n).toBe(1);
   });
 });
 

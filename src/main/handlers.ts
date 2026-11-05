@@ -10,7 +10,9 @@ import { holdBill, listHeldBills, recallBill, recordRemoval } from '../services/
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from '../services/import';
 import { receiveGoods } from '../services/inventory';
 import { createCustomer, createSupplier, findCustomers, listSuppliers } from '../services/parties';
-import { cashierActivity, salesSummary, stockOnHand, voidsReport } from '../services/reports';
+import { adjustmentsReport, cashierActivity, refundsReport, salesSummary, stockOnHand, voidsReport } from '../services/reports';
+import { createRefund, findSaleForRefund, refundReceiptData } from '../services/refunds';
+import { postStockCount, recordWastage } from '../services/adjustments';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
 import { closeShift, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
@@ -146,6 +148,23 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       const broken = verifyAuditChain(ctx);
       return { auditChainOk: broken === null, firstBrokenAuditId: broken };
     },
+    'refund.find': (p, s) => findSaleForRefund(ctx, userId(s), p.invoiceNo),
+    'refund.create': (p, s) => {
+      let approverId: number | undefined;
+      if (p.approver) approverId = authenticate(ctx, p.approver.username, p.approver.pin).id;
+      return createRefund(ctx, userId(s), { requestKey: p.requestKey, invoiceNo: p.invoiceNo, reason: p.reason, lines: p.lines, approverId });
+    },
+    'refund.print': async (p, s) => {
+      requirePermission(ctx, userId(s), 'sale.create');
+      const data = refundReceiptData(ctx, p.refundId);
+      if (p.copy) appendAudit(ctx, { userId: userId(s), action: 'refund.reprint', entity: 'refund', entityId: p.refundId, details: { refundNo: data.invoiceNo } });
+      await printer.printReceipt(data, p.copy);
+      return null;
+    },
+    'stock.waste': (p, s) => recordWastage(ctx, userId(s), p),
+    'stock.count': (p, s) => postStockCount(ctx, userId(s), p),
+    'report.refunds': (p, s) => refundsReport(ctx, userId(s), p.fromDay, p.toDay),
+    'report.adjustments': (p, s) => adjustmentsReport(ctx, userId(s), p.fromDay, p.toDay),
     'user.create': (p, s) => createUser(ctx, userId(s), { username: p.username, displayName: p.displayName, pin: p.pin, roles: [p.role] }),
     'backup.status': () => ({ ...backupStatus(ctx), keyConfigured: !!backup?.getKey() }),
     'backup.setupKey': (_p, s) => {
@@ -208,7 +227,11 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       if (e instanceof DomainError) return { ok: false, code: e.code, message: e.message };
       console.error(`[ipc] ${c} failed`, e);
       // Sale finalization is one transaction, so an unexpected error means nothing was saved.
-      return { ok: false, code: 'INTERNAL', message: c === 'sale.finalize' ? 'Sale NOT saved. Nothing was recorded. Try again.' : 'Unexpected error' };
+      return {
+        ok: false,
+        code: 'INTERNAL',
+        message: c === 'sale.finalize' ? 'Sale NOT saved. Nothing was recorded. Try again.' : c === 'refund.create' ? 'Refund NOT saved. Do not pay out cash. Try again.' : 'Unexpected error',
+      };
     }
   };
 }

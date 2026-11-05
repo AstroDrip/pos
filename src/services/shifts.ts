@@ -13,6 +13,8 @@ export interface ShiftSummary {
   cardSales: number;
   cashIn: number;
   cashOut: number;
+  refundCount: number;
+  cashRefunds: number; // refunds are always paid in cash (owner decision D1)
   expectedCash: number;
   countedCash: number | null;
 }
@@ -73,6 +75,8 @@ export function shiftSummary(ctx: Ctx, shiftId: number): ShiftSummary {
   const cardSales = q("SELECT COALESCE(SUM(p.amount),0) AS v FROM payments p JOIN sales s ON s.id = p.sale_id WHERE s.shift_id = ? AND p.tender = 'card'");
   const cashIn = q("SELECT COALESCE(SUM(amount),0) AS v FROM cash_movements WHERE shift_id = ? AND kind = 'in'");
   const cashOut = q("SELECT COALESCE(SUM(amount),0) AS v FROM cash_movements WHERE shift_id = ? AND kind = 'out'");
+  const refundCount = q('SELECT count(*) AS v FROM refunds WHERE shift_id = ?');
+  const cashRefunds = q('SELECT COALESCE(SUM(total_incl),0) AS v FROM refunds WHERE shift_id = ?');
   const cashSales = cashTendered - change;
   return {
     shiftId,
@@ -83,7 +87,9 @@ export function shiftSummary(ctx: Ctx, shiftId: number): ShiftSummary {
     cardSales,
     cashIn,
     cashOut,
-    expectedCash: s.opening_float + cashSales + cashIn - cashOut,
+    refundCount,
+    cashRefunds,
+    expectedCash: s.opening_float + cashSales + cashIn - cashOut - cashRefunds,
     countedCash: s.counted_cash,
   };
 }

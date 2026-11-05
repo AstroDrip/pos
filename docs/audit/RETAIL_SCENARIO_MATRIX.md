@@ -43,7 +43,7 @@ Run date: 2026-11-05.
 | S-3.3-03 | Zero weight, 99.999 kg, 999.99 SAR, bad check digit, unknown code, piece product on a label | All rejected with a specific message | PASS (auto) | S |
 | S-3.3-04 | Two packs, same product, different weights | Two lines, priced separately | PASS (auto) | S |
 | S-3.3-05 | Repeated scan of the same label | Double-scan confirmation (same as any barcode) | PASS (auto) | `hardware-input.test.ts` |
-| S-3.3-06 | Refund of a partly used weighed item | Needs refunds | N/I | — |
+| S-3.3-06 | Refund of a partly used weighed item | 0.5 kg of 1.2 kg refunded; amount proportional to what was paid | PASS | phase2.test.ts |
 | B-3.3-07 | The store's real label format | Must come from the scale's settings or a photo | BLOCKED | — |
 
 ## Part 3.1 / 3.4 / 3.5 — checkout, discounts, payments
@@ -76,11 +76,11 @@ Run date: 2026-11-05.
 
 | ID | Scenario | Status |
 |---|---|---|
-| 4.1 | Partial refund linked to the original | **N/I**: refunds not built (Phase 2) |
-| 4.2 / A | Refund SAR 40 → SAR 20 cash + SAR 20 toward a new SAR 35 sale | **N/I**: needs refunds + store credit |
+| 4.1 | Partial refund linked to the original | **PASS** (phase2.test.ts, e2e): linked to the sale line; discount shared per unit; partial refunds sum exactly to what was paid |
+| 4.2 / A | Refund SAR 40 → SAR 20 cash + SAR 20 toward a new SAR 35 sale | **Not supported by policy**: refunds are cash only and store credit was not requested. Workaround: refund 40 in cash, then a new sale |
 | 4.3 | Store credit issue, use, concurrency | **N/I**: not in the approved plan |
-| 4.4 | Refund without a receipt, altered receipt, old purchase | **N/I + BLOCKED**: needs the return policy |
-| 4.5 / F / L | Double refund, over-refund, concurrent refund | **N/I**: design in FINANCIAL_INTEGRITY_AUDIT §4 |
+| 4.4 | Refund without a receipt, altered receipt, old purchase | **PASS**: unknown invoice refused; amounts come only from the stored sale, never from the paper; day 8 refused, day 7 allowed (Saudi days) |
+| 4.5 / F / L | Double refund, over-refund, concurrent refund | **PASS**: same request key pays once; over-refund refused (service and screen); one database connection serialises tills |
 
 ## Part 5 — receipt tampering and fraud
 
@@ -95,7 +95,7 @@ Run date: 2026-11-05.
 | S-13-01 | Deactivated user logs in or approves | Refused | PASS (auto) | S |
 | V-13-02 | 5 wrong PINs | Locked 5 minutes; audited | PASS (auto) | V |
 | E-13-03 | Renderer has no Node access, unknown channels blocked, navigation blocked | As expected | PASS (E2E) | E |
-| 5.3-x | Fake refund / credit to self | N/I (no refunds yet), so impossible today | N/I | — |
+| 5.3-x | Fake refund / credit to self | Needs a real invoice and a supervisor PIN; cashier and approver recorded; per-user refund counts in the cashier report | PASS | phase2.test.ts, handlers.test.ts |
 | 5.3-y | Repeated drawer opening | N/I (no drawer command) | BLOCKED | — |
 
 ## Part 6 / 7 — stock and purchasing
@@ -105,7 +105,7 @@ Run date: 2026-11-05.
 | S-7-01 | GRN saved twice (double click) | PASS (auto) | S |
 | V-6-01 | Negative stock: block policy rolls back the whole sale; allow policy flags it | PASS (auto) | V |
 | V-6-02 | Weighted-average cost on receipt; COGS at average cost | PASS (auto) | V |
-| 6.1-x | Count, adjustment, wastage, expiry, supplier return | N/I (Phase 2) | — |
+| 6.1-x | Count, adjustment, wastage, expiry, supplier return | Count and wastage PASS (phase2.test.ts, e2e). Expiry/batch and supplier returns not built (Phase 2 rest / Phase 4) | partial |
 | 6.3 | Two tills selling the last item | N/A: single till, single connection; transactions are serialised | — |
 | 7-x | PO, partial or excess delivery, supplier invoice/payment/return | N/I (Phase 4) | — |
 

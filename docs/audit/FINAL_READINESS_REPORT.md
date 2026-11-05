@@ -21,7 +21,7 @@ The core checkout, stock, cash and audit logic is sound and heavily tested. Real
 ## Blockers before any real sale (Critical)
 
 1. **ZATCA Phase 2** not implemented (Phase 5), so invoices are not legal tax invoices.
-2. **Refunds and credit notes** not implemented (Phase 2), so the store can't return goods.
+2. **Refunds**: built 2026-11-05 to the owner's policy D1, with local credit notes. The **ZATCA credit note** (and debit note) is still missing (Phase 5).
 3. **Off-site backup** not implemented (Phase 6), so a stolen or dead laptop loses data unless USB copies are made.
 4. **Store hardware** untested: scanner, receipt printer, scale label format, cash drawer.
 
@@ -30,14 +30,14 @@ The core checkout, stock, cash and audit logic is sound and heavily tested. Real
 5. The accountant approves the chart of accounts and posting rules, including what the suspense account 2900 cash movements become.
 6. Owner decisions (below).
 7. Clean-PC install and update test; code-signing certificate (otherwise SmartScreen warns).
-8. Stock count, wastage and adjustments (Phase 2).
+8. Stock count and wastage: built 2026-11-05. Batches and expiry dates are not built yet.
 9. Residual risk R-1 (direct DB editing by someone with Windows access): separate Windows account for cashiers, plus device encryption.
 
 ## Owner decisions needed
 
 | # | Decision | Safe default in the build today |
 |---|---|---|
-| D1 | Return policy: period, receipt required, refund tender, approval limits | No refunds possible |
+| D1 | ~~Return policy~~ **Decided 2026-11-05:** 7 days, receipt required, cash only, supervisor approval | Built |
 | D2 | Offer store credit? Expiry? Customer ID required? | Not offered |
 | D3 | Scale label format (weight, price or both) and which price wins (F-SCALE-1/2) | Weight labels charge today's price; price labels charge the printed price |
 | D4 | Scale label limits (30 kg / 1,000 SAR) | Those limits |

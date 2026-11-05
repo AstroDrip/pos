@@ -29,13 +29,20 @@ export function receiptHtml(r: ReceiptData, store: { nameAr: string; nameEn: str
 <div class="c b" dir="rtl">${esc(store.nameAr)}</div><div class="c b">${esc(store.nameEn)}</div>
 <div class="c">VAT No. / الرقم الضريبي: ${esc(store.vatNumber || '—')}</div>
 ${copy ? '<div class="c b">COPY / نسخة</div>' : ''}
-<div class="c">TEST BUILD — NOT A ZATCA TAX INVOICE</div>
-<hr><div>Invoice: ${esc(r.invoiceNo)}</div><div>Date / التاريخ: ${esc(storeDateTime(r.createdAt))}</div><div>Cashier: ${esc(r.cashier)}</div><hr>
+${r.kind === 'refund' ? '<div class="c b">REFUND — CREDIT NOTE<br><span dir="rtl">استرداد — إشعار دائن</span></div>' : ''}
+<div class="c">TEST BUILD — NOT A ZATCA ${r.kind === 'refund' ? 'CREDIT NOTE' : 'TAX INVOICE'}</div>
+<hr>${r.kind === 'refund'
+    ? `<div>Credit note: ${esc(r.invoiceNo)}</div><div>Original invoice / الفاتورة الأصلية: ${esc(r.originalInvoiceNo ?? '')}</div><div>Reason / السبب: ${esc(r.reason ?? '')}</div>`
+    : `<div>Invoice: ${esc(r.invoiceNo)}</div>`}
+<div>Date / التاريخ: ${esc(storeDateTime(r.createdAt))}</div><div>Cashier: ${esc(r.cashier)}</div>${r.approver ? `<div>Approved by: ${esc(r.approver)}</div>` : ''}<hr>
 <table>${rows}</table><hr>
 <table>
 <tr><td>Total excl. VAT</td><td></td><td class="r">${formatSar(r.totalExcl)}</td></tr>
 <tr><td>VAT 15%</td><td></td><td class="r">${formatSar(r.totalVat)}</td></tr>
-<tr class="b"><td>Total / الإجمالي</td><td></td><td class="r">${formatSar(r.totalIncl)}</td></tr>
-${pays}<tr><td>Change / الباقي</td><td></td><td class="r">${formatSar(r.changeGiven)}</td></tr>
+${r.kind === 'refund'
+    ? `<tr class="b"><td>Refunded / المبلغ المسترد</td><td></td><td class="r">${formatSar(r.totalIncl)}</td></tr>
+<tr><td>Paid back in cash / نقداً</td><td></td><td class="r">${formatSar(r.totalIncl)}</td></tr>`
+    : `<tr class="b"><td>Total / الإجمالي</td><td></td><td class="r">${formatSar(r.totalIncl)}</td></tr>
+${pays}<tr><td>Change / الباقي</td><td></td><td class="r">${formatSar(r.changeGiven)}</td></tr>`}
 </table></body></html>`;
 }

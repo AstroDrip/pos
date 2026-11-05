@@ -35,6 +35,12 @@ export interface SalesSummary {
   totalDiscount: number;
   cash: number;
   card: number;
+  /** Refunds made in the period (cash, any original sale date). Net = sales minus refunds. */
+  refundCount: number;
+  refundTotal: number;
+  refundVat: number;
+  netIncl: number;
+  netVat: number;
   byDay: { day: string; saleCount: number; totalIncl: number; totalVat: number }[];
   topProducts: { productId: number; nameEn: string; qty: number; totalIncl: number }[];
 }
@@ -56,12 +62,20 @@ export function salesSummary(ctx: Ctx, userId: number, fromDay: string, toDay: s
   const tender = (k: string) =>
     (ctx.db.prepare('SELECT COALESCE(SUM(p.amount),0) AS v FROM payments p JOIN sales s ON s.id = p.sale_id WHERE p.tender = ? AND s.created_at >= ? AND s.created_at < ?').get(k, from, to) as { v: number }).v;
   const { change, ...totals } = t;
+  const r = ctx.db
+    .prepare('SELECT count(*) AS n, COALESCE(SUM(total_incl),0) AS incl, COALESCE(SUM(total_vat),0) AS vat FROM refunds WHERE created_at >= ? AND created_at < ?')
+    .get(from, to) as { n: number; incl: number; vat: number };
   return {
     from: fromDay,
     to: toDay,
     ...totals,
     cash: tender('cash') - change,
     card: tender('card'),
+    refundCount: r.n,
+    refundTotal: r.incl,
+    refundVat: r.vat,
+    netIncl: totals.totalIncl - r.incl,
+    netVat: totals.totalVat - r.vat,
     byDay: ctx.db
       .prepare(
         `SELECT ${sqlStoreDay('created_at')} AS day, count(*) AS saleCount, SUM(total_incl) AS totalIncl, SUM(total_vat) AS totalVat
@@ -116,6 +130,9 @@ export interface CashierActivity {
   removals: number;
   removedValue: number;
   reprints: number;
+  refundCount: number; // refunds this user processed
+  refundTotal: number;
+  refundsApproved: number; // refunds this user approved (supervisors)
   cashOutCount: number;
   cashOutTotal: number;
   shiftsClosed: number;
@@ -141,6 +158,8 @@ export function cashierActivity(ctx: Ctx, userId: number, fromDay: string, toDay
       const pay = (t: string) => one(`SELECT COALESCE(SUM(p.amount),0) AS v FROM payments p JOIN sales s ON s.id = p.sale_id WHERE s.user_id = ? AND p.tender = ? AND s.created_at >= ? AND s.created_at < ?`, u.id, t, from, to).v!;
       const audit = (actions: string) => ctx.db.prepare(`SELECT details_json FROM audit_log WHERE user_id = ? AND action IN (${actions}) AND at >= ? AND at < ?`).all(u.id, from, to) as { details_json: string }[];
       const removed = audit("'sale.line_removed','sale.bill_cleared'");
+      const ref = one('SELECT count(*) AS n, COALESCE(SUM(total_incl),0) AS v FROM refunds WHERE user_id = ? AND created_at >= ? AND created_at < ?', u.id, from, to);
+      const approved = one('SELECT count(*) AS n FROM refunds WHERE approved_by = ? AND created_at >= ? AND created_at < ?', u.id, from, to);
       const out = one(`SELECT count(*) AS n, COALESCE(SUM(amount),0) AS v FROM cash_movements WHERE user_id = ? AND kind = 'out' AND at >= ? AND at < ?`, u.id, from, to);
       const shifts = one(`SELECT count(*) AS n, COALESCE(SUM(counted_cash - expected_cash),0) AS v FROM register_shifts WHERE closed_by = ? AND closed_at >= ? AND closed_at < ?`, u.id, from, to);
       return {
@@ -155,11 +174,74 @@ export function cashierActivity(ctx: Ctx, userId: number, fromDay: string, toDay
         removals: removed.length,
         removedValue: removed.reduce((sum, r) => sum + ((JSON.parse(r.details_json) as { total?: number }).total ?? 0), 0),
         reprints: audit("'sale.reprint'").length,
+        refundCount: ref.n!,
+        refundTotal: ref.v!,
+        refundsApproved: approved.n!,
         cashOutCount: out.n!,
         cashOutTotal: out.v!,
         shiftsClosed: shifts.n!,
         overShortTotal: shifts.v!,
       };
     })
-    .filter((a) => a.sales + a.removals + a.reprints + a.cashOutCount + a.shiftsClosed > 0);
+    .filter((a) => a.sales + a.removals + a.reprints + a.refundCount + a.refundsApproved + a.cashOutCount + a.shiftsClosed > 0);
+}
+
+export interface RefundRow {
+  refundId: number;
+  refundNo: string;
+  at: string;
+  invoiceNo: string;
+  saleAt: string;
+  cashier: string;
+  approver: string;
+  reason: string;
+  items: number;
+  restockedItems: number;
+  total: number;
+}
+
+/** Refunds (credit notes) made on store days fromDay..toDay. */
+export function refundsReport(ctx: Ctx, userId: number, fromDay: string, toDay: string): RefundRow[] {
+  requirePermission(ctx, userId, 'reports.view');
+  if (toDay < fromDay) throw new DomainError('VALIDATION', '"To" date is before "From" date');
+  return ctx.db
+    .prepare(
+      `SELECT r.id AS refundId, r.refund_no AS refundNo, r.created_at AS at, s.invoice_no AS invoiceNo, s.created_at AS saleAt,
+              u.display_name AS cashier, a.display_name AS approver, r.reason, r.total_incl AS total,
+              (SELECT count(*) FROM refund_lines l WHERE l.refund_id = r.id) AS items,
+              (SELECT count(*) FROM refund_lines l WHERE l.refund_id = r.id AND l.restock = 1) AS restockedItems
+       FROM refunds r JOIN sales s ON s.id = r.original_sale_id JOIN users u ON u.id = r.user_id JOIN users a ON a.id = r.approved_by
+       WHERE r.created_at >= ? AND r.created_at < ? ORDER BY r.id`,
+    )
+    .all(storeDayStartUtc(fromDay), storeDayStartUtc(nextDay(toDay))) as RefundRow[];
+}
+
+export interface AdjustmentRow {
+  adjNo: string;
+  at: string;
+  kind: 'waste' | 'count';
+  reason: string;
+  user: string;
+  sku: string;
+  nameEn: string;
+  nameAr: string;
+  systemQty: number;
+  countedQty: number | null;
+  qty: number;
+  value: number;
+}
+
+/** Wastage and stock-count differences, one row per product line, for store days fromDay..toDay. */
+export function adjustmentsReport(ctx: Ctx, userId: number, fromDay: string, toDay: string): AdjustmentRow[] {
+  requirePermission(ctx, userId, 'reports.view');
+  if (toDay < fromDay) throw new DomainError('VALIDATION', '"To" date is before "From" date');
+  return ctx.db
+    .prepare(
+      `SELECT a.adj_no AS adjNo, a.created_at AS at, a.kind, a.reason, u.display_name AS user, p.sku, p.name_en AS nameEn, p.name_ar AS nameAr,
+              l.system_qty AS systemQty, l.counted_qty AS countedQty, l.qty, l.value
+       FROM stock_adjustments a JOIN stock_adjustment_lines l ON l.adjustment_id = a.id JOIN products p ON p.id = l.product_id
+       JOIN users u ON u.id = a.user_id
+       WHERE a.created_at >= ? AND a.created_at < ? ORDER BY a.id, l.line_no`,
+    )
+    .all(storeDayStartUtc(fromDay), storeDayStartUtc(nextDay(toDay))) as AdjustmentRow[];
 }

@@ -4,16 +4,18 @@ import { Admin, Restore, type FullBackupStatus } from './Admin';
 import { call } from './api';
 import { LangToggle, useI18n } from './i18n';
 import { Products } from './Products';
+import { Refund } from './Refund';
 import { Reports } from './Reports';
 import { Sell } from './Sell';
 import { Shift } from './Shift';
 import { Stock } from './Stock';
 
 type Status = { needsSetup: boolean; user: User | null };
-type Tab = 'sell' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
+type Tab = 'sell' | 'refund' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
 
 const TABS: { id: Tab; label: string; perm?: string }[] = [
   { id: 'sell', label: 'Sell' },
+  { id: 'refund', label: 'Refund' },
   { id: 'stock', label: 'Stock', perm: 'stock.receive' },
   { id: 'products', label: 'Products', perm: 'product.manage' },
   { id: 'reports', label: 'Reports', perm: 'reports.view' },
@@ -67,6 +69,7 @@ export function App() {
       </div>
       {can('reports.view') && <HealthBanner />}
       {tab === 'sell' && <Sell canDiscount={can('sale.discount')} />}
+      {tab === 'refund' && <Refund canApprove={can('sale.refund')} />}
       {tab === 'stock' && <Stock can={can} />}
       {tab === 'products' && <Products />}
       {tab === 'reports' && <Reports />}

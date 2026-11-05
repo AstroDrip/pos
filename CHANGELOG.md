@@ -2,7 +2,37 @@
 
 Not for live trading: there is no ZATCA Phase 2 integration yet, and receipts are marked "NOT A ZATCA TAX INVOICE".
 
-## Unreleased — Phase 1, checkpoint 3: known-gap fixes (2026-11-05)
+## Unreleased — Phase 2, part 1: refunds, wastage, stock counts (2026-11-05)
+
+Built to the owner's refund policy (decision D1, given 2026-11-05): **7-day window, original receipt required, refunds always paid in cash, supervisor approval for every refund.** Store credit (D2) was not requested and is not built.
+
+### Added
+- **Refund tab.** The cashier types the invoice number from the receipt. The screen shows what was sold, what was already refunded and how many days have passed. The cashier picks quantities and a reason. A supervisor PIN is needed, or a logged-in supervisor approves it. The app then prints a **credit note** (CN-00000001…) naming the original invoice, reason, cashier and approver.
+  - Refunds cannot exceed what was sold on that line, counting earlier refunds. A double-click pays out once (request key).
+  - The amount comes from the stored sale: the price paid, discount shared out per unit. Refunding the last units of a line returns the exact remainder, so all refunds of a line can never add up to more than was paid (tested).
+  - "Back on shelf" (ticked by default) returns the item to stock at the cost it left at. Untick it for damaged or expired goods: the customer still gets the money, the stock does not come back.
+  - Books: Dr Sales and Dr VAT payable, Cr Cash; restocked goods Dr Inventory / Cr Cost of goods sold.
+  - Sales made by card are refunded in cash, as decided. The screen warns the cashier when the sale was paid by card.
+  - Refunds and refund lines are immutable (database triggers), like sales.
+- **Wastage** (Stock tab, supervisor/admin): expired, damaged, spoiled or other. Stock is taken off at the average cost, Dr 5100 Wastage / Cr Inventory, document ADJ-000001…
+- **Stock count** (Stock tab, supervisor/admin): enter what is on the shelf (blind count: the system quantity is not shown). Only the differences are recorded; gains and losses are posted to 5100. Count with the shop closed.
+- **Shift**: "Refunds paid in cash" line; expected drawer cash is reduced by refunds.
+- **Reports**: refunds and net sales / net VAT in the summary, a refunds list (credit note, invoice, cashier, approver, reason), a wastage and count-differences list, and refunds processed / approved per user in the cashier report.
+- Migration 5 (new tables only; existing data untouched; the encrypted pre-migration snapshot runs first as usual).
+
+### Not done in this part
+- **ZATCA credit note** (XML, signature, QR, reporting): Phase 5. Each refund already stores the original invoice and its own UUID for it. **Debit notes** are also needed for ZATCA onboarding and will come with Phase 5.
+- Batches and expiry dates, device diagnostics (rest of Phase 2 in the plan).
+- **For the accountant:** an item sold while stock was below zero left at cost 0.00 (no stock had been received yet). If it is refunded and put back on the shelf, it returns at 0.00, which lowers the average cost. This follows "returns come back at the cost they left at". Receiving goods before selling them avoids it.
+
+### Verified (commands run on 2026-11-05)
+- `npm run typecheck`, `npm run lint`: clean. `npm test`: **119 passed** (16 new: 15 refund/wastage/count tests, 1 refund-over-IPC test; the cashier permission matrix now also covers refunds without approval, wastage, counts and the two new reports).
+- `node e2e/smoke.mjs`: **24/24 steps**. New steps:
+  - cashier refund with the owner's PIN: over-refund refused on screen, credit note printed with the original invoice, receipt then shows "already refunded";
+  - shift shows the refund and the reduced expected cash;
+  - owner records wastage and a stock count, then sees refunds, net sales and differences in Reports.
+
+## Phase 1, checkpoint 3: known-gap fixes (2026-11-05)
 
 ### Fixed
 - **Saudi business days.** Reports, the voids report and **journal entry dates** now use Riyadh time (UTC+3, no daylight saving). Before this, a sale after 9 pm was dated the previous day in the books.

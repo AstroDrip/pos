@@ -144,10 +144,11 @@ try {
 
   await step('stock: receive goods from the supplier', async () => {
     await page.click('.top button:has-text("Stock")');
-    await page.locator('.card select').selectOption({ label: 'Farm Co' });
-    await page.locator('.card input[placeholder="Search name or SKU"]').fill('Water');
-    await page.click('.card button:has-text("Water 1.5L")');
-    const row = page.locator('.card table.list tbody tr').first().locator('input');
+    const grn = page.locator('.card:has(h3:text("Receive goods"))');
+    await grn.locator('select').selectOption({ label: 'Farm Co' });
+    await grn.locator('input[placeholder="Search name or SKU"]').fill('Water');
+    await grn.locator('button:has-text("Water 1.5L")').click();
+    const row = grn.locator('table.list tbody tr').first().locator('input');
     await row.nth(0).fill('24');
     await row.nth(1).fill('1.50');
     await page.click('button:has-text("Save receipt")');
@@ -188,12 +189,37 @@ try {
     await page.waitForSelector('text=SAVED INV-00000003');
   });
 
-  await step('shift shows expected cash and closes', async () => {
+  await step('cashier: refund needs a supervisor PIN, pays cash and prints a credit note', async () => {
+    await page.click('.top button:has-text("Refund")');
+    await page.fill('input[aria-label="refund invoice"]', 'inv-00000001');
+    await page.click('button:has-text("Find sale")');
+    await page.waitForSelector('td:has-text("Water 1.5L")');
+    await page.fill('input[aria-label="refund qty 1"]', '3');
+    await page.waitForSelector('text=Check the quantities'); // only 2 were sold
+    await page.fill('input[aria-label="refund qty 1"]', '1');
+    await page.fill('input[placeholder="Supervisor username"]', 'owner');
+    await page.fill('input[placeholder="PIN"]', '4321');
+    await page.click('button:has-text("Refund about 2.50 in cash")');
+    await page.waitForSelector('text=Refund CN-00000001 saved. Give the customer 2.50 in cash.');
+    await page.waitForTimeout(500);
+    const html = readFileSync(receipt, 'utf8');
+    assert.match(html, /CREDIT NOTE/);
+    assert.match(html, /CN-00000001/);
+    assert.match(html, /INV-00000001/);
+    // the same receipt cannot refund more than is left
+    await page.fill('input[aria-label="refund invoice"]', 'INV-00000001');
+    await page.click('button:has-text("Find sale")');
+    await page.waitForSelector('text=Already refunded on this receipt: CN-00000001');
+  });
+
+  await step('shift shows refund and expected cash, and closes', async () => {
     await page.click('.top button:has-text("Shift")');
     await page.waitForSelector('text=Expected cash in drawer');
-    assert.match(await page.locator('table').innerText(), /107\.50/);
+    const table = await page.locator('table').innerText();
+    assert.match(table, /Refunds paid in cash \(1\)\s+2\.50/);
+    assert.match(table, /105\.00/); // 107.50 minus the 2.50 refund
     page.once('dialog', (d) => d.accept());
-    await page.locator('.card input').last().fill('107.50');
+    await page.locator('.card input').last().fill('105.00');
     await page.click('button:has-text("Close shift")');
     await page.waitForSelector('text=No open shift');
   });
@@ -208,6 +234,32 @@ try {
     await page.click('button:has-text("Back up now")');
     await page.waitForSelector('text=Backup saved');
     assert.match(await page.locator('.top').innerText(), /Backup less than 1h ago/);
+  });
+
+  await step('owner: wastage and a stock count adjust stock and show in reports', async () => {
+    await page.click('.top button:has-text("Stock")');
+    const waste = page.locator('.card:has(h3:text("Record wastage"))');
+    await waste.locator('input[aria-label="waste product search"]').fill('Water');
+    await waste.locator('button:has-text("Water 1.5L")').click();
+    await waste.locator('input[aria-label="waste qty 1"]').fill('1');
+    await waste.locator('button:has-text("Save wastage")').click();
+    // INV-00000001 was sold before any stock arrived (cost 0.00); its refunded unit came back at that cost,
+    // so the average cost is (20 x 1.50 + 1 x 0.00) / 21 = 1.43.
+    await page.waitForSelector('text=ADJ-000001 saved: 1 products changed, value -1.43');
+    // stock now 24 received - 4 sold + 1 refunded - 1 wasted = 20; the shelf has 18
+    const count = page.locator('.card:has(h3:text("Stock count"))');
+    await count.locator('input[placeholder="e.g. Monthly count, aisle 3"]').fill('E2E count');
+    await count.locator('input[aria-label="count product search"]').fill('Water');
+    await count.locator('button:has-text("Water 1.5L")').click();
+    await count.locator('input[aria-label="count qty 1"]').fill('18');
+    await count.locator('button:has-text("Post count")').click();
+    await page.waitForSelector('text=ADJ-000002 saved: 1 products changed, value -2.86');
+    await page.click('.top button:has-text("Reports")');
+    await page.waitForSelector('text=Net sales incl. VAT');
+    const text = await page.locator('.page').innerText();
+    assert.match(text, /Refunds \(1, paid in cash\)\s+-2\.50/);
+    assert.match(text, /Net sales incl\. VAT\s+7\.00/); // 9.50 sold - 2.50 refunded
+    assert.match(text, /Wastage and stock count differences \(2\)/);
   });
 
   await step('Arabic UI switches to right-to-left and back', async () => {

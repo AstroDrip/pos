@@ -35,7 +35,7 @@ Date: 2026-11-05. Scope: payments, tax, stock and accounting as built in Phase 1
 | Goods receipt | 1200 Inventory | 2100 Goods received not invoiced | Tested |
 | Shift over/short | 1010 / 6000 | 6000 / 1010 | Tested |
 | Cash in/out | 1010 / 2900 Suspense | 2900 / 1010 | Tested; the accountant reclassifies |
-| Refund, credit note, store credit | — | — | **Not built** (§4) |
+| Refund, credit note | Proportional to the paid line, exact remainder on the last units; Dr 4000 + Dr 2200 / Cr 1010; restock Dr 1200 / Cr 5000 at sale cost | phase2.test.ts (balanced journals, no stock drift, VAT refunded = VAT charged) | **Built 2026-11-05** (local credit note; ZATCA in Phase 5). Store credit not built (not requested) |
 | Supplier invoice and payment, expenses, period close | — | — | Not built (Phase 3/4) |
 
 Posted entries are immutable (triggers). Double posting is blocked by `UNIQUE(source_type, source_id)`.

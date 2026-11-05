@@ -37,6 +37,7 @@ export function Shift({ can }: { can: (p: string) => boolean }) {
           <tr><td>{t('Cash sales')}</td><td className="num">{formatSar(s.cashSales)}</td></tr>
           <tr><td>{t('Card sales')}</td><td className="num">{formatSar(s.cardSales)}</td></tr>
           <tr><td>{t('Cash in / out')}</td><td className="num">{formatSar(s.cashIn)} / {formatSar(s.cashOut)}</td></tr>
+          <tr><td>{t('Refunds paid in cash ({0})', s.refundCount)}</td><td className="num">{formatSar(s.cashRefunds)}</td></tr>
           <tr><td><strong>{t('Expected cash in drawer')}</strong></td><td className="num"><strong>{formatSar(s.expectedCash)}</strong></td></tr>
         </tbody>
       </table>

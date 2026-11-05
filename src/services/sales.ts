@@ -181,6 +181,11 @@ function getSaleResult(ctx: Ctx, saleId: number): Omit<SaleResult, 'replayed'> {
 }
 
 export interface ReceiptData {
+  /** 'refund' = credit note; invoiceNo then holds the credit note number. */
+  kind?: 'sale' | 'refund';
+  originalInvoiceNo?: string;
+  reason?: string;
+  approver?: string;
   invoiceNo: string;
   uuid: string;
   createdAt: string;

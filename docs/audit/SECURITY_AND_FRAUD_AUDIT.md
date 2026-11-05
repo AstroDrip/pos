@@ -45,7 +45,7 @@ Recommended (not implemented):
 | Removes items before payment and pockets cash | Allowed (decision Q-10), always audited with bill and invoice no. | "Items removed before payment" report; removals per cashier |
 | Removes an item **after** payment, voids a sale | Impossible (immutable) | — |
 | Scans a cheaper product instead | Not detectable by software alone; the product name prints on the receipt for the customer | CCTV / spot checks |
-| Fake refund, credit to self | No refunds exist yet. The design (financial audit §4) requires a link to the original sale, refundable qty and approval | — |
+| Fake refund, credit to self | Needs a real invoice within 7 days and a supervisor's approval; capped at what is left on each line; immutable | Refunds report (cashier, approver, reason); refunds and approvals per user in the cashier report |
 | Excessive reprints | Audited | Reprints per cashier |
 | Drawer opened without a sale | No drawer command yet; it will be audited when built | — |
 | Uses another user's login / shares PIN | Not preventable by software; PIN lockout; idle auto-lock not implemented (F-AUTH-1) | User activity in the audit log |
