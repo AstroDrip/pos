@@ -91,9 +91,11 @@ See the task ledger (`docs/IMPLEMENTATION_TASK_LEDGER.md`) for the per-task stat
 
 | Req | Status | Files | Migration | Tests | Blockers | Verified |
 |---|---|---|---|---|---|---|
-| A Themes | pending | | — | | — | |
-| B Expenses + accounting | pending | | 6 | | Accountant approval of the chart and VAT treatment (provisional defaults used) | |
-| C Owner dashboard | pending | | 6 | | Hosting decision and cost | |
-| D Keyboard workflow | pending | | — | | — | |
-| E Weighed-label format | pending | | 6 | | **Real label sample** | |
-| F Financial report integration | pending | | — | | Accountant approval | |
+| A Themes | **VERIFIED** | `renderer/theme.tsx`, `styles.css` (tokens), `App.tsx` | — | `theme.test.ts` (tokens complete in both themes, no hardcoded colours), e2e (dark during open bill, kept after reload) | — | 2026-11-05 |
+| B Expenses + accounting | **VERIFIED, PROVISIONAL accounting** | `services/expenses.ts`, `renderer/Expenses.tsx` | 7 | `expenses.test.ts` (19), permission matrix, e2e | Accountant approval of chart, posting rules and VAT treatment | 2026-11-05 |
+| C Owner dashboard | **PARTIAL** (POS side built; remote service + phone UI MISSING) | `services/dashboard-sync.ts`, Admin sync card | 8 | `dashboard-sync.test.ts` (8, simulated server) | **Owner decision: hosting provider, domain, monthly cost** | 2026-11-05 |
+| D Keyboard workflow | **VERIFIED** | `renderer/checkout-keys.ts`, `Sell.tsx`, `SearchBox.tsx` | — | `checkout-keys.test.ts` (7), e2e keyboard-only sale, Ctrl+Enter, split refusal, repeated Enter | Typing a weight for weighed goods still blocked (decision Q-8) | 2026-11-05 |
+| E Weighed-label format | **PARTIAL / BLOCKED** (configurable parser built; real layout unverified) | `core/scale-layout.ts`, `services/catalog.ts`, Admin "Scale labels" | 6 | `scale-layout.test.ts` (8), `scale-labels.test.ts` (6) — synthetic layouts only | **Real label from the store's scale** | 2026-11-05 |
+| F Financial report integration | **VERIFIED, PROVISIONAL** | `services/financials.ts`, `renderer/Accounting.tsx` | — | reconciliation test (P&L = sales − refunds, COGS, BS balanced, TB balanced, GL, KPIs = P&L) | Accountant approval; no period close | 2026-11-05 |
+
+Found and fixed during this work: BUG-015 (cost of units sold below zero stock), BUG-016 (default capital category), BUG-017/018 (keyboard focus). See `docs/audit/BUG_REGISTER.md`.

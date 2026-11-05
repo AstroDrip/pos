@@ -2,6 +2,38 @@
 
 Not for live trading: there is no ZATCA Phase 2 integration yet, and receipts are marked "NOT A ZATCA TAX INVOICE".
 
+## Unreleased — Owner tools: themes, keyboard checkout, scale layouts, expenses, accounting, dashboard sync (2026-11-05)
+
+Branch `feature/owner-tools`. Details: `docs/IMPLEMENTATION_STATUS.md`, `docs/ARCHITECTURE_DECISIONS.md`.
+
+### Added
+- **Light / dark / system appearance** (top bar). Kept per till; switching never touches the open bill.
+- **Keyboard checkout**:
+  - type 3 letters or a code, ↑/↓, Enter → quantity box (`+` adds one) → Enter adds the item;
+  - on the empty search box, Enter opens payment and `+` adds one more of the last item;
+  - in payment, Enter = cash and Ctrl+Enter = card.
+  - Guards: held Enter, double taps, a split in progress and a payment still saving can never create a second or wrong sale.
+  - Scanner bursts still add straight away.
+- **Configurable scale-label layouts** (Admin → Scale labels), any field order such as item code + quantity + PLU, with a "Test a label" box.
+  - The scanned label is stored on the sale line.
+  - **Not verified against a real store label yet.**
+- **Expenses tab**:
+  - categories you can configure, drafts, approve/post, pay by bank or from the till (partly or in full);
+  - recurring expenses (drafts only, never paid automatically);
+  - prepaid expenses spread over months, capital purchases to Equipment;
+  - VAT treatment per expense;
+  - reversals that never delete anything;
+  - report with paid, owed, overdue, by category, monthly trend, expected vs actual.
+- **Accounting tab**: owner overview, profit and loss, balance sheet, trial balance and general ledger, all from the journal. Labelled **provisional** until the accountant approves the chart.
+- **Owner dashboard, POS side**: reporting snapshots in a transactional outbox, a sync engine that marks data sent only after the server confirms, retries with back-off, and a staleness flag.
+  - **The online dashboard and phone screen are not built**: they need your choice of hosting.
+- Migrations 6 (scale layouts), 7 (expenses, draft accounts, permissions), 8 (dashboard outbox). New tables and columns only; existing data untouched.
+
+### Fixed
+- **BUG-015 (High)**: goods sold before stock arrived left at cost 0.00 and the books never corrected it. Now trued up to Cost of goods sold when stock arrives.
+- BUG-016 (High): new expense defaulted to the capital category.
+- BUG-017 and BUG-018: keyboard focus problems.
+
 ## Unreleased — Phase 2, part 1: refunds, wastage, stock counts (2026-11-05)
 
 Built to the owner's refund policy (decision D1, given 2026-11-05): **7-day window, original receipt required, refunds always paid in cash, supervisor approval for every refund.** Store credit (D2) was not requested and is not built.
