@@ -2,6 +2,37 @@
 
 Not for live trading: there is no ZATCA Phase 2 integration yet, and receipts are marked "NOT A ZATCA TAX INVOICE".
 
+## Unreleased — Phase 1, checkpoint 3: known-gap fixes (2026-11-05)
+
+### Fixed
+- **Saudi business days.** Reports, the voids report and **journal entry dates** now use Riyadh time (UTC+3, no daylight saving). Before this, a sale after 9 pm was dated the previous day in the books.
+- **Pre-migration snapshot is encrypted** (as a `.posbak` in the backups folder) once a backup key exists. Without a key, it stays a plain copy, as before.
+- **Cash in/out now posts to the ledger**: Cash against account 2900 "Suspense – cash movements to classify", so book cash always equals drawer cash. The accountant reclassifies the suspense balance.
+- **Removing lines or clearing a bill before payment is audited**, and a new "Items removed before payment" report lists each removal with user, time and value. Removal is not blocked (see decision Q-10 below).
+- **Receipt** shows Riyadh date and time and bilingual tender and change labels.
+
+### Added
+- **Arabic/English interface** with a language button. Arabic switches the whole layout to right-to-left, and product names show in the chosen language first. The choice is saved per till. A test fails the build if any on-screen phrase lacks an Arabic translation. The Arabic wording is my translation and should be checked by the owner.
+- `e2e/installer.mjs`: silent per-user install, then launch the installed app, then silent uninstall.
+
+### Verified (commands run on 2026-11-05)
+- `npm run typecheck`, `npm run lint`: clean. `npm test`: 80 passed.
+- `node e2e/smoke.mjs`: 21/21 steps, now including the Arabic RTL toggle and an 80 mm receipt render (Arabic letters correctly joined; checked by eye from the captured image).
+- `node e2e/installer.mjs` on this Windows 11 machine:
+  - silent install to `%LOCALAPPDATA%\Programs\Store POS` with a desktop shortcut;
+  - the installed app starts and creates its database;
+  - silent uninstall removes the program and shortcut and keeps the store's data folder.
+  - Both the installer and uninstaller finish in a background process after the command returns, and the test waits for them.
+
+### Still open (needs hardware, money or a decision)
+- **Real printer and scanner**: need the models. The receipt is only checked as a rendered image.
+- **Clean-machine install, upgrade from an older version, SmartScreen/antivirus**: needs a spare PC and a code-signing certificate (yearly cost).
+- **Off-site backup**: Phase 6.
+- **Accountant's chart of accounts and real accounts for cash in/out**: needs the accountant.
+- **Decision Q-8**: manual weight entry, still blocked.
+- **Decision Q-10 (new)**: should a cashier need a supervisor to remove lines? Today removals are allowed and audited.
+- **Refunds**: Phase 2.
+
 ## Unreleased — Phase 1, checkpoint 2 (2026-11-05)
 
 ### Added
