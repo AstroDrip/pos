@@ -4,6 +4,7 @@ import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
 import { applyMovement, receiveGoods } from './inventory';
 import { postEntry, type PostingLine } from './ledger';
+import { ageBucket, finStatus, suggestAllocation, type AgeBucket, type FinStatus } from '../core/status';
 import { openShiftId } from './shifts';
 import { requirePermission } from './users';
 
@@ -82,6 +83,12 @@ export interface PurchaseInvoiceInput {
   vatRecoverable: boolean;
   differenceReason?: string; // required when the invoice net differs from the received goods value
   notes?: string;
+  /** Informal credit with no due date (never shown as overdue). */
+  noDueDate?: boolean;
+  /** e.g. "Supplier collects payment at the next delivery". */
+  arrangementNote?: string;
+  /** Paid (fully or partly) when the invoice is entered: one payment allocated to this invoice. */
+  payNow?: { requestKey: string; amount: number; method: 'bank' | 'till'; reference?: string };
 }
 
 export function createPurchaseInvoice(ctx: Ctx, userId: number, input: PurchaseInvoiceInput): { invoiceId: number; pinvNo: string; replayed: boolean } {
@@ -125,10 +132,10 @@ export function createPurchaseInvoice(ctx: Ctx, userId: number, input: PurchaseI
       ctx.db
         .prepare(
           `INSERT INTO purchase_invoices (pinv_no, request_key, supplier_id, supplier_invoice_no, supplier_vat_no, invoice_date, due_date, goods_net, invoice_net,
-             vat_amount, vat_recoverable, gross, difference_reason, notes, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             vat_amount, vat_recoverable, gross, difference_reason, notes, user_id, created_at, no_due_date, arrangement_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(pinvNo, input.requestKey, sup.id, input.supplierInvoiceNo.trim(), input.supplierVatNo?.trim() || sup.vat_number, input.invoiceDate, due, goodsNet,
-          input.invoiceNet, input.vatAmount, input.vatRecoverable ? 1 : 0, gross, input.differenceReason?.trim() || null, input.notes?.trim() || null, userId, ctx.now()).lastInsertRowid,
+          input.invoiceNet, input.vatAmount, input.vatRecoverable ? 1 : 0, gross, input.differenceReason?.trim() || null, input.notes?.trim() || null, userId, ctx.now(), input.noDueDate ? 1 : 0, input.arrangementNote?.trim() || null).lastInsertRowid,
     );
     for (const g of grnIds) ctx.db.prepare('INSERT INTO purchase_invoice_grns (invoice_id, grn_id) VALUES (?, ?)').run(id, g);
     const lines: PostingLine[] = [
@@ -138,7 +145,12 @@ export function createPurchaseInvoice(ctx: Ctx, userId: number, input: PurchaseI
       { account: '2000', credit: gross },
     ];
     postEntry(ctx, { date: input.invoiceDate, sourceType: 'purchase_invoice', sourceId: id, memo: `Supplier invoice ${input.supplierInvoiceNo.trim()} (${sup.name})`, lines });
-    appendAudit(ctx, { userId, action: 'purchase.invoice', entity: 'purchase_invoice', entityId: id, details: { pinvNo, supplierId: sup.id, supplierInvoiceNo: input.supplierInvoiceNo.trim(), goodsNet, invoiceNet: input.invoiceNet, vat: input.vatAmount, grns: grnIds } });
+    appendAudit(ctx, { userId, action: 'purchase.invoice', entity: 'purchase_invoice', entityId: id, details: { pinvNo, supplierId: sup.id, supplierInvoiceNo: input.supplierInvoiceNo.trim(), goodsNet, invoiceNet: input.invoiceNet, vat: input.vatAmount, grns: grnIds, noDueDate: !!input.noDueDate } });
+    if (input.payNow) {
+      requirePermission(ctx, userId, 'purchase.pay');
+      if (input.payNow.amount > gross) throw new DomainError('VALIDATION', 'Paid now is more than the invoice');
+      payTx(ctx, userId, { requestKey: input.payNow.requestKey, supplierId: sup.id, amount: input.payNow.amount, method: input.payNow.method, paidOn: input.invoiceDate, reference: input.payNow.reference, allocations: [{ invoiceId: id, amount: input.payNow.amount }] });
+    }
     return { invoiceId: id, pinvNo, replayed: false };
   })();
 }
@@ -155,6 +167,8 @@ export interface PurchaseReturnInput {
   creditNet: number; // net credit agreed with the supplier (their credit note)
   vatAmount: number;
   vatRecoverable: boolean;
+  /** The supplier invoice the credit is taken off (default: the oldest open items). */
+  invoiceId?: number;
 }
 
 export function createPurchaseReturn(ctx: Ctx, userId: number, input: PurchaseReturnInput): { returnId: number; pretNo: string; stockValue: number; replayed: boolean } {
@@ -215,6 +229,15 @@ export function createPurchaseReturn(ctx: Ctx, userId: number, input: PurchaseRe
         difference >= 0 ? { account: '5010', credit: difference } : { account: '5010', debit: -difference },
       ],
     });
+    // The credit settles the chosen invoice, or the oldest open items. Credit left over stays as money the supplier owes us.
+    const items = openSupplierItems(ctx, sup0.id);
+    const target = input.invoiceId ? items.filter((i) => i.invoiceId === input.invoiceId) : items;
+    if (input.invoiceId && target.length === 0) throw new DomainError('VALIDATION', 'That supplier invoice has nothing owed');
+    for (const a of suggestAllocation(target.map((i) => ({ id: i.key, open: i.open })), gross)) {
+      const it = items.find((i) => i.key === a.id)!;
+      ctx.db.prepare("INSERT INTO supplier_payment_allocations (return_id, invoice_id, opening_id, amount, kind, user_id, created_at) VALUES (?, ?, ?, ?, 'return', ?, ?)")
+        .run(id, it.invoiceId, it.openingId, a.amount, userId, ctx.now());
+    }
     appendAudit(ctx, { userId, action: 'purchase.return', entity: 'purchase_return', entityId: id, details: { pretNo, supplierId: sup0.id, stockValue, creditNet: input.creditNet, vat: input.vatAmount } });
     return { returnId: id, pretNo, stockValue, replayed: false };
   })();
@@ -238,30 +261,108 @@ export function setSupplierOpeningBalance(ctx: Ctx, userId: number, input: { sup
   })();
 }
 
-export function paySupplier(ctx: Ctx, userId: number, input: { requestKey: string; supplierId: number; amount: number; method: 'bank' | 'till'; paidOn: string; reference?: string }): { paymentId: number; payNo: string; replayed: boolean } {
+export interface SupplierPaymentInput {
+  requestKey: string;
+  supplierId: number;
+  amount: number;
+  method: 'bank' | 'till';
+  paidOn: string;
+  reference?: string;
+  /**
+   * Which invoices / opening balance this payment settles. Omitted = oldest first (the screen always shows and
+   * sends the split). Anything not allocated is a supplier advance (1310), only when allowAdvance is set.
+   */
+  allocations?: { invoiceId?: number; openingId?: number; amount: number }[];
+  allowAdvance?: boolean;
+}
+
+export function paySupplier(ctx: Ctx, userId: number, input: SupplierPaymentInput): { paymentId: number; payNo: string; advance: number; replayed: boolean } {
   requirePermission(ctx, userId, 'purchase.pay');
+  return ctx.db.transaction(() => payTx(ctx, userId, input))();
+}
+
+function payTx(ctx: Ctx, userId: number, input: SupplierPaymentInput): { paymentId: number; payNo: string; advance: number; replayed: boolean } {
   if (!KEY.test(input.requestKey)) throw new DomainError('VALIDATION', 'Invalid request key');
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0) throw new DomainError('VALIDATION', 'Payment must be more than zero');
   if (!DAY.test(input.paidOn) || input.paidOn > today(ctx)) throw new DomainError('VALIDATION', 'Payment date must be today or earlier');
+  const done = ctx.db.prepare('SELECT id, pay_no FROM supplier_payments WHERE request_key = ?').get(input.requestKey) as { id: number; pay_no: string } | undefined;
+  if (done) {
+    const alloc = (ctx.db.prepare('SELECT COALESCE(SUM(amount),0) AS v FROM supplier_payment_allocations WHERE payment_id = ?').get(done.id) as { v: number }).v;
+    return { paymentId: done.id, payNo: done.pay_no, advance: input.amount - alloc, replayed: true };
+  }
+  const sup = supplier(ctx, input.supplierId);
+  const items = openSupplierItems(ctx, sup.id);
+  const owed = items.reduce((s, i) => s + i.open, 0);
+  const allocs = input.allocations
+    ? input.allocations.map((a) => {
+        const it = items.find((i) => (a.invoiceId !== undefined ? i.invoiceId === a.invoiceId : i.openingId === a.openingId));
+        if (!it) throw new DomainError('VALIDATION', 'That supplier invoice has nothing owed, or belongs to another supplier');
+        if (!Number.isSafeInteger(a.amount) || a.amount <= 0 || a.amount > it.open) throw new DomainError('VALIDATION', `${it.doc}: only ${it.open / 100} SAR is owed`);
+        return { it, amount: a.amount };
+      })
+    : suggestAllocation(items.map((i) => ({ id: i.key, open: i.open })), input.amount).map((a) => ({ it: items.find((i) => i.key === a.id)!, amount: a.amount }));
+  if (new Set(allocs.map((a) => a.it.key)).size !== allocs.length) throw new DomainError('VALIDATION', 'The same invoice is listed twice');
+  const allocated = allocs.reduce((s, a) => s + a.amount, 0);
+  if (allocated > input.amount) throw new DomainError('VALIDATION', 'Allocations add up to more than the payment');
+  const advance = input.amount - allocated;
+  if (advance > 0 && !input.allowAdvance) {
+    throw new DomainError('VALIDATION', input.amount > owed
+      ? `${sup.name} is owed ${owed / 100} SAR; a payment cannot be more than that unless it is recorded as an advance`
+      : `${advance / 100} SAR is not allocated to any invoice. Allocate it, or record it as an advance.`);
+  }
+  let shiftId: number | null = null;
+  if (input.method === 'till') {
+    shiftId = openShiftId(ctx);
+    if (shiftId === null) throw new DomainError('NO_OPEN_SHIFT', 'Paying from the till needs an open shift');
+    if (input.paidOn !== today(ctx)) throw new DomainError('VALIDATION', 'Cash from the till is paid today');
+  }
+  const payNo = nextNo(ctx, 'SPAY', 'SP');
+  const now = ctx.now();
+  const id = Number(ctx.db.prepare('INSERT INTO supplier_payments (pay_no, request_key, supplier_id, amount, method, paid_on, reference, shift_id, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(payNo, input.requestKey, sup.id, input.amount, input.method, input.paidOn, input.reference?.trim() || null, shiftId, userId, now).lastInsertRowid);
+  const ins = ctx.db.prepare("INSERT INTO supplier_payment_allocations (payment_id, invoice_id, opening_id, amount, kind, user_id, created_at) VALUES (?, ?, ?, ?, 'at_payment', ?, ?)");
+  for (const a of allocs) ins.run(id, a.it.invoiceId, a.it.openingId, a.amount, userId, now);
+  postEntry(ctx, {
+    date: input.paidOn,
+    sourceType: 'supplier_payment',
+    sourceId: id,
+    memo: `Payment to ${sup.name} ${payNo}`,
+    lines: [{ account: '2000', debit: allocated }, { account: '1310', debit: advance }, { account: input.method === 'till' ? '1010' : '1030', credit: input.amount }],
+  });
+  appendAudit(ctx, { userId, action: 'purchase.pay', entity: 'supplier', entityId: sup.id, details: { payNo, amount: input.amount, method: input.method, allocations: allocs.map((a) => ({ doc: a.it.doc, amount: a.amount })), advance } });
+  return { paymentId: id, payNo, advance, replayed: false };
+}
+
+/** Applies money already paid to the supplier in advance to invoices: Dr 2000 / Cr 1310. */
+export function applySupplierAdvance(ctx: Ctx, userId: number, supplierId: number, allocations: { invoiceId?: number; openingId?: number; amount: number }[]): number {
+  requirePermission(ctx, userId, 'purchase.pay');
   return ctx.db.transaction(() => {
-    const done = ctx.db.prepare('SELECT id, pay_no FROM supplier_payments WHERE request_key = ?').get(input.requestKey) as { id: number; pay_no: string } | undefined;
-    if (done) return { paymentId: done.id, payNo: done.pay_no, replayed: true };
-    const sup = supplier(ctx, input.supplierId);
-    const owed = supplierBalanceOf(ctx, sup.id);
-    // Paying in advance would need a supplier-advance account; not supported (accountant to decide).
-    if (input.amount > owed) throw new DomainError('VALIDATION', `${sup.name} is owed ${owed / 100} SAR; a payment cannot be more than that`);
-    let shiftId: number | null = null;
-    if (input.method === 'till') {
-      shiftId = openShiftId(ctx);
-      if (shiftId === null) throw new DomainError('NO_OPEN_SHIFT', 'Paying from the till needs an open shift');
-      if (input.paidOn !== today(ctx)) throw new DomainError('VALIDATION', 'Cash from the till is paid today');
+    const sup = supplier(ctx, supplierId);
+    const items = openSupplierItems(ctx, supplierId);
+    const sources = unappliedPayments(ctx, supplierId);
+    let available = sources.reduce((s, p) => s + p.open, 0);
+    let total = 0;
+    for (const a of allocations) {
+      const it = items.find((i) => (a.invoiceId !== undefined ? i.invoiceId === a.invoiceId : i.openingId === a.openingId));
+      if (!it || !Number.isSafeInteger(a.amount) || a.amount <= 0 || a.amount > it.open) throw new DomainError('VALIDATION', 'Check the invoice and amount');
+      if (a.amount > available) throw new DomainError('VALIDATION', `Only ${available / 100} SAR of advance is available`);
+      let left = a.amount;
+      for (const src of sources) {
+        if (left === 0) break;
+        const use = Math.min(left, src.open);
+        if (use === 0) continue;
+        const aid = Number(ctx.db.prepare("INSERT INTO supplier_payment_allocations (payment_id, invoice_id, opening_id, amount, kind, user_id, created_at) VALUES (?, ?, ?, ?, 'advance_applied', ?, ?)")
+          .run(src.id, it.invoiceId, it.openingId, use, userId, ctx.now()).lastInsertRowid);
+        postEntry(ctx, { date: today(ctx), sourceType: 'supplier_advance_applied', sourceId: aid, memo: `Advance applied to ${it.doc} (${sup.name})`, lines: [{ account: '2000', debit: use }, { account: '1310', credit: use }] });
+        src.open -= use;
+        left -= use;
+      }
+      available -= a.amount;
+      it.open -= a.amount;
+      total += a.amount;
     }
-    const payNo = nextNo(ctx, 'SPAY', 'SP');
-    const id = Number(ctx.db.prepare('INSERT INTO supplier_payments (pay_no, request_key, supplier_id, amount, method, paid_on, reference, shift_id, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(payNo, input.requestKey, sup.id, input.amount, input.method, input.paidOn, input.reference?.trim() || null, shiftId, userId, ctx.now()).lastInsertRowid);
-    postEntry(ctx, { date: input.paidOn, sourceType: 'supplier_payment', sourceId: id, memo: `Payment to ${sup.name} ${payNo}`, lines: [{ account: '2000', debit: input.amount }, { account: input.method === 'till' ? '1010' : '1030', credit: input.amount }] });
-    appendAudit(ctx, { userId, action: 'purchase.pay', entity: 'supplier', entityId: sup.id, details: { payNo, amount: input.amount, method: input.method } });
-    return { paymentId: id, payNo, replayed: false };
+    appendAudit(ctx, { userId, action: 'purchase.advance_applied', entity: 'supplier', entityId: supplierId, details: { allocations } });
+    return total;
   })();
 }
 
@@ -283,12 +384,124 @@ export function reverseSupplierPayment(ctx: Ctx, userId: number, paymentId: numb
       if (shiftId === null) throw new DomainError('NO_OPEN_SHIFT', 'Returning cash to the till needs an open shift');
     }
     const payNo = nextNo(ctx, 'SPAY', 'SP');
+    const now = ctx.now();
     const id = Number(ctx.db.prepare('INSERT INTO supplier_payments (pay_no, request_key, supplier_id, amount, method, paid_on, shift_id, reversed_of, reason, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(payNo, requestKey, p.supplier_id, -p.amount, p.method, today(ctx), shiftId, p.id, reason.trim(), userId, ctx.now()).lastInsertRowid);
-    postEntry(ctx, { date: today(ctx), sourceType: 'supplier_payment', sourceId: id, memo: `Reversal of ${p.pay_no}: ${reason.trim()}`, lines: [{ account: p.method === 'till' ? '1010' : '1030', debit: p.amount }, { account: '2000', credit: p.amount }] });
+      .run(payNo, requestKey, p.supplier_id, -p.amount, p.method, today(ctx), shiftId, p.id, reason.trim(), userId, now).lastInsertRowid);
+    // Undo everything this payment settled (at the time, or later as an applied advance). The original rows stay.
+    const allocs = ctx.db.prepare('SELECT invoice_id, opening_id, SUM(amount) AS amt FROM supplier_payment_allocations WHERE payment_id = ? GROUP BY invoice_id, opening_id HAVING amt <> 0').all(p.id) as { invoice_id: number | null; opening_id: number | null; amt: number }[];
+    let allocated = 0;
+    for (const a of allocs) {
+      ctx.db.prepare("INSERT INTO supplier_payment_allocations (payment_id, invoice_id, opening_id, amount, kind, user_id, created_at) VALUES (?, ?, ?, ?, 'reversal', ?, ?)").run(p.id, a.invoice_id, a.opening_id, -a.amt, userId, now);
+      allocated += a.amt;
+    }
+    postEntry(ctx, {
+      date: today(ctx),
+      sourceType: 'supplier_payment',
+      sourceId: id,
+      memo: `Reversal of ${p.pay_no}: ${reason.trim()}`,
+      lines: [{ account: p.method === 'till' ? '1010' : '1030', debit: p.amount }, { account: '2000', credit: allocated }, { account: '1310', credit: p.amount - allocated }],
+    });
     appendAudit(ctx, { userId, action: 'purchase.payment_reversed', entity: 'supplier', entityId: p.supplier_id, details: { payNo: p.pay_no, amount: p.amount, reason } });
     return id;
   })();
+}
+
+// ── open items ─────────────────────────────────────────────
+
+export interface SupplierItem {
+  key: number; // unique within a supplier: invoice id, or −opening id
+  invoiceId: number | null;
+  openingId: number | null;
+  doc: string;
+  supplierInvoiceNo: string | null;
+  date: string;
+  dueDate: string | null; // null = no due date
+  total: number;
+  open: number;
+  status: FinStatus;
+  arrangementNote: string | null;
+}
+
+/** Supplier invoices and opening balances with what is still owed on each (from allocations, never a stored total). */
+export function openSupplierItems(ctx: Ctx, supplierId: number, includePaid = false): SupplierItem[] {
+  const day = today(ctx);
+  const rows = ctx.db
+    .prepare(
+      `SELECT i.id AS invoiceId, NULL AS openingId, i.pinv_no AS doc, i.supplier_invoice_no AS supplierInvoiceNo, i.invoice_date AS date,
+              CASE WHEN i.no_due_date = 1 THEN NULL ELSE i.due_date END AS dueDate, i.gross AS total, i.arrangement_note AS arrangementNote,
+              i.gross - COALESCE((SELECT SUM(amount) FROM supplier_payment_allocations a WHERE a.invoice_id = i.id), 0) AS open
+       FROM purchase_invoices i WHERE i.supplier_id = @s
+       UNION ALL
+       SELECT NULL, o.id, 'OPENING', o.reference, o.as_of, o.as_of, o.amount, NULL,
+              o.amount - COALESCE((SELECT SUM(amount) FROM supplier_payment_allocations a WHERE a.opening_id = o.id), 0)
+       FROM supplier_opening_balances o WHERE o.supplier_id = @s`,
+    )
+    .all({ s: supplierId }) as Omit<SupplierItem, 'key' | 'status'>[];
+  // Oldest due first; items without a due date last.
+  rows.sort((x, y) => (x.dueDate ?? '9999-12-31').localeCompare(y.dueDate ?? '9999-12-31') || x.date.localeCompare(y.date) || (x.invoiceId ?? 0) - (y.invoiceId ?? 0));
+  return rows
+    .map((r) => ({ ...r, key: r.invoiceId ?? -(r.openingId as number), status: finStatus({ total: r.total, open: r.open, dueDate: r.dueDate, today: day, dueSoonDays: 7 }) }))
+    .filter((r) => includePaid || r.open > 0);
+}
+
+function unappliedPayments(ctx: Ctx, supplierId: number): { id: number; open: number }[] {
+  return (ctx.db
+    .prepare(`SELECT p.id, p.amount - COALESCE((SELECT SUM(a.amount) FROM supplier_payment_allocations a WHERE a.payment_id = p.id), 0)
+                - COALESCE((SELECT -x.amount FROM supplier_payments x WHERE x.reversed_of = p.id), 0) AS open
+              FROM supplier_payments p WHERE p.supplier_id = ? AND p.amount > 0 ORDER BY p.id`)
+    .all(supplierId) as { id: number; open: number }[]).filter((r) => r.open > 0);
+}
+
+/** Money paid to the supplier in advance (asset 1310). */
+export const supplierAdvanceOf = (ctx: Ctx, supplierId: number) => unappliedPayments(ctx, supplierId).reduce((s, p) => s + p.open, 0);
+
+/** Return credits not yet taken off any invoice (the supplier owes us this). */
+export function supplierReturnCreditOf(ctx: Ctx, supplierId: number): number {
+  return (ctx.db
+    .prepare('SELECT COALESCE(SUM(r.gross - COALESCE((SELECT SUM(a.amount) FROM supplier_payment_allocations a WHERE a.return_id = r.id), 0)), 0) AS v FROM purchase_returns r WHERE r.supplier_id = ?')
+    .get(supplierId) as { v: number }).v;
+}
+
+/** Control check: open supplier items − unused return credits = Accounts payable (2000); advances = 1310. */
+export function supplierControls(ctx: Ctx) {
+  const acct = (code: string) => (ctx.db.prepare('SELECT COALESCE(SUM(l.debit) - SUM(l.credit),0) AS v FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = ?').get(code) as { v: number }).v;
+  const ids = (ctx.db.prepare('SELECT id FROM suppliers').all() as { id: number }[]).map((r) => r.id);
+  const open = ids.reduce((s, id) => s + openSupplierItems(ctx, id).reduce((x, i) => x + i.open, 0), 0);
+  const credits = ids.reduce((s, id) => s + supplierReturnCreditOf(ctx, id), 0);
+  const advances = ids.reduce((s, id) => s + supplierAdvanceOf(ctx, id), 0);
+  return { payablesOpen: open - credits, payablesControl: -acct('2000'), supplierAdvances: advances, supplierAdvancesControl: acct('1310'), ok: open - credits === -acct('2000') && advances === acct('1310') };
+}
+
+/**
+ * One-time: supplier payments and returns recorded before allocations existed are allocated oldest-first, exactly
+ * as the old ageing assumed. Their journal entries already debited 2000 in full, which matches.
+ */
+export function backfillSupplierAllocations(ctx: Ctx): number {
+  const flag = ctx.db.prepare("SELECT value FROM settings WHERE key = 'supplier_allocations_backfilled'").get() as { value: string } | undefined;
+  if (!flag || flag.value === '1') return 0;
+  let n = 0;
+  ctx.db.transaction(() => {
+    const admin = (ctx.db.prepare("SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.code = 'admin' ORDER BY u.id LIMIT 1").get() as { id: number } | undefined)?.id;
+    const docs = ctx.db
+      .prepare(`SELECT 'p' AS t, id, supplier_id AS sid, amount, paid_on AS d FROM supplier_payments p WHERE amount > 0 AND NOT EXISTS (SELECT 1 FROM supplier_payments x WHERE x.reversed_of = p.id)
+                  AND NOT EXISTS (SELECT 1 FROM supplier_payment_allocations a WHERE a.payment_id = p.id)
+                UNION ALL SELECT 'r', id, supplier_id, gross, return_date FROM purchase_returns r WHERE NOT EXISTS (SELECT 1 FROM supplier_payment_allocations a WHERE a.return_id = r.id)
+                ORDER BY d, id`)
+      .all() as { t: 'p' | 'r'; id: number; sid: number; amount: number; d: string }[];
+    if (docs.length && admin === undefined) return; // no user to attribute it to yet; try again next start
+    for (const doc of docs) {
+      const items = openSupplierItems(ctx, doc.sid);
+      for (const a of suggestAllocation(items.map((i) => ({ id: i.key, open: i.open })), doc.amount)) {
+        const it = items.find((i) => i.key === a.id)!;
+        ctx.db.prepare(`INSERT INTO supplier_payment_allocations (${doc.t === 'p' ? 'payment_id' : 'return_id'}, invoice_id, opening_id, amount, kind, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+          .run(doc.id, it.invoiceId, it.openingId, a.amount, doc.t === 'p' ? 'backfill' : 'return', admin!, ctx.now());
+        n++;
+      }
+    }
+    ctx.db.prepare("UPDATE settings SET value = '1' WHERE key = 'supplier_allocations_backfilled'").run();
+    if (n && admin !== undefined) appendAudit(ctx, { userId: admin, action: 'purchase.allocations_backfilled', entity: 'supplier', details: { allocations: n } });
+  })();
+  return n;
 }
 
 // ── balances, statements, ageing ────────────────────────────
@@ -333,50 +546,90 @@ export function supplierStatement(ctx: Ctx, userId: number, supplierId: number):
 export interface AgeingRow {
   supplierId: number;
   supplier: string;
-  balance: number;
+  balance: number; // open items (what we owe)
+  noDue: number;
   notDue: number;
   d1_30: number;
   d31_60: number;
   d61_90: number;
   over90: number;
+  advance: number; // paid in advance, not yet applied
+  returnCredit: number; // return credits not yet taken off an invoice
+  mostOverdue: string | null;
+  lastPayment: string | null;
 }
 
-/**
- * Supplier ageing as of a day: payments and returns settle the oldest amounts first (first in, first out);
- * what remains is grouped by days past its due date.
- */
+/** Supplier ageing by due date of each open item, after explicit allocations. No due date is its own column. */
 export function supplierAgeing(ctx: Ctx, userId: number, asOf: string): AgeingRow[] {
   requirePermission(ctx, userId, 'purchase.view');
   if (!DAY.test(asOf)) throw new DomainError('VALIDATION', 'Date must be YYYY-MM-DD');
-  const sups = ctx.db.prepare('SELECT id, name FROM suppliers ORDER BY name').all() as { id: number; name: string }[];
   const out: AgeingRow[] = [];
-  for (const s of sups) {
-    const items = ctx.db
-      .prepare(
-        `SELECT as_of AS due, amount AS amt FROM supplier_opening_balances WHERE supplier_id = @sid AND as_of <= @asOf
-         UNION ALL SELECT due_date, gross FROM purchase_invoices WHERE supplier_id = @sid AND invoice_date <= @asOf ORDER BY due`,
-      )
-      .all({ sid: s.id, asOf }) as { due: string; amt: number }[];
-    let credits =
-      (ctx.db.prepare('SELECT COALESCE(SUM(gross),0) AS v FROM purchase_returns WHERE supplier_id = ? AND return_date <= ?').get(s.id, asOf) as { v: number }).v +
-      (ctx.db.prepare('SELECT COALESCE(SUM(amount),0) AS v FROM supplier_payments WHERE supplier_id = ? AND paid_on <= ?').get(s.id, asOf) as { v: number }).v;
-    const row: AgeingRow = { supplierId: s.id, supplier: s.name, balance: 0, notDue: 0, d1_30: 0, d31_60: 0, d61_90: 0, over90: 0 };
-    for (const it of items) {
-      const used = Math.min(credits, it.amt);
-      credits -= used;
-      const open = it.amt - used;
-      if (open === 0) continue;
-      const late = roundDiv(Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${it.due}T00:00:00Z`), 86_400_000); // whole days (both at midnight UTC)
-      if (late <= 0) row.notDue += open;
-      else if (late <= 30) row.d1_30 += open;
-      else if (late <= 60) row.d31_60 += open;
-      else if (late <= 90) row.d61_90 += open;
-      else row.over90 += open;
+  for (const s of ctx.db.prepare('SELECT id, name FROM suppliers ORDER BY name').all() as { id: number; name: string }[]) {
+    const row: AgeingRow = { supplierId: s.id, supplier: s.name, balance: 0, noDue: 0, notDue: 0, d1_30: 0, d31_60: 0, d61_90: 0, over90: 0, advance: supplierAdvanceOf(ctx, s.id), returnCredit: supplierReturnCreditOf(ctx, s.id), mostOverdue: null, lastPayment: null };
+    for (const it of openSupplierItems(ctx, s.id).filter((i) => i.date <= asOf)) {
+      const b: AgeBucket = ageBucket(it.dueDate, asOf);
+      row[b] += it.open;
+      row.balance += it.open;
+      if (it.dueDate !== null && it.dueDate < asOf && row.mostOverdue === null) row.mostOverdue = it.doc;
     }
-    row.balance = row.notDue + row.d1_30 + row.d31_60 + row.d61_90 + row.over90 - credits; // leftover credit = supplier owes us
-    if (items.length || credits) out.push(row);
+    row.lastPayment = (ctx.db.prepare('SELECT MAX(paid_on) AS v FROM supplier_payments WHERE supplier_id = ? AND amount > 0').get(s.id) as { v: string | null }).v;
+    if (row.balance || row.advance || row.returnCredit) out.push(row);
   }
   return out;
+}
+
+export interface SupplierAccount {
+  id: number;
+  name: string;
+  phone: string | null;
+  vatNumber: string | null;
+  paymentTermsDays: number;
+  notes: string | null;
+  totalPurchases: number;
+  totalPayments: number;
+  outstanding: number;
+  overdue: number;
+  advance: number;
+  returnCredit: number;
+  unpaidCount: number;
+  partialCount: number;
+  lastPurchase: string | null;
+  lastPayment: string | null;
+  items: SupplierItem[];
+}
+
+export function supplierAccount(ctx: Ctx, userId: number, supplierId: number): SupplierAccount {
+  requirePermission(ctx, userId, 'purchase.view');
+  const s = ctx.db.prepare('SELECT id, name, phone, vat_number, payment_terms_days, notes FROM suppliers WHERE id = ?').get(supplierId) as
+    | { id: number; name: string; phone: string | null; vat_number: string | null; payment_terms_days: number; notes: string | null }
+    | undefined;
+  if (!s) throw new DomainError('NOT_FOUND', 'Supplier not found');
+  const all = openSupplierItems(ctx, supplierId, true);
+  const open = all.filter((i) => i.open > 0);
+  const v = (sql: string) => (ctx.db.prepare(sql).get(supplierId) as { v: number | string | null }).v;
+  return {
+    id: s.id, name: s.name, phone: s.phone, vatNumber: s.vat_number, paymentTermsDays: s.payment_terms_days, notes: s.notes,
+    totalPurchases: v('SELECT COALESCE(SUM(gross),0) AS v FROM purchase_invoices WHERE supplier_id = ?') as number,
+    totalPayments: v('SELECT COALESCE(SUM(amount),0) AS v FROM supplier_payments WHERE supplier_id = ?') as number,
+    outstanding: open.reduce((x, i) => x + i.open, 0),
+    overdue: open.filter((i) => i.status === 'overdue').reduce((x, i) => x + i.open, 0),
+    advance: supplierAdvanceOf(ctx, supplierId),
+    returnCredit: supplierReturnCreditOf(ctx, supplierId),
+    unpaidCount: open.filter((i) => i.open === i.total).length,
+    partialCount: open.filter((i) => i.open < i.total).length,
+    lastPurchase: v('SELECT MAX(invoice_date) AS v FROM purchase_invoices WHERE supplier_id = ?') as string | null,
+    lastPayment: v('SELECT MAX(paid_on) AS v FROM supplier_payments WHERE supplier_id = ? AND amount > 0') as string | null,
+    items: all,
+  };
+}
+
+export function setSupplierNotes(ctx: Ctx, userId: number, supplierId: number, notes: string): void {
+  requirePermission(ctx, userId, 'purchase.manage');
+  ctx.db.transaction(() => {
+    const r = ctx.db.prepare('UPDATE suppliers SET notes = ? WHERE id = ?').run(notes.trim() || null, supplierId);
+    if (r.changes === 0) throw new DomainError('NOT_FOUND', 'Supplier not found');
+    appendAudit(ctx, { userId, action: 'supplier.notes', entity: 'supplier', entityId: supplierId, details: { notes } });
+  })();
 }
 
 export function purchaseRegister(ctx: Ctx, userId: number, fromDay: string, toDay: string) {

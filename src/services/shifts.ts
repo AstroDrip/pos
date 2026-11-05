@@ -17,6 +17,8 @@ export interface ShiftSummary {
   cashRefunds: number; // refunds are always paid in cash (owner decision D1)
   tillExpenses: number; // expenses paid out of this till (net of reversals)
   tillSupplierPayments: number; // suppliers paid out of this till (net of reversals)
+  cashCollections: number; // customer payments received in cash (net of reversals)
+  cardCollections: number;
   expectedCash: number;
   countedCash: number | null;
 }
@@ -78,9 +80,12 @@ export function shiftSummary(ctx: Ctx, shiftId: number): ShiftSummary {
   const cashIn = q("SELECT COALESCE(SUM(amount),0) AS v FROM cash_movements WHERE shift_id = ? AND kind = 'in'");
   const cashOut = q("SELECT COALESCE(SUM(amount),0) AS v FROM cash_movements WHERE shift_id = ? AND kind = 'out'");
   const refundCount = q('SELECT count(*) AS v FROM refunds WHERE shift_id = ?');
-  const cashRefunds = q('SELECT COALESCE(SUM(total_incl),0) AS v FROM refunds WHERE shift_id = ?');
+  // Only the cash part of refunds leaves the drawer; a refund that reduced a customer's debt pays no cash.
+  const cashRefunds = q('SELECT COALESCE(SUM(total_incl),0) - COALESCE((SELECT SUM(o.amount) FROM refund_account_offsets o JOIN refunds r2 ON r2.id = o.refund_id WHERE r2.shift_id = refunds.shift_id),0) AS v FROM refunds WHERE shift_id = ?');
   const tillExpenses = q("SELECT COALESCE(SUM(amount),0) AS v FROM expense_payments WHERE shift_id = ? AND method = 'till'");
   const tillSupplierPayments = q("SELECT COALESCE(SUM(amount),0) AS v FROM supplier_payments WHERE shift_id = ? AND method = 'till'");
+  const cashCollections = q("SELECT COALESCE(SUM(amount),0) AS v FROM customer_receipts WHERE shift_id = ? AND method = 'cash'");
+  const cardCollections = q("SELECT COALESCE(SUM(amount),0) AS v FROM customer_receipts WHERE shift_id = ? AND method = 'card'");
   const cashSales = cashTendered - change;
   return {
     shiftId,
@@ -95,7 +100,9 @@ export function shiftSummary(ctx: Ctx, shiftId: number): ShiftSummary {
     cashRefunds,
     tillExpenses,
     tillSupplierPayments,
-    expectedCash: s.opening_float + cashSales + cashIn - cashOut - cashRefunds - tillExpenses - tillSupplierPayments,
+    cashCollections,
+    cardCollections,
+    expectedCash: s.opening_float + cashSales + cashCollections + cashIn - cashOut - cashRefunds - tillExpenses - tillSupplierPayments,
     countedCash: s.counted_cash,
   };
 }

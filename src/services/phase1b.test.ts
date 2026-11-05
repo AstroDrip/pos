@@ -227,6 +227,21 @@ describe('CSV import', () => {
 /** Makes a fresh database look like one created by schema v1 (undoes migrations 2 and 3). */
 function rollBackToV1(db: ReturnType<typeof openDatabase>) {
   db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
+  // undo migration 10
+  db.exec(`DROP TABLE supplier_payment_allocations; DROP TABLE invoice_disputes; DROP TABLE refund_account_offsets; DROP TABLE customer_writeoffs;
+    DROP TABLE receipt_allocations; DROP TABLE customer_receipts; DROP TABLE receivables;
+    ALTER TABLE suppliers DROP COLUMN notes; ALTER TABLE suppliers DROP COLUMN address; ALTER TABLE purchase_invoices DROP COLUMN no_due_date; ALTER TABLE purchase_invoices DROP COLUMN arrangement_note;
+    ALTER TABLE customers DROP COLUMN credit_enabled; ALTER TABLE customers DROP COLUMN credit_limit; ALTER TABLE customers DROP COLUMN payment_terms_days;
+    ALTER TABLE customers DROP COLUMN address; ALTER TABLE customers DROP COLUMN notes; ALTER TABLE customers DROP COLUMN updated_at;
+    CREATE TABLE payments_old (id INTEGER PRIMARY KEY, sale_id INTEGER NOT NULL REFERENCES sales(id), tender TEXT NOT NULL CHECK (tender IN ('cash','card')), amount INTEGER NOT NULL CHECK (amount > 0), reference TEXT) STRICT;
+    INSERT INTO payments_old SELECT * FROM payments; DROP TRIGGER trg_payments_no_update; DROP TRIGGER trg_payments_no_delete; DROP TABLE payments;
+    ALTER TABLE payments_old RENAME TO payments; CREATE INDEX ix_payments_sale ON payments(sale_id);
+    CREATE TRIGGER trg_payments_no_update BEFORE UPDATE ON payments BEGIN SELECT RAISE(ABORT, 'payments is immutable'); END;
+    CREATE TRIGGER trg_payments_no_delete BEFORE DELETE ON payments BEGIN SELECT RAISE(ABORT, 'payments is immutable'); END;
+    DELETE FROM role_permissions WHERE permission_code LIKE 'customer.%' AND permission_code <> 'customer.manage';
+    DELETE FROM permissions WHERE code LIKE 'customer.%' AND code <> 'customer.manage';
+    DELETE FROM accounts WHERE code IN ('1100','1310','2300','6910'); DELETE FROM invoice_counters WHERE series = 'CRCPT';
+    DELETE FROM settings WHERE key IN ('supplier_allocations_backfilled','credit_due_soon_days');`);
   // undo migration 9
   db.exec(`DROP TABLE supplier_opening_balances; DROP TABLE supplier_payments; DROP TABLE purchase_return_lines; DROP TABLE purchase_returns;
     DROP TABLE purchase_invoice_grns; DROP TABLE purchase_invoices;

@@ -2,6 +2,7 @@ import { roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
+import { refundOffsetFor } from './credit';
 import { applyMovement, cogsTrueUpLines } from './inventory';
 import { postEntry } from './ledger';
 import type { ReceiptData } from './sales';
@@ -103,6 +104,8 @@ export interface RefundResult {
   refundNo: string;
   totalIncl: number;
   cashOut: number;
+  /** Part of the refund that reduced what the customer still owes on a credit invoice (no cash for it). */
+  accountOffset: number;
   replayed: boolean;
 }
 
@@ -121,7 +124,10 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
     const done = ctx.db.prepare('SELECT id, refund_no, total_incl FROM refunds WHERE request_key = ?').get(input.requestKey) as
       | { id: number; refund_no: string; total_incl: number }
       | undefined;
-    if (done) return { refundId: done.id, refundNo: done.refund_no, totalIncl: done.total_incl, cashOut: done.total_incl, replayed: true };
+    if (done) {
+      const off = (ctx.db.prepare('SELECT COALESCE(SUM(amount),0) AS v FROM refund_account_offsets WHERE refund_id = ?').get(done.id) as { v: number }).v;
+      return { refundId: done.id, refundNo: done.refund_no, totalIncl: done.total_incl, cashOut: done.total_incl - off, accountOffset: off, replayed: true };
+    }
 
     let approver: number;
     if (hasPermission(ctx, userId, 'sale.refund')) approver = userId;
@@ -173,6 +179,8 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
 
     const totalIncl = priced.reduce((s, p) => s + p.incl, 0);
     const totalVat = priced.reduce((s, p) => s + p.vat, 0);
+    // Credit invoice with money still owed: the refund first reduces the debt; cash only for what was paid (decision C-4).
+    const accountOffset = refundOffsetFor(ctx, sale.saleId, totalIncl);
     if (totalIncl <= 0) throw new DomainError('VALIDATION', 'Nothing to refund: these items were free');
 
     const n = (ctx.db.prepare("UPDATE invoice_counters SET next_value = next_value + 1 WHERE series = 'REFUND' RETURNING next_value - 1 AS v").get() as { v: number }).v;
@@ -188,6 +196,7 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
         .lastInsertRowid,
     );
 
+    if (accountOffset > 0) ctx.db.prepare('INSERT INTO refund_account_offsets (refund_id, sale_id, amount) VALUES (?, ?, ?)').run(refundId, sale.saleId, accountOffset);
     const insertLine = ctx.db.prepare(
       `INSERT INTO refund_lines (refund_id, line_no, sale_line_no, product_id, name_ar, name_en, qty, unit_price_incl, vat_rate_bp,
          line_incl, line_vat, line_excl, unit_cost, restock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -214,7 +223,8 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
       lines: [
         { account: '4000', debit: totalIncl - totalVat },
         { account: '2200', debit: totalVat },
-        { account: '1010', credit: totalIncl },
+        { account: '1010', credit: totalIncl - accountOffset },
+        { account: '1100', credit: accountOffset },
         { account: '1200', debit: restockedCost },
         { account: '5000', credit: restockedCost },
         ...cogsTrueUpLines(trueUp),
@@ -226,10 +236,10 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
       action: 'sale.refund',
       entity: 'refund',
       entityId: refundId,
-      details: { refundNo, invoiceNo: sale.invoiceNo, total: totalIncl, approver, reason, lines: priced.length },
+      details: { refundNo, invoiceNo: sale.invoiceNo, total: totalIncl, approver, reason, lines: priced.length, accountOffset },
     });
 
-    return { refundId, refundNo, totalIncl, cashOut: totalIncl, replayed: false };
+    return { refundId, refundNo, totalIncl, cashOut: totalIncl - accountOffset, accountOffset, replayed: false };
   })();
 }
 
@@ -238,12 +248,13 @@ export function refundReceiptData(ctx: Ctx, refundId: number): ReceiptData {
   const r = ctx.db
     .prepare(
       `SELECT r.refund_no, r.uuid, r.created_at, r.reason, r.total_incl, r.total_vat, r.total_excl, s.invoice_no,
+              COALESCE((SELECT amount FROM refund_account_offsets o WHERE o.refund_id = r.id), 0) AS offset,
               u.display_name AS cashier, a.display_name AS approver
        FROM refunds r JOIN sales s ON s.id = r.original_sale_id JOIN users u ON u.id = r.user_id JOIN users a ON a.id = r.approved_by
        WHERE r.id = ?`,
     )
     .get(refundId) as
-    | { refund_no: string; uuid: string; created_at: string; reason: string; total_incl: number; total_vat: number; total_excl: number; invoice_no: string; cashier: string; approver: string }
+    | { refund_no: string; uuid: string; created_at: string; reason: string; total_incl: number; total_vat: number; total_excl: number; invoice_no: string; offset: number; cashier: string; approver: string }
     | undefined;
   if (!r) throw new DomainError('NOT_FOUND', 'Refund not found');
   return {
@@ -262,7 +273,10 @@ export function refundReceiptData(ctx: Ctx, refundId: number): ReceiptData {
     totalVat: r.total_vat,
     totalIncl: r.total_incl,
     totalDiscount: 0,
-    payments: [{ tender: 'cash', amount: r.total_incl }],
+    payments: [
+      ...(r.offset > 0 ? [{ tender: 'account', amount: r.offset }] : []),
+      ...(r.total_incl - r.offset > 0 ? [{ tender: 'cash', amount: r.total_incl - r.offset }] : []),
+    ],
     changeGiven: 0,
   };
 }

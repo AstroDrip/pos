@@ -9,6 +9,7 @@ import * as m006 from './migrations/006_scale_layouts';
 import * as m007 from './migrations/007_expenses';
 import * as m008 from './migrations/008_dashboard_outbox';
 import * as m009 from './migrations/009_purchasing';
+import * as m010 from './migrations/010_credit';
 
 export interface Migration {
   version: number;
@@ -27,6 +28,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 7, name: 'expenses', sql: m007.sql },
   { version: 8, name: 'dashboard_outbox', sql: m008.sql },
   { version: 9, name: 'purchasing', sql: m009.sql },
+  { version: 10, name: 'credit', sql: m010.sql },
 ];
 
 /** Versions not yet applied to this database (empty for a brand-new file before migrate()). */

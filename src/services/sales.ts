@@ -8,6 +8,7 @@ import { appendAudit } from './audit';
 import { getProduct } from './catalog';
 import { DomainError, type Ctx } from './context';
 import { applyMovement } from './inventory';
+import { checkCreditSale } from './credit';
 import { postEntry } from './ledger';
 import { hasPermission, requirePermission } from './users';
 
@@ -22,7 +23,7 @@ export interface SaleLineInput {
 }
 
 export interface PaymentInput {
-  tender: 'cash' | 'card';
+  tender: 'cash' | 'card' | 'account'; // account = left on the customer's account (credit sale)
   amount: number;
   reference?: string;
 }
@@ -35,6 +36,8 @@ export interface SaleInput {
   customerId?: number;
   /** Supervisor who approved discounts, when the cashier lacks sale.discount. */
   discountApproverId?: number;
+  /** Supervisor who approved a credit sale above the customer's limit. */
+  creditApproverId?: number;
 }
 
 export interface SaleResult {
@@ -109,8 +112,16 @@ export function finalizeSale(ctx: Ctx, userId: number, input: SaleInput): SaleRe
     }
     const cash = input.payments.filter((p) => p.tender === 'cash').reduce((s, p) => s + p.amount, 0);
     const card = input.payments.filter((p) => p.tender === 'card').reduce((s, p) => s + p.amount, 0);
+    const onAccount = input.payments.filter((p) => p.tender === 'account').reduce((s, p) => s + p.amount, 0);
     if (card > totals.totalIncl) throw new DomainError('VALIDATION', 'Card amount is more than the bill');
-    const paid = cash + card;
+    let credit: { overrideBy: number | null; dueDate: string | null } | null = null;
+    if (onAccount > 0) {
+      // A credit sale: paid now (cash/card) + on account must equal the bill exactly, so no change is given.
+      if (input.customerId === undefined) throw new DomainError('VALIDATION', 'A credit sale needs a customer');
+      if (cash + card + onAccount !== totals.totalIncl) throw new DomainError('VALIDATION', 'On a credit sale, paid now plus on account must equal the bill');
+      credit = checkCreditSale(ctx, userId, input.customerId, onAccount, input.creditApproverId);
+    }
+    const paid = cash + card + onAccount;
     if (paid < totals.totalIncl) throw new DomainError('INSUFFICIENT_PAYMENT', 'Payment is less than the total');
     const change = paid - totals.totalIncl;
     if (change > cash) throw new DomainError('VALIDATION', 'Change can only be given from cash');
@@ -145,6 +156,10 @@ export function finalizeSale(ctx: Ctx, userId: number, input: SaleInput): SaleRe
       insertLine.run(saleId, i + 1, p.id, p.nameAr, p.nameEn, input.lines[i]!.qty, p.priceIncl, t.discount, t.vatRate, t.lineIncl, t.lineVat, t.lineExcl, mv.unitCost, input.lines[i]!.scanCode ?? null);
     });
 
+    if (credit) {
+      ctx.db.prepare('INSERT INTO receivables (sale_id, customer_id, amount, due_date, override_by, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(saleId, input.customerId!, onAccount, credit.dueDate, credit.overrideBy, createdAt);
+    }
     const insertPay = ctx.db.prepare('INSERT INTO payments (sale_id, tender, amount, reference) VALUES (?, ?, ?, ?)');
     for (const p of input.payments) insertPay.run(saleId, p.tender, p.amount, p.reference ?? null);
 
@@ -156,6 +171,7 @@ export function finalizeSale(ctx: Ctx, userId: number, input: SaleInput): SaleRe
       lines: [
         { account: '1010', debit: cash - change },
         { account: '1020', debit: card },
+        { account: '1100', debit: onAccount },
         { account: '4000', credit: totals.totalExcl },
         { account: '2200', credit: totals.totalVat },
         { account: '5000', debit: cogs },
@@ -168,7 +184,7 @@ export function finalizeSale(ctx: Ctx, userId: number, input: SaleInput): SaleRe
       action: 'sale.finalize',
       entity: 'sale',
       entityId: saleId,
-      details: { invoiceNo, total: totals.totalIncl, discount: totals.totalDiscount, approver, negativeStock: negative },
+      details: { invoiceNo, total: totals.totalIncl, discount: totals.totalDiscount, approver, negativeStock: negative, onAccount, creditOverrideBy: credit?.overrideBy ?? null },
     });
 
     return { saleId, invoiceNo, uuid, totalIncl: totals.totalIncl, totalVat: totals.totalVat, changeGiven: change, createdAt, replayed: false, negativeStockProducts: negative };

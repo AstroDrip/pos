@@ -25,6 +25,12 @@ export interface Transport {
 }
 
 export const STALE_AFTER_MS = 30 * 60_000;
+
+/** "Right now" figures: they belong to the position snapshot, never to a past day's or month's snapshot. */
+const POSITION_FIELDS = [
+  'inventoryValue', 'expensesOutstanding', 'lowStockCount', 'receivablesOutstanding', 'receivablesOverdue', 'receivablesDueSoon', 'customersWithBalance',
+  'customerAdvances', 'payablesOutstanding', 'payablesOverdue', 'payablesDueSoon', 'suppliersWithBalance', 'supplierAdvances', 'cashAndBank',
+] as const satisfies readonly (keyof ReturnType<typeof ownerKpis>)[];
 const BATCH = 50;
 
 export function dashboardEnabled(ctx: Ctx): boolean {
@@ -49,9 +55,7 @@ export function buildSnapshots(ctx: Ctx): { kind: string; snapKey: string; paylo
   // past day's snapshot never changes because of something that happened today.
   const period = (from: string, to: string) => {
     const k: Partial<ReturnType<typeof ownerKpis>> = { ...ownerKpis(ctx, null, from, to) };
-    delete k.inventoryValue;
-    delete k.expensesOutstanding;
-    delete k.lowStockCount;
+    for (const f of POSITION_FIELDS) delete k[f];
     return k;
   };
   const now = ownerKpis(ctx, null, today, today);
@@ -60,7 +64,7 @@ export function buildSnapshots(ctx: Ctx): { kind: string; snapKey: string; paylo
     { kind: 'kpis_day', snapKey: yesterday, payload: period(yesterday, yesterday) },
     { kind: 'kpis_month', snapKey: today.slice(0, 7), payload: period(monthStart(today), today) },
     { kind: 'kpis_month', snapKey: pm.from.slice(0, 7), payload: period(pm.from, pm.to) },
-    { kind: 'position', snapKey: 'current', payload: { inventoryValue: now.inventoryValue, expensesOutstanding: now.expensesOutstanding, lowStockCount: now.lowStockCount, asOf: now.generatedAt } },
+    { kind: 'position', snapKey: 'current', payload: { ...Object.fromEntries(POSITION_FIELDS.map((f) => [f, now[f]])), asOf: now.generatedAt } },
     { kind: 'shift', snapKey: 'current', payload: shiftId === null ? { open: false } : { open: true, ...shiftSummary(ctx, shiftId) } },
     {
       kind: 'low_stock',

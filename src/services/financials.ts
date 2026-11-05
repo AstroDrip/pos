@@ -1,7 +1,9 @@
 import { roundDiv } from '../core/money';
 import { nextDay, storeDay, storeDayStartUtc } from '../core/store-time';
 import { DomainError, type Ctx } from './context';
+import { dueSoonDays, openCreditInvoicesAll as receivablesAgeingAll } from './credit';
 import { recognizePrepaid } from './expenses';
+import { openSupplierItems, supplierControls } from './purchasing';
 import { requirePermission } from './users';
 
 // Financial statements from the journal (ADR-5). Accrual basis, by journal date (Saudi business day).
@@ -190,6 +192,20 @@ export interface OwnerKpis {
   inventoryValue: number; // Inventory account balance (stock at weighted-average cost, as booked)
   expensesOutstanding: number; // 2010 balance today
   lowStockCount: number;
+  /** Customer credit (accounts receivable) and supplier credit (accounts payable). Never part of cash. */
+  receivablesOutstanding: number; // open customer invoices = 1100
+  receivablesOverdue: number;
+  receivablesDueSoon: number;
+  customersWithBalance: number;
+  customerAdvances: number; // money held for customers = 2300 (a liability)
+  collectionsInPeriod: number; // customer payments received in the period (cash basis)
+  payablesOutstanding: number; // open supplier items − unused return credits = 2000
+  payablesOverdue: number;
+  payablesDueSoon: number;
+  suppliersWithBalance: number;
+  supplierAdvances: number; // paid to suppliers in advance = 1310 (an asset)
+  supplierPaymentsInPeriod: number;
+  cashAndBank: number; // 1010 + 1020 + 1030 in the books (card clearing is money the bank still has to pay)
 }
 
 /** Owner KPIs for store days from..to. Uses the same P&L as the Accounting tab. */
@@ -226,8 +242,35 @@ export function ownerKpis(ctx: Ctx, userId: number | null, from: string, to: str
     // rounding halalas, so the account balance is used.
     inventoryValue: (ctx.db.prepare("SELECT COALESCE(SUM(l.debit) - SUM(l.credit),0) AS v FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '1200'").get() as { v: number }).v,
     expensesOutstanding: ap,
+    ...creditPosition(ctx, from, to, f, tt),
     lowStockCount: one('SELECT count(*) AS v FROM products p LEFT JOIN stock_balances b ON b.product_id = p.id WHERE p.active = 1 AND COALESCE(b.qty,0) <= p.reorder_level'),
   };
 }
 
 export const todayStoreDay = (ctx: Ctx) => storeDay(ctx.now());
+
+function creditPosition(ctx: Ctx, from: string, to: string, fUtc: string, tUtc: string) {
+  const ar = receivablesAgeingAll(ctx);
+  const day = storeDay(ctx.now());
+  const soon = new Date(Date.parse(`${day}T00:00:00Z`) + dueSoonDays(ctx) * 86_400_000).toISOString().slice(0, 10);
+  const sups = (ctx.db.prepare('SELECT id FROM suppliers').all() as { id: number }[]).map((r) => r.id);
+  const supItems = sups.map((id) => openSupplierItems(ctx, id));
+  const acct = (code: string) => (ctx.db.prepare('SELECT COALESCE(SUM(l.debit) - SUM(l.credit),0) AS v FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = ?').get(code) as { v: number }).v;
+  const sum = (sql: string, ...a: unknown[]) => (ctx.db.prepare(sql).get(...a) as { v: number }).v;
+  const sc = supplierControls(ctx);
+  return {
+    receivablesOutstanding: ar.reduce((s, i) => s + i.open, 0),
+    receivablesOverdue: ar.filter((i) => i.dueDate !== null && i.dueDate < day).reduce((s, i) => s + i.open, 0),
+    receivablesDueSoon: ar.filter((i) => i.dueDate !== null && i.dueDate >= day && i.dueDate <= soon).reduce((s, i) => s + i.open, 0),
+    customersWithBalance: new Set(ar.map((i) => i.customerId)).size,
+    customerAdvances: -acct('2300'),
+    collectionsInPeriod: sum('SELECT COALESCE(SUM(amount),0) AS v FROM customer_receipts WHERE created_at >= ? AND created_at < ?', fUtc, tUtc),
+    payablesOutstanding: sc.payablesOpen,
+    payablesOverdue: supItems.flat().filter((i) => i.dueDate !== null && i.dueDate < day).reduce((s, i) => s + i.open, 0),
+    payablesDueSoon: supItems.flat().filter((i) => i.dueDate !== null && i.dueDate >= day && i.dueDate <= soon).reduce((s, i) => s + i.open, 0),
+    suppliersWithBalance: supItems.filter((items) => items.length > 0).length,
+    supplierAdvances: sc.supplierAdvances,
+    supplierPaymentsInPeriod: sum('SELECT COALESCE(SUM(amount),0) AS v FROM supplier_payments WHERE paid_on BETWEEN ? AND ?', from, to),
+    cashAndBank: acct('1010') + acct('1020') + acct('1030'),
+  };
+}
