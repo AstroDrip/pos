@@ -175,6 +175,8 @@ describe('permission matrix over IPC (audit 5.4: the backend enforces roles, not
       ['stock.count', { requestKey: 'abcdefgh-c1', reason: 'x', lines: [{ productId: 1, countedQty: 0 }] }],
       ['report.refunds', day],
       ['report.adjustments', day],
+      ['scale.layouts', null],
+      ['scale.saveLayout', { name: 'x', spec: 'lit=2 item:4 weight_g:5 plu:3', itemMatches: 'plu', active: true }],
     ];
     for (const [ch, payload] of forbidden) {
       const r = await dispatch(ch, payload, c);

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { BackupStatus } from '../services/backup';
 import type { DryRun } from '../services/import';
+import type { LookupResult, ScaleLayoutRow } from '../services/catalog';
 import type { Supplier } from '../services/parties';
+import { formatQty } from '../core/money';
 import { call } from './api';
 import { useI18n } from './i18n';
 
@@ -14,6 +16,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
       {can('user.manage') && <Users />}
       {can('supplier.manage') && <Suppliers />}
       {(can('product.manage') || can('supplier.manage')) && <Import />}
+      {can('settings.manage') && <ScaleLabels />}
     </div>
   );
 }
@@ -243,6 +246,77 @@ function Import() {
           )}
         </div>
       )}
+      {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+    </div>
+  );
+}
+
+/**
+ * Scale label layouts (ADR-3). The store's real layout must be copied from a real label: scan one into
+ * "Test a label" and adjust the layout until the product and weight are right.
+ */
+function ScaleLabels() {
+  const { t } = useI18n();
+  const [rows, setRows] = useState<ScaleLayoutRow[]>([]);
+  const [f, setF] = useState({ id: 0, name: '', spec: 'lit=2 item:4 weight_g:5 plu:3', itemMatches: 'plu' as 'plu' | 'sku', active: true });
+  const [test, setTest] = useState('');
+  const [msg, setMsg] = useState<Msg>(null);
+  const load = () => call<ScaleLayoutRow[]>('scale.layouts').then(setRows, () => setRows([]));
+  useEffect(() => void load(), []);
+
+  const save = async () => {
+    setMsg(null);
+    try {
+      await call('scale.saveLayout', { id: f.id || undefined, name: f.name, spec: f.spec, itemMatches: f.itemMatches, active: f.active });
+      setMsg({ kind: 'ok', text: t('Layout saved') });
+      setF({ ...f, id: 0, name: '' });
+      void load();
+    } catch (e) {
+      setMsg({ kind: 'error', text: t((e as Error).message) });
+    }
+  };
+  const tryLabel = async () => {
+    setMsg(null);
+    try {
+      const r = await call<LookupResult | null>('catalog.lookup', { code: test.trim() });
+      if (!r) setMsg({ kind: 'warn', text: t('Not a scale label for any active layout, and no product has this code.') });
+      else setMsg({ kind: r.source === 'scale' ? 'ok' : 'warn', text: `${r.source}: ${r.product.nameEn} · ${formatQty(r.qty, r.product.sellMode === 'unit' ? 0 : 3)} ${r.product.sellMode === 'weight' ? 'kg' : ''}` });
+    } catch (e) {
+      setMsg({ kind: 'error', text: t((e as Error).message) });
+    }
+  };
+
+  return (
+    <div className="card" style={{ margin: 8, maxWidth: 520 }}>
+      <h3>{t('Scale labels')}</h3>
+      <p className="msg warn">{t('The real label layout is not confirmed yet. Scan a real label below and check product and weight before using it.')}</p>
+      <table className="list">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td>{r.name}</td><td><code>{r.spec}</code></td><td>{r.active ? t('Active') : t('Off')}</td>
+              <td><button onClick={() => setF({ id: r.id, name: r.name, spec: r.spec, itemMatches: r.itemMatches, active: r.active })}>{t('Edit')}</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <label>{t('Layout name')}</label>
+      <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+      <label>{t('Fields in label order')}</label>
+      <input aria-label="layout spec" value={f.spec} onChange={(e) => setF({ ...f, spec: e.target.value })} />
+      <small className="ar" style={{ direction: 'ltr' }}>lit=21 · item:5 · plu:4 · weight_g:5 · weight_kg3:5 · price:5 · pieces:2 · skip:1 · check</small>
+      <label>{t('Item code is looked up as')}</label>
+      <select value={f.itemMatches} onChange={(e) => setF({ ...f, itemMatches: e.target.value as 'plu' | 'sku' })}>
+        <option value="plu">PLU</option>
+        <option value="sku">SKU</option>
+      </select>
+      <label><input type="checkbox" style={{ width: 'auto' }} checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
+      <p><button className="primary" disabled={!f.name.trim()} onClick={save}>{f.id ? t('Update layout') : t('Add layout')}</button></p>
+      <label>{t('Test a label (scan or type it)')}</label>
+      <div className="row">
+        <input aria-label="test label" value={test} onChange={(e) => setTest(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void tryLabel()} />
+        <button style={{ flex: '0 0 auto' }} disabled={!test.trim()} onClick={tryLabel}>{t('Test')}</button>
+      </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
     </div>
   );

@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { schemas, type Channel, type IpcResult } from '../shared/ipc';
 import { backupStatus, createBackup, prepareRestore } from '../services/backup';
 import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto';
-import { createProduct, getAliases, getProduct, lookup, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
+import { createProduct, getAliases, getProduct, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit, verifyAuditChain } from '../services/audit';
@@ -148,6 +148,11 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       const broken = verifyAuditChain(ctx);
       return { auditChainOk: broken === null, firstBrokenAuditId: broken };
     },
+    'scale.layouts': (_p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      return scaleLayouts(ctx);
+    },
+    'scale.saveLayout': (p, s) => saveScaleLayout(ctx, userId(s), p),
     'refund.find': (p, s) => findSaleForRefund(ctx, userId(s), p.invoiceNo),
     'refund.create': (p, s) => {
       let approverId: number | undefined;

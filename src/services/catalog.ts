@@ -1,5 +1,6 @@
 import { MILLI_PER_UNIT, extendPrice } from '../core/money';
 import { parseScaleBarcode, type ScaleBarcodeFormat } from '../core/scale-barcode';
+import { LabelError, layoutToSpec, looksLike, parseLabel, parseLayoutSpec, validateLayout, type ParsedLabel, type ScaleLayout } from '../core/scale-layout';
 import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
 import { indexProduct, searchProducts as indexedSearch } from './search';
@@ -159,6 +160,8 @@ export interface LookupResult {
   product: Product;
   qty: number; // milli-units to add
   source: 'barcode' | 'plu' | 'scale' | 'sku';
+  /** The exact scale label scanned, kept on the sale line for audit. */
+  scanCode?: string;
 }
 
 /**
@@ -188,29 +191,117 @@ export function lookup(ctx: Ctx, code: string): LookupResult | null {
     const row = ctx.db.prepare('SELECT product_id FROM plu_codes WHERE CAST(plu AS INTEGER) = ?').get(Number(scale.itemCode)) as { product_id: number } | undefined;
     if (!row) throw new DomainError('NOT_FOUND', `Scale label product code ${scale.itemCode} is not set up as a PLU`);
     const p = getProduct(ctx, row.product_id)!;
-    if (!p.active) throw new DomainError('VALIDATION', `${p.nameEn} is inactive and cannot be sold`);
-    if (p.sellMode !== 'weight') throw new DomainError('VALIDATION', `${p.nameEn} is not a weighed product; its PLU should not be on a scale label`);
-    const limits = scaleLimits(ctx);
-    if (scale.weightGrams !== undefined) {
-      if (scale.weightGrams <= 0) throw new DomainError('VALIDATION', 'Scale label shows zero weight. Reweigh the item.');
-      if (scale.weightGrams > limits.maxGrams) throw new DomainError('VALIDATION', `Scale label weight ${scale.weightGrams} g is above the allowed ${limits.maxGrams} g. Check the label.`);
-      return { product: p, qty: scale.weightGrams, source: 'scale' };
+    return { product: p, qty: labelQty(ctx, p, scale), source: 'scale', scanCode: c };
+  }
+
+  // Configurable layouts (ADR-3): any field order, e.g. item code + quantity + PLU.
+  const layout = scaleLayouts(ctx, true).find((l) => looksLike(c, l));
+  if (layout) {
+    let label: ParsedLabel;
+    try {
+      label = parseLabel(c, layout);
+    } catch (e) {
+      throw new DomainError('VALIDATION', e instanceof LabelError ? e.message : 'Scale label could not be read');
     }
-    const price = scale.priceHalalas!;
-    if (price <= 0) throw new DomainError('VALIDATION', 'Scale label shows zero price. Reweigh the item.');
-    if (price > limits.maxHalalas) throw new DomainError('VALIDATION', 'Scale label price is above the allowed maximum. Check the label.');
-    // Price labels: the printed price is authoritative. The POS only accepts the label if some exact weight at
-    // today's shelf price gives that price; otherwise the label is out of date and must be reprinted.
-    const qty = qtyForLabelPrice(p.priceIncl, price);
-    if (qty === null) throw new DomainError('VALIDATION', 'Label price does not match the current shelf price. Reweigh the item.');
-    // The weight implied by the price must be possible too (e.g. 999.99 SAR of bananas = 167 kg).
-    if (qty > limits.maxGrams) throw new DomainError('VALIDATION', `Scale label price implies ${qty} g, above the allowed ${limits.maxGrams} g. Check the label.`);
-    return { product: p, qty, source: 'scale' };
+    const p = labelProduct(ctx, label, layout);
+    return { product: p, qty: labelQty(ctx, p, label), source: 'scale', scanCode: c };
   }
 
   const sku = ctx.db.prepare('SELECT id FROM products WHERE sku = ?').get(c) as { id: number } | undefined;
   if (sku) return mustBeActive(getProduct(ctx, sku.id), MILLI_PER_UNIT, 'sku');
   return null;
+}
+
+/** Finds the product a label names. With both an item code and a PLU, both must name the same product. */
+function labelProduct(ctx: Ctx, label: ParsedLabel, layout: ScaleLayout): Product {
+  const byPlu = (code: string) => (ctx.db.prepare('SELECT product_id FROM plu_codes WHERE CAST(plu AS INTEGER) = ?').get(Number(code)) as { product_id: number } | undefined)?.product_id;
+  const bySku = (code: string) => (ctx.db.prepare('SELECT id FROM products WHERE sku = ?').get(code) as { id: number } | undefined)?.id;
+  let fromPlu: number | undefined;
+  let fromItem: number | undefined;
+  if (label.plu !== undefined) {
+    fromPlu = byPlu(label.plu);
+    if (fromPlu === undefined) throw new DomainError('NOT_FOUND', `Scale label PLU ${label.plu} is not set up`);
+  }
+  if (label.itemCode !== undefined) {
+    fromItem = layout.itemMatches === 'sku' ? bySku(label.itemCode) : byPlu(label.itemCode);
+    if (fromItem === undefined) throw new DomainError('NOT_FOUND', `Scale label item code ${label.itemCode} is not set up`);
+  }
+  if (fromPlu !== undefined && fromItem !== undefined && fromPlu !== fromItem) {
+    throw new DomainError('VALIDATION', 'Scale label item code and PLU point to different products. Check the scale setup.');
+  }
+  return getProduct(ctx, (fromPlu ?? fromItem)!)!;
+}
+
+/** Quantity (milli-units) from a scale label, with every safety check. Shared by both label paths. */
+function labelQty(ctx: Ctx, p: Product, label: { weightGrams?: number; priceHalalas?: number; pieces?: number }): number {
+  if (!p.active) throw new DomainError('VALIDATION', `${p.nameEn} is inactive and cannot be sold`);
+  const limits = scaleLimits(ctx);
+  if (label.pieces !== undefined) {
+    if (p.sellMode !== 'unit') throw new DomainError('VALIDATION', `${p.nameEn} is sold by weight; a piece-count label does not fit it`);
+    if (label.pieces <= 0) throw new DomainError('VALIDATION', 'Scale label shows zero pieces. Check the label.');
+    if (label.pieces > 999) throw new DomainError('VALIDATION', 'Scale label piece count is impossible. Check the label.');
+    return label.pieces * MILLI_PER_UNIT;
+  }
+  if (p.sellMode !== 'weight') throw new DomainError('VALIDATION', `${p.nameEn} is not a weighed product; its PLU should not be on a scale label`);
+  if (label.weightGrams !== undefined) {
+    if (label.weightGrams <= 0) throw new DomainError('VALIDATION', 'Scale label shows zero weight. Reweigh the item.');
+    if (label.weightGrams > limits.maxGrams) throw new DomainError('VALIDATION', `Scale label weight ${label.weightGrams} g is above the allowed ${limits.maxGrams} g. Check the label.`);
+    return label.weightGrams;
+  }
+  const price = label.priceHalalas!;
+  if (price <= 0) throw new DomainError('VALIDATION', 'Scale label shows zero price. Reweigh the item.');
+  if (price > limits.maxHalalas) throw new DomainError('VALIDATION', 'Scale label price is above the allowed maximum. Check the label.');
+  // Price labels: the printed price is authoritative. The POS only accepts the label if some exact weight at
+  // today's shelf price gives that price; otherwise the label is out of date and must be reprinted.
+  const qty = qtyForLabelPrice(p.priceIncl, price);
+  if (qty === null) throw new DomainError('VALIDATION', 'Label price does not match the current shelf price. Reweigh the item.');
+  // The weight implied by the price must be possible too (e.g. 999.99 SAR of bananas = 167 kg).
+  if (qty > limits.maxGrams) throw new DomainError('VALIDATION', `Scale label price implies ${qty} g, above the allowed ${limits.maxGrams} g. Check the label.`);
+  return qty;
+}
+
+export interface ScaleLayoutRow extends ScaleLayout {
+  id: number;
+  spec: string;
+  active: boolean;
+}
+
+export function scaleLayouts(ctx: Ctx, activeOnly = false): ScaleLayoutRow[] {
+  const rows = ctx.db
+    .prepare(`SELECT id, name, fields_json, item_matches, active FROM scale_label_layouts ${activeOnly ? 'WHERE active = 1' : ''} ORDER BY id`)
+    .all() as { id: number; name: string; fields_json: string; item_matches: 'plu' | 'sku'; active: number }[];
+  return rows.map((r) => {
+    const fields = JSON.parse(r.fields_json) as ScaleLayout['fields'];
+    return { id: r.id, name: r.name, fields, itemMatches: r.item_matches, active: r.active === 1, spec: layoutToSpec(fields) };
+  });
+}
+
+/** Creates or updates a label layout from its text spec. Needs settings.manage; audited. */
+export function saveScaleLayout(ctx: Ctx, userId: number, input: { id?: number; name: string; spec: string; itemMatches: 'plu' | 'sku'; active: boolean }): number {
+  requirePermission(ctx, userId, 'settings.manage');
+  let layout: ScaleLayout;
+  try {
+    layout = { name: input.name.trim(), fields: parseLayoutSpec(input.spec), itemMatches: input.itemMatches };
+    validateLayout(layout);
+  } catch (e) {
+    throw new DomainError('VALIDATION', (e as Error).message);
+  }
+  return ctx.db.transaction(() => {
+    const now = ctx.now();
+    const json = JSON.stringify(layout.fields);
+    let id: number;
+    if (input.id) {
+      const r = ctx.db.prepare('UPDATE scale_label_layouts SET name = ?, fields_json = ?, item_matches = ?, active = ?, updated_at = ? WHERE id = ?')
+        .run(layout.name, json, layout.itemMatches, input.active ? 1 : 0, now, input.id);
+      if (r.changes === 0) throw new DomainError('NOT_FOUND', 'Layout not found');
+      id = input.id;
+    } else {
+      id = Number(ctx.db.prepare('INSERT INTO scale_label_layouts (name, fields_json, item_matches, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(layout.name, json, layout.itemMatches, input.active ? 1 : 0, now, now).lastInsertRowid);
+    }
+    appendAudit(ctx, { userId, action: 'scale.layout_saved', entity: 'scale_label_layout', entityId: id, details: { name: layout.name, spec: layoutToSpec(layout.fields), itemMatches: layout.itemMatches, active: input.active } });
+    return id;
+  })();
 }
 
 function mustBeActive(p: Product | null, qty: number, source: LookupResult['source']): LookupResult | null {

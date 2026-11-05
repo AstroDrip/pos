@@ -17,6 +17,8 @@ export interface SaleLineInput {
   discount?: number; // halalas off this line
   /** The unit price the cashier saw. If the shelf price changed since, the sale is refused (BUG-001). */
   expectedUnitPrice?: number;
+  /** The scale label scanned for this line, kept for audit. */
+  scanCode?: string;
 }
 
 export interface PaymentInput {
@@ -131,7 +133,7 @@ export function finalizeSale(ctx: Ctx, userId: number, input: SaleInput): SaleRe
 
     const insertLine = ctx.db.prepare(
       `INSERT INTO sale_lines (sale_id, line_no, product_id, name_ar, name_en, qty, unit_price_incl, discount, vat_rate_bp,
-         line_incl, line_vat, line_excl, unit_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         line_incl, line_vat, line_excl, unit_cost, scan_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     let cogs = 0;
     const negative: number[] = [];
@@ -140,7 +142,7 @@ export function finalizeSale(ctx: Ctx, userId: number, input: SaleInput): SaleRe
       const mv = applyMovement(ctx, { productId: p.id, qty: -input.lines[i]!.qty, reason: 'sale', sourceType: 'sale', sourceId: saleId, sourceLine: i + 1, userId });
       if (mv.wentNegative) negative.push(p.id);
       cogs += -mv.value;
-      insertLine.run(saleId, i + 1, p.id, p.nameAr, p.nameEn, input.lines[i]!.qty, p.priceIncl, t.discount, t.vatRate, t.lineIncl, t.lineVat, t.lineExcl, mv.unitCost);
+      insertLine.run(saleId, i + 1, p.id, p.nameAr, p.nameEn, input.lines[i]!.qty, p.priceIncl, t.discount, t.vatRate, t.lineIncl, t.lineVat, t.lineExcl, mv.unitCost, input.lines[i]!.scanCode ?? null);
     });
 
     const insertPay = ctx.db.prepare('INSERT INTO payments (sale_id, tender, amount, reference) VALUES (?, ?, ?, ?)');

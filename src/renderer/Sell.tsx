@@ -17,6 +17,7 @@ interface Line {
   product: Product;
   qty: number;
   discount: number; // halalas
+  scanCode?: string; // scale label scanned, kept on the sale line for audit
 }
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -99,11 +100,11 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const hasDiscount = lines.some((l) => l.discount > 0);
   const needsApproval = hasDiscount && !canDiscount;
 
-  const addLine = useCallback((product: Product, qty: number) => {
+  const addLine = useCallback((product: Product, qty: number, scanCode?: string) => {
     if (product.sellMode === 'unit') lastUnitProduct.current = product.id;
     setLines((prev) => {
       const i = prev.findIndex((l) => l.product.id === product.id && product.sellMode === 'unit');
-      if (i < 0) return [...prev, { product, qty, discount: 0 }];
+      if (i < 0) return [...prev, { product, qty, discount: 0, scanCode }];
       return prev.map((l, k) => (k === i ? { ...l, qty: l.qty + qty } : l));
     });
   }, []);
@@ -124,7 +125,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
       const r = await call<LookupResult | null>('catalog.lookup', { code });
       if (!r) return setMsg({ kind: 'error', text: t('Not found: {0}', code) });
       if (r.qty === 0) return setMsg({ kind: 'warn', text: t('{0} is sold by weight. Scan the scale label.', r.product.nameEn) });
-      if (r.source === 'scale') return addLine(r.product, r.qty); // the label carries the weight
+      if (r.source === 'scale') return addLine(r.product, r.qty, r.scanCode); // the label carries the weight
       setPending({ product: r.product, text: formatQty(r.qty, 0) });
       goStep('qty');
     } catch (e) {
@@ -152,7 +153,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
         return setMsg({ kind: 'warn', text: t('{0} is sold by weight. Scan the scale label.', r.product.nameEn) });
       }
       if (possibleDuplicate && !window.confirm(t('{0} was scanned twice very quickly. Add it again?', r.product.nameEn))) return;
-      addLine(r.product, r.qty);
+      addLine(r.product, r.qty, r.scanCode);
     } catch (e) {
       setMsg({ kind: 'error', text: t((e as Error).message) });
     }
@@ -202,7 +203,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
       const r = await call<SaleResult>('sale.finalize', {
         idempotencyKey: billKey.current,
         // The prices the cashier sees are sent too: if a price changed meanwhile, the sale is refused, not charged differently.
-        lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty, discount: l.discount || undefined, expectedUnitPrice: l.product.priceIncl })),
+        lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty, discount: l.discount || undefined, expectedUnitPrice: l.product.priceIncl, scanCode: l.scanCode })),
         payments,
         approver: needsApproval ? approver : undefined,
         customerId: customer?.id,

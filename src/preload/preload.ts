@@ -40,6 +40,8 @@ const PRELOAD_CHANNELS = [
   'user.setActive',
   'report.cashiers',
   'system.health',
+  'scale.layouts',
+  'scale.saveLayout',
   'refund.find',
   'refund.create',
   'refund.print',

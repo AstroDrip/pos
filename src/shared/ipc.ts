@@ -34,7 +34,7 @@ export const schemas = {
   }),
   'sale.finalize': z.object({
     idempotencyKey: z.string().regex(/^[\w-]{8,64}$/),
-    lines: z.array(z.object({ productId: int.positive(), qty: int.positive(), discount: money.optional(), expectedUnitPrice: money.optional() })).min(1).max(500),
+    lines: z.array(z.object({ productId: int.positive(), qty: int.positive(), discount: money.optional(), expectedUnitPrice: money.optional(), scanCode: z.string().regex(/^\d{4,32}$/).optional() })).min(1).max(500),
     payments: z.array(z.object({ tender: z.enum(['cash', 'card']), amount: money.positive(), reference: z.string().max(40).optional() })).min(1).max(5),
     approver: z.object({ username: z.string().max(40), pin: z.string().max(8) }).optional(),
     customerId: int.positive().optional(),
@@ -59,6 +59,8 @@ export const schemas = {
   'user.setActive': z.object({ userId: int.positive(), active: z.boolean() }),
   'report.cashiers': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
   'system.health': z.null(),
+  'scale.layouts': z.null(),
+  'scale.saveLayout': z.object({ id: int.positive().optional(), name: z.string().min(1).max(60), spec: z.string().min(1).max(200), itemMatches: z.enum(['plu', 'sku']), active: z.boolean() }),
   'refund.find': z.object({ invoiceNo: z.string().min(1).max(40) }),
   'refund.create': z.object({
     requestKey: z.string().regex(/^[\w-]{8,64}$/),
