@@ -2,7 +2,7 @@ import { roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
-import { applyMovement } from './inventory';
+import { applyMovement, cogsTrueUpLines } from './inventory';
 import { postEntry } from './ledger';
 import type { ReceiptData } from './sales';
 import { openShiftId } from './shifts';
@@ -193,6 +193,7 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
          line_incl, line_vat, line_excl, unit_cost, restock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     let restockedCost = 0;
+    let trueUp = 0;
     priced.forEach((p, i) => {
       insertLine.run(refundId, i + 1, p.line.saleLineNo, p.line.productId, p.line.nameAr, p.line.nameEn, p.req.qty, p.line.unitPriceIncl,
         p.vatRate, p.incl, p.vat, p.incl - p.vat, p.unitCost, p.req.restock ? 1 : 0);
@@ -201,6 +202,7 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
       if (p.req.restock) {
         const mv = applyMovement(ctx, { productId: p.line.productId, qty: p.req.qty, unitCost: p.unitCost, reason: 'refund', sourceType: 'refund', sourceId: refundId, sourceLine: i + 1, userId });
         restockedCost += mv.value;
+        trueUp += mv.cogsTrueUp;
       }
     });
 
@@ -215,6 +217,7 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
         { account: '1010', credit: totalIncl },
         { account: '1200', debit: restockedCost },
         { account: '5000', credit: restockedCost },
+        ...cogsTrueUpLines(trueUp),
       ],
     });
 

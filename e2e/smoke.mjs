@@ -316,6 +316,30 @@ try {
     assert.match(text, /Wastage and stock count differences \(2\)/);
   });
 
+  await step('owner: rent expense posted and paid by bank shows in Expenses and in the P&L; books balance', async () => {
+    await page.click('.top button:has-text("Expenses")');
+    await page.click('button:has-text("New expense")');
+    const form = page.locator('[aria-label="expense form"]');
+    await form.locator('button:has-text("Save draft")').click();
+    await form.locator('text=Choose a category').waitFor(); // no default category
+    await form.locator('select[aria-label="expense category"]').selectOption({ label: 'Rent' });
+    await form.locator('input[aria-label="expense description"]').fill('Shop rent');
+    await form.locator('select').nth(1).selectOption('out_of_scope'); // VAT treatment
+    await form.locator('input[aria-label="expense amount"]').fill('1500');
+    await form.locator('button:has-text("Post and pay by bank")').click();
+    await page.waitForSelector('text=Expense posted and paid');
+    await page.waitForSelector('td:has-text("Shop rent")');
+    assert.match(await page.locator('tr:has(td:has-text("Shop rent"))').innerText(), /1500\.00[\s\S]*1500\.00[\s\S]*paid/);
+    await page.click('.top button:has-text("Accounting")');
+    await page.waitForSelector('text=Profit and loss');
+    const text = await page.locator('.page').innerText();
+    assert.match(text, /6100 Rent\s+-1500\.00/);
+    assert.match(text, /Provisional figures/);
+    assert.match(text, /Trial balance\s+balanced/);
+    assert.doesNotMatch(text, /NOT BALANCED/);
+    if (shots) await page.screenshot({ path: join(shots, 'pos-accounting.png'), fullPage: true });
+  });
+
   await step('Arabic UI switches to right-to-left and back', async () => {
     await page.click('button[aria-label="language"]');
     await page.waitForSelector('.top button:has-text("البيع")');

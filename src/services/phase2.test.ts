@@ -237,3 +237,19 @@ describe('wastage and stock counts', () => {
     expect(() => ctx.db.prepare('DELETE FROM stock_adjustment_lines').run()).toThrow(/immutable/);
   });
 });
+
+describe('BUG-015: selling before stock arrives', () => {
+  it('when goods arrive, the cost of units already sold below zero moves to COGS, so Inventory matches the shelf', () => {
+    const water = createProduct(ctx, u.admin, { sku: 'WAT', nameEn: 'Water', nameAr: 'ماء', unitCode: 'PCS', sellMode: 'unit', vatRateBp: 1500, priceIncl: 250 });
+    finalizeSale(ctx, u.cashier, { idempotencyKey: key(), lines: [{ productId: water, qty: 2000 }], payments: [{ tender: 'cash', amount: 500 }] }); // stock -2 at cost 0.00
+    const inv0 = account('1200').debit - account('1200').credit;
+    const cogs0 = account('5000').debit - account('5000').credit;
+    const sup = createSupplier(ctx, u.admin, { name: 'Water Co' });
+    receiveGoods(ctx, u.admin, { supplierId: sup, lines: [{ productId: water, qty: 24_000, unitCost: 150 }] });
+    expect(stock(water)).toBe(22_000);
+    // +36.00 received, -3.00 for the 2 bottles already sold: the shelf holds 22 x 1.50 = 33.00 of water
+    expect(account('1200').debit - account('1200').credit - inv0).toBe(3300);
+    expect(account('5000').debit - account('5000').credit - cogs0).toBe(300);
+    expect(unbalancedEntries(ctx)).toEqual([]);
+  });
+});

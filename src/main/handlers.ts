@@ -13,6 +13,11 @@ import { createCustomer, createSupplier, findCustomers, listSuppliers } from '..
 import { adjustmentsReport, cashierActivity, refundsReport, salesSummary, stockOnHand, voidsReport } from '../services/reports';
 import { createRefund, findSaleForRefund, refundReceiptData } from '../services/refunds';
 import { postStockCount, recordWastage } from '../services/adjustments';
+import {
+  cancelDraft, categoryAccounts, createExpense, expensePayments, expenseSummary, generateRecurring, getExpense, listCategories, listExpenses,
+  listRecurring, payExpense, postExpense, reverseExpense, reversePayment, saveCategory, saveRecurring, updateDraft,
+} from '../services/expenses';
+import { balanceSheet, datedTrialBalance, generalLedger, ownerKpis, profitAndLoss } from '../services/financials';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
 import { closeShift, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
@@ -153,6 +158,37 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       return scaleLayouts(ctx);
     },
     'scale.saveLayout': (p, s) => saveScaleLayout(ctx, userId(s), p),
+    'expense.categories': (_p, s) => listCategories(ctx, userId(s)),
+    'expense.accounts': (_p, s) => categoryAccounts(ctx, userId(s)),
+    'expense.saveCategory': (p, s) => saveCategory(ctx, userId(s), p),
+    'expense.list': (p, s) => {
+      // Opening the list creates the drafts of recurring expenses that have started (never posts or pays them).
+      if (hasPermission(ctx, userId(s), 'expense.create')) generateRecurring(ctx, userId(s));
+      return listExpenses(ctx, userId(s), p);
+    },
+    'expense.summary': (p, s) => expenseSummary(ctx, userId(s), p.fromDay, p.toDay),
+    'expense.get': (p, s) => {
+      requirePermission(ctx, userId(s), 'expense.view');
+      return { expense: getExpense(ctx, p.id), payments: expensePayments(ctx, userId(s), p.id) };
+    },
+    'expense.create': (p, s) => createExpense(ctx, userId(s), p),
+    'expense.update': (p, s) => {
+      const { id, ...fields } = p;
+      updateDraft(ctx, userId(s), id, fields);
+      return null;
+    },
+    'expense.cancel': (p, s) => cancelDraft(ctx, userId(s), p.id, p.reason),
+    'expense.post': (p, s) => postExpense(ctx, userId(s), p.id, p.payNow),
+    'expense.pay': (p, s) => payExpense(ctx, userId(s), p.id, p),
+    'expense.reversePayment': (p, s) => reversePayment(ctx, userId(s), p.paymentId, p.requestKey, p.reason),
+    'expense.reverse': (p, s) => reverseExpense(ctx, userId(s), p.id, p.reason),
+    'expense.recurring': (_p, s) => listRecurring(ctx, userId(s)),
+    'expense.saveRecurring': (p, s) => saveRecurring(ctx, userId(s), p),
+    'finance.pl': (p, s) => profitAndLoss(ctx, userId(s), p.fromDay, p.toDay),
+    'finance.bs': (p, s) => balanceSheet(ctx, userId(s), p.asOf),
+    'finance.tb': (p, s) => datedTrialBalance(ctx, userId(s), p.fromDay, p.toDay),
+    'finance.gl': (p, s) => generalLedger(ctx, userId(s), p.code, p.fromDay, p.toDay),
+    'finance.kpis': (p, s) => ownerKpis(ctx, userId(s), p.fromDay, p.toDay),
     'refund.find': (p, s) => findSaleForRefund(ctx, userId(s), p.invoiceNo),
     'refund.create': (p, s) => {
       let approverId: number | undefined;

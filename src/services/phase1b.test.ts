@@ -227,6 +227,12 @@ describe('CSV import', () => {
 /** Makes a fresh database look like one created by schema v1 (undoes migrations 2 and 3). */
 function rollBackToV1(db: ReturnType<typeof openDatabase>) {
   db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
+  // undo migration 7
+  db.exec(`DROP TABLE expense_amortization; DROP TABLE expense_payments; DROP TABLE expenses; DROP TABLE recurring_expenses; DROP TABLE expense_categories;
+    DELETE FROM role_permissions WHERE permission_code LIKE 'expense.%' OR permission_code = 'finance.view';
+    DELETE FROM permissions WHERE code LIKE 'expense.%' OR code = 'finance.view';
+    DELETE FROM accounts WHERE code IN ('1030','1300','1500','2010','6100','6110','6120','6130','6200','6300','6310','6400','6410','6420','6430','6500','6900');
+    DELETE FROM invoice_counters WHERE series = 'EXP';`);
   // undo migration 6
   db.exec('DROP TABLE scale_label_layouts; ALTER TABLE sale_lines DROP COLUMN scan_code;');
   // undo migration 5

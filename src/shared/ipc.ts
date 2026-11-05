@@ -3,6 +3,26 @@ import { z } from 'zod';
 // The only operations the renderer can ask for. Every payload is validated in the main process.
 const int = z.number().int().safe();
 const money = int.nonnegative();
+const key = z.string().regex(/^[\w-]{8,64}$/);
+const vatClass = z.enum(['standard', 'zero', 'exempt', 'out_of_scope']);
+const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+const expenseFields = z.object({
+  categoryId: int.positive(),
+  description: z.string().min(1).max(200),
+  payee: z.string().max(80).optional(),
+  invoiceRef: z.string().max(60).optional(),
+  supplierVatNo: z.string().max(15).optional(),
+  notes: z.string().max(500).optional(),
+  attachmentRef: z.string().max(120).optional(),
+  expenseDate: z.iso.date(),
+  dueDate: z.iso.date().optional(),
+  periodStart: month.optional(),
+  periodEnd: month.optional(),
+  gross: money.positive(),
+  vatClass,
+  vatAmount: money,
+  vatRecoverable: z.boolean(),
+});
 
 export const schemas = {
   'auth.status': z.null(),
@@ -61,6 +81,30 @@ export const schemas = {
   'system.health': z.null(),
   'scale.layouts': z.null(),
   'scale.saveLayout': z.object({ id: int.positive().optional(), name: z.string().min(1).max(60), spec: z.string().min(1).max(200), itemMatches: z.enum(['plu', 'sku']), active: z.boolean() }),
+  'expense.categories': z.null(),
+  'expense.accounts': z.null(),
+  'expense.saveCategory': z.object({ id: int.positive().optional(), nameEn: z.string().min(1).max(80), nameAr: z.string().max(80), accountCode: z.string().regex(/^\d{4}$/), active: z.boolean() }),
+  'expense.list': z.object({ fromDay: z.iso.date(), toDay: z.iso.date(), categoryId: int.positive().optional(), payState: z.string().max(20).optional(), payee: z.string().max(80).optional() }),
+  'expense.summary': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
+  'expense.get': z.object({ id: int.positive() }),
+  'expense.create': expenseFields.extend({ requestKey: key }),
+  'expense.update': expenseFields.extend({ id: int.positive() }),
+  'expense.cancel': z.object({ id: int.positive(), reason: z.string().min(1).max(200) }),
+  'expense.post': z.object({ id: int.positive(), payNow: z.object({ requestKey: key, method: z.enum(['bank', 'till']), reference: z.string().max(60).optional() }).optional() }),
+  'expense.pay': z.object({ id: int.positive(), requestKey: key, amount: money.positive(), method: z.enum(['bank', 'till']), paidOn: z.iso.date(), reference: z.string().max(60).optional() }),
+  'expense.reversePayment': z.object({ paymentId: int.positive(), requestKey: key, reason: z.string().min(1).max(200) }),
+  'expense.reverse': z.object({ id: int.positive(), reason: z.string().min(1).max(200) }),
+  'expense.recurring': z.null(),
+  'expense.saveRecurring': z.object({
+    id: int.positive().optional(), name: z.string().min(1).max(80), categoryId: int.positive(), expectedGross: money.positive(), variableAmount: z.boolean(),
+    interval: z.enum(['monthly', 'quarterly', 'yearly']), startDate: z.iso.date(), endDate: z.iso.date().optional(), dueDay: int.min(1).max(28),
+    payee: z.string().max(80).optional(), vatClass: vatClass, vatRecoverable: z.boolean(), active: z.boolean(),
+  }),
+  'finance.pl': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
+  'finance.bs': z.object({ asOf: z.iso.date() }),
+  'finance.tb': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
+  'finance.gl': z.object({ code: z.string().regex(/^\d{4}$/), fromDay: z.iso.date(), toDay: z.iso.date() }),
+  'finance.kpis': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
   'refund.find': z.object({ invoiceNo: z.string().min(1).max(40) }),
   'refund.create': z.object({
     requestKey: z.string().regex(/^[\w-]{8,64}$/),

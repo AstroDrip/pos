@@ -23,6 +23,13 @@ export interface MovementResult {
   value: number; // halalas, signed like qty
   newQty: number;
   wentNegative: boolean;
+  /**
+   * BUG-015: units sold while stock was below zero left at the old average cost (often 0.00). When costed stock
+   * arrives, those units' real cost is now known: cogsTrueUp = covered units x (new cost - old average). The caller
+   * posts it Dr Cost of goods sold / Cr Inventory (negative = the reverse), so the Inventory account matches the
+   * stock actually on hand. 0 in every other case.
+   */
+  cogsTrueUp: number;
 }
 
 export function negativeStockPolicy(ctx: Ctx): 'allow' | 'block' {
@@ -69,7 +76,9 @@ export function applyMovement(ctx: Ctx, m: MovementInput): MovementResult {
     )
     .run(m.productId, newQty, newAvg);
 
-  return { unitCost, value: roundDiv(m.qty * unitCost, MILLI_PER_UNIT), newQty, wentNegative };
+  const covered = m.qty > 0 && m.unitCost !== undefined && bal.qty < 0 ? Math.min(-bal.qty, m.qty) : 0;
+  const cogsTrueUp = covered ? roundDiv(covered * (unitCost - bal.avg_cost), MILLI_PER_UNIT) : 0;
+  return { unitCost, value: roundDiv(m.qty * unitCost, MILLI_PER_UNIT), newQty, wentNegative, cogsTrueUp };
 }
 
 export interface GrnInput {
@@ -104,9 +113,10 @@ export function receiveGoods(ctx: Ctx, userId: number, input: GrnInput): { grnId
         .prepare('INSERT INTO goods_receipts (grn_no, supplier_id, reference, total_cost, user_id, received_at, request_key) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(grnNo, input.supplierId, input.reference ?? null, total, userId, ctx.now(), input.requestKey ?? null).lastInsertRowid,
     );
+    let trueUp = 0;
     input.lines.forEach((l, i) => {
       ctx.db.prepare('INSERT INTO grn_lines (grn_id, line_no, product_id, qty, unit_cost) VALUES (?, ?, ?, ?, ?)').run(grnId, i + 1, l.productId, l.qty, l.unitCost);
-      applyMovement(ctx, { productId: l.productId, qty: l.qty, unitCost: l.unitCost, reason: 'grn', sourceType: 'grn', sourceId: grnId, sourceLine: i + 1, userId });
+      trueUp += applyMovement(ctx, { productId: l.productId, qty: l.qty, unitCost: l.unitCost, reason: 'grn', sourceType: 'grn', sourceId: grnId, sourceLine: i + 1, userId }).cogsTrueUp;
     });
     postEntry(ctx, {
       date: storeDay(ctx.now()),
@@ -116,11 +126,19 @@ export function receiveGoods(ctx: Ctx, userId: number, input: GrnInput): { grnId
       lines: [
         { account: '1200', debit: total },
         { account: '2100', credit: total },
+        ...cogsTrueUpLines(trueUp),
       ],
     });
     appendAudit(ctx, { userId, action: 'stock.receive', entity: 'grn', entityId: grnId, details: { grnNo, total, lines: input.lines.length } });
     return { grnId, grnNo };
   })();
+}
+
+/** Journal lines for a cost true-up of units sold below zero stock (BUG-015). */
+export function cogsTrueUpLines(amount: number): { account: string; debit?: number; credit?: number }[] {
+  if (amount > 0) return [{ account: '5000', debit: amount }, { account: '1200', credit: amount }];
+  if (amount < 0) return [{ account: '1200', debit: -amount }, { account: '5000', credit: -amount }];
+  return [];
 }
 
 /** Balance table vs. sum of movements. Must always return an empty list. */

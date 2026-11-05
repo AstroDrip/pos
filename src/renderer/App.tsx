@@ -3,6 +3,8 @@ import type { User } from '../services/users';
 import { Admin, Restore, type FullBackupStatus } from './Admin';
 import { call } from './api';
 import { LangToggle, useI18n } from './i18n';
+import { Accounting } from './Accounting';
+import { Expenses } from './Expenses';
 import { Products } from './Products';
 import { Refund } from './Refund';
 import { Reports } from './Reports';
@@ -12,7 +14,7 @@ import { Stock } from './Stock';
 import { ThemeSelect } from './theme';
 
 type Status = { needsSetup: boolean; user: User | null };
-type Tab = 'sell' | 'refund' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
+type Tab = 'sell' | 'refund' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
 
 const TABS: { id: Tab; label: string; perm?: string }[] = [
   { id: 'sell', label: 'Sell' },
@@ -20,6 +22,8 @@ const TABS: { id: Tab; label: string; perm?: string }[] = [
   { id: 'stock', label: 'Stock', perm: 'stock.receive' },
   { id: 'products', label: 'Products', perm: 'product.manage' },
   { id: 'reports', label: 'Reports', perm: 'reports.view' },
+  { id: 'expenses', label: 'Expenses', perm: 'expense.view' },
+  { id: 'accounting', label: 'Accounting', perm: 'finance.view' },
   { id: 'shift', label: 'Shift' },
   { id: 'admin', label: 'Admin', perm: 'backup.run' },
 ];
@@ -82,6 +86,8 @@ export function App() {
       {tab === 'stock' && <Stock can={can} />}
       {tab === 'products' && <Products />}
       {tab === 'reports' && <Reports />}
+      {tab === 'expenses' && <Expenses can={can} />}
+      {tab === 'accounting' && <Accounting />}
       {tab === 'shift' && <Shift can={can} />}
       {tab === 'admin' && <Admin can={can} />}
     </>
