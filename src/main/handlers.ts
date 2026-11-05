@@ -2,17 +2,18 @@ import type { z } from 'zod';
 import { schemas, type Channel, type IpcResult } from '../shared/ipc';
 import { backupStatus, createBackup, prepareRestore } from '../services/backup';
 import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto';
-import { createProduct, getProduct, lookup, searchProducts } from '../services/catalog';
+import { createProduct, getAliases, getProduct, lookup, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
+import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
-import { appendAudit } from '../services/audit';
+import { appendAudit, verifyAuditChain } from '../services/audit';
 import { holdBill, listHeldBills, recallBill, recordRemoval } from '../services/held-bills';
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from '../services/import';
 import { receiveGoods } from '../services/inventory';
 import { createCustomer, createSupplier, findCustomers, listSuppliers } from '../services/parties';
-import { salesSummary, stockOnHand, voidsReport } from '../services/reports';
+import { cashierActivity, salesSummary, stockOnHand, voidsReport } from '../services/reports';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
 import { closeShift, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
-import { authenticate, createUser, hasPermission, listUsers, requirePermission, userCount, type User } from '../services/users';
+import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
 
 export interface Printer {
   printReceipt(data: ReceiptData, copy: boolean): Promise<void>;
@@ -88,14 +89,25 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'catalog.lookup': (p) => lookup(ctx, p.code),
     'catalog.search': (p) => searchProducts(ctx, p.text),
     'catalog.create': (p, s) => createProduct(ctx, userId(s), p),
+    'catalog.suggest': (p) => indexedSearch(ctx, p.text, 20),
+    'catalog.setPrice': (p, s) => setPrice(ctx, userId(s), p.productId, p.priceIncl),
+    'catalog.setActive': (p, s) => setProductActive(ctx, userId(s), p.productId, p.active, p.reason),
+    'catalog.aliases': (p, s) => {
+      requirePermission(ctx, userId(s), 'product.manage');
+      return getAliases(ctx, p.productId);
+    },
+    'catalog.setAliases': (p, s) => setAliases(ctx, userId(s), p.productId, p.aliases),
     'sale.finalize': (p, s) => {
       let discountApproverId: number | undefined;
       if (p.approver) discountApproverId = authenticate(ctx, p.approver.username, p.approver.pin).id;
       return finalizeSale(ctx, userId(s), { idempotencyKey: p.idempotencyKey, lines: p.lines, payments: p.payments, discountApproverId, customerId: p.customerId });
     },
     'sale.receipt': (p) => receiptData(ctx, p.saleId),
-    'sale.print': async (p) => {
-      await printer.printReceipt(receiptData(ctx, p.saleId), p.copy);
+    'sale.print': async (p, s) => {
+      const data = receiptData(ctx, p.saleId);
+      // Reprints are recorded (who, which invoice) for the cashier activity report. A reprint never creates a sale.
+      if (p.copy) appendAudit(ctx, { userId: userId(s), action: 'sale.reprint', entity: 'sale', entityId: p.saleId, details: { invoiceNo: data.invoiceNo } });
+      await printer.printReceipt(data, p.copy);
       return null;
     },
     'hold.create': (p, s) => holdBill(ctx, userId(s), p.label, { lines: p.lines, customerId: p.customerId, billKey: p.billKey }),
@@ -127,11 +139,18 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       requirePermission(ctx, userId(s), 'user.manage');
       return listUsers(ctx);
     },
+    'user.setActive': (p, s) => setUserActive(ctx, userId(s), p.userId, p.active),
+    'report.cashiers': (p, s) => cashierActivity(ctx, userId(s), p.fromDay, p.toDay),
+    'system.health': (_p, s) => {
+      requirePermission(ctx, userId(s), 'reports.view');
+      const broken = verifyAuditChain(ctx);
+      return { auditChainOk: broken === null, firstBrokenAuditId: broken };
+    },
     'user.create': (p, s) => createUser(ctx, userId(s), { username: p.username, displayName: p.displayName, pin: p.pin, roles: [p.role] }),
     'backup.status': () => ({ ...backupStatus(ctx), keyConfigured: !!backup?.getKey() }),
     'backup.setupKey': (_p, s) => {
-      const b = needBackup();
       requirePermission(ctx, userId(s), 'settings.manage');
+      const b = needBackup();
       if (b.getKey()) throw new DomainError('CONFLICT', 'A backup key already exists');
       const key = b.newKey();
       b.saveNewKey(key);
@@ -139,6 +158,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       return { recoveryCode: keyToRecoveryCode(key) }; // shown once; never stored in plain text
     },
     'backup.run': (_p, s) => {
+      requirePermission(ctx, userId(s), 'backup.run');
       const b = needBackup();
       const key = b.getKey();
       if (!key) throw new DomainError('VALIDATION', 'Set up the backup key first');
@@ -146,8 +166,8 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       return { fileName: r.fileName, createdAt: r.manifest.createdAt };
     },
     'restore.prepare': async (p, s) => {
+      if (!canRestore(s)) throw new DomainError('PERMISSION_DENIED', 'Not allowed: backup.restore'); // permission before anything else
       const b = needBackup();
-      if (!canRestore(s)) throw new DomainError('PERMISSION_DENIED', 'Not allowed: backup.restore');
       const file = await b.pickBackupFile();
       if (!file) return null;
       const key = p.recoveryCode ? recoveryCodeToKeyOrFail(p.recoveryCode) : b.getKey();
@@ -162,8 +182,8 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       }
     },
     'restore.apply': (_p, s) => {
+      if (!canRestore(s)) throw new DomainError('PERMISSION_DENIED', 'Not allowed: backup.restore'); // permission before anything else
       const b = needBackup();
-      if (!canRestore(s)) throw new DomainError('PERMISSION_DENIED', 'Not allowed: backup.restore');
       if (!prepared) throw new DomainError('VALIDATION', 'Check a backup file first');
       // Safety net: back up the current data before replacing it (if there is a key).
       const key = b.getKey();

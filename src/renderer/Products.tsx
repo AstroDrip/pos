@@ -11,6 +11,7 @@ export function Products() {
   const [form, setForm] = useState(empty);
   const [list, setList] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
+  const [editing, setEditing] = useState<Product | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const load = (text: string) => call<Product[]>('catalog.search', { text }).then(setList);
@@ -67,7 +68,7 @@ export function Products() {
           <thead><tr><th>SKU</th><th>{t('Name')}</th><th>{t('Sold by')}</th><th className="num">{t('Price')}</th></tr></thead>
           <tbody>
             {list.map((p) => (
-              <tr key={p.id}>
+              <tr key={p.id} onClick={() => setEditing(p)} style={{ cursor: 'pointer' }}>
                 <td>{p.sku}</td>
                 <td><ProductName en={p.nameEn} ar={p.nameAr} /></td>
                 <td>{p.sellMode === 'weight' ? t('kg') : t('piece')}</td>
@@ -76,7 +77,48 @@ export function Products() {
             ))}
           </tbody>
         </table>
+        {editing && <EditProduct key={editing.id} product={editing} onDone={() => { setEditing(null); void load(search); }} />}
       </div>
+    </div>
+  );
+}
+
+function EditProduct({ product, onDone }: { product: Product; onDone: () => void }) {
+  const { t } = useI18n();
+  const [price, setPrice] = useState(formatSar(product.priceIncl));
+  const [aliases, setAliases] = useState('');
+  const [reason, setReason] = useState('');
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  useEffect(() => void call<string[]>('catalog.aliases', { productId: product.id }).then((a) => setAliases(a.join(', '))), [product.id]);
+  const run = async (fn: () => Promise<unknown>) => {
+    setMsg(null);
+    try {
+      await fn();
+      onDone();
+    } catch (e) {
+      setMsg({ kind: 'error', text: t((e as Error).message) });
+    }
+  };
+  return (
+    <div className="card" style={{ margin: '12px 0' }}>
+      <h3>{product.nameEn} · {product.sku}</h3>
+      <label>{product.sellMode === 'weight' ? t('Shelf price incl. VAT (SAR per kg)') : t('Shelf price incl. VAT (SAR)')}</label>
+      <div className="row">
+        <input aria-label="new price" value={price} onChange={(e) => setPrice(e.target.value)} />
+        <button onClick={() => run(() => call('catalog.setPrice', { productId: product.id, priceIncl: parseSar(price) }))}>{t('Save price')}</button>
+      </div>
+      <label>{t('Other names for search (comma-separated)')}</label>
+      <div className="row">
+        <input value={aliases} onChange={(e) => setAliases(e.target.value)} />
+        <button onClick={() => run(() => call('catalog.setAliases', { productId: product.id, aliases: aliases.split(',').map((a) => a.trim()).filter(Boolean) }))}>{t('Save names')}</button>
+      </div>
+      <label>{t('Reason')}</label>
+      <div className="row">
+        <input value={reason} onChange={(e) => setReason(e.target.value)} />
+        <button className="danger" onClick={() => run(() => call('catalog.setActive', { productId: product.id, active: false, reason }))}>{t('Deactivate product')}</button>
+      </div>
+      {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+      <p><button onClick={onDone}>{t('Close')}</button></p>
     </div>
   );
 }

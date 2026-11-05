@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatQty, formatSar, parseQty, parseSar } from '../core/money';
 import type { Product } from '../services/catalog';
 import type { Supplier } from '../services/parties';
@@ -22,6 +22,8 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   const [lines, setLines] = useState<GrnLine[]>([]);
   const [rows, setRows] = useState<StockRow[]>([]);
   const [onlyLow, setOnlyLow] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const requestKey = useRef(crypto.randomUUID());
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), []);
@@ -34,9 +36,12 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   }, [search]);
 
   const save = async () => {
+    if (saving) return;
+    setSaving(true);
     setMsg(null);
     try {
       const payload = {
+        requestKey: requestKey.current,
         supplierId,
         reference: reference || undefined,
         lines: lines.map((l) => ({ productId: l.product.id, qty: parseQty(l.qty), unitCost: parseSar(l.cost) })),
@@ -45,8 +50,11 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
       setMsg({ kind: 'ok', text: t('Received {0}', r.grnNo) });
       setLines([]);
       setReference('');
+      requestKey.current = crypto.randomUUID(); // next delivery is a new receipt
     } catch (e) {
       setMsg({ kind: 'error', text: t((e as Error).message) });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -83,7 +91,7 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
             </tbody>
           </table>
           {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
-          <p><button className="primary" disabled={!supplierId || lines.length === 0} onClick={save}>{t('Save receipt')}</button></p>
+          <p><button className="primary" disabled={saving || !supplierId || lines.length === 0} onClick={save}>{t('Save receipt')}</button></p>
         </div>
       )}
       {can('reports.view') && (

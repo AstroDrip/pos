@@ -138,3 +138,56 @@ describe('backup and restore over IPC', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('permission matrix over IPC (audit 5.4: the backend enforces roles, not just hidden buttons)', () => {
+  it('a logged-in cashier is refused every manager/admin operation', async () => {
+    await dispatch('auth.setupAdmin', { username: 'owner', displayName: 'Owner', pin: '4321' }, s);
+    await dispatch('catalog.create', { sku: 'W', nameAr: 'ماء', nameEn: 'Water', unitCode: 'PCS', sellMode: 'unit', vatRateBp: 1500, priceIncl: 250 }, s);
+    createUser(t.ctx, s.user!.id, { username: 'cashier', displayName: 'C', pin: '1111', roles: ['cashier'] });
+    const c: Session = { user: null };
+    await dispatch('auth.login', { username: 'cashier', pin: '1111' }, c);
+    const day = { fromDay: '2026-11-01', toDay: '2026-11-30' };
+    const forbidden: [string, unknown][] = [
+      ['catalog.create', { sku: 'X', nameAr: 'س', nameEn: 'X', unitCode: 'PCS', sellMode: 'unit', vatRateBp: 1500, priceIncl: 1 }],
+      ['catalog.setPrice', { productId: 1, priceIncl: 1 }],
+      ['catalog.setActive', { productId: 1, active: false, reason: 'x' }],
+      ['catalog.aliases', { productId: 1 }],
+      ['catalog.setAliases', { productId: 1, aliases: ['x'] }],
+      ['supplier.create', { name: 'S' }],
+      ['grn.create', { supplierId: 1, lines: [{ productId: 1, qty: 1000, unitCost: 1 }] }],
+      ['cash.move', { kind: 'out', amount: 100, reason: 'x' }],
+      ['report.stock', { onlyLow: false }],
+      ['report.sales', day],
+      ['report.voids', day],
+      ['report.cashiers', day],
+      ['import.dryRun', { kind: 'products', csv: 'sku\n' }],
+      ['import.commit', { kind: 'products', csv: 'sku\n', acceptWarnings: true }],
+      ['user.list', null],
+      ['user.create', { username: 'evil', displayName: 'E', pin: '1234', role: 'admin' }],
+      ['user.setActive', { userId: 1, active: false }],
+      ['system.health', null],
+      ['backup.setupKey', null],
+      ['backup.run', null],
+      ['restore.prepare', {}],
+      ['restore.apply', null],
+    ];
+    for (const [ch, payload] of forbidden) {
+      const r = await dispatch(ch, payload, c);
+      expect([ch, r]).toEqual([ch, expect.objectContaining({ ok: false, code: 'PERMISSION_DENIED' })]);
+    }
+    // and the allowed basics still work
+    expect(await dispatch('catalog.suggest', { text: 'wat' }, c)).toMatchObject({ ok: true, data: [{ product: { nameEn: 'Water' } }] });
+  });
+
+  it('reprints are audited and never create a sale', async () => {
+    await dispatch('auth.setupAdmin', { username: 'owner', displayName: 'Owner', pin: '4321' }, s);
+    await dispatch('catalog.create', { sku: 'W', nameAr: 'ماء', nameEn: 'Water', unitCode: 'PCS', sellMode: 'unit', vatRateBp: 1500, priceIncl: 250 }, s);
+    await dispatch('shift.open', { openingFloat: 0 }, s);
+    await dispatch('sale.finalize', { idempotencyKey: 'abcdefgh-9', lines: [{ productId: 1, qty: 1000 }], payments: [{ tender: 'cash', amount: 250 }] }, s);
+    await dispatch('sale.print', { saleId: 1, copy: true }, s);
+    await dispatch('sale.print', { saleId: 1, copy: true }, s);
+    const n = (sql: string) => (t.ctx.db.prepare(sql).get() as { n: number }).n;
+    expect(n("SELECT count(*) AS n FROM audit_log WHERE action = 'sale.reprint'")).toBe(2);
+    expect(n('SELECT count(*) AS n FROM sales')).toBe(1);
+  });
+});

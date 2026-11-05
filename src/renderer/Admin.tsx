@@ -111,7 +111,7 @@ export function Restore() {
 
 function Users() {
   const { t } = useI18n();
-  const [list, setList] = useState<{ id: number; username: string; displayName: string; roles: string }[]>([]);
+  const [list, setList] = useState<{ id: number; username: string; displayName: string; roles: string; active: boolean }[]>([]);
   const [f, setF] = useState({ username: '', displayName: '', pin: '', role: 'cashier' });
   const [msg, setMsg] = useState<Msg>(null);
   const load = () => call<typeof list>('user.list').then(setList);
@@ -139,7 +139,12 @@ function Users() {
       </select>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       <p><button className="primary">{t('Add user')}</button></p>
-      <table className="list"><tbody>{list.map((u) => <tr key={u.id}><td>{u.username}</td><td>{u.displayName}</td><td>{u.roles}</td></tr>)}</tbody></table>
+      <table className="list"><tbody>{list.map((u) => (
+        <tr key={u.id} style={u.active ? undefined : { color: 'var(--muted)', textDecoration: 'line-through' }}>
+          <td>{u.username}</td><td>{u.displayName}</td><td>{u.roles}</td>
+          <td><button type="button" onClick={() => call('user.setActive', { userId: u.id, active: !u.active }).then(load, (e: Error) => setMsg({ kind: 'error', text: t(e.message) }))}>{u.active ? t('Deactivate') : t('Reactivate')}</button></td>
+        </tr>
+      ))}</tbody></table>
     </form>
   );
 }

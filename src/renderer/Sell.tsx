@@ -4,10 +4,12 @@ import { ScanBuffer } from '../core/scan-buffer';
 import { computeInvoice } from '../core/vat';
 import type { LookupResult, Product } from '../services/catalog';
 import type { HeldBill } from '../services/held-bills';
+import type { SearchHit } from '../services/search';
 import type { Customer } from '../services/parties';
 import type { SaleResult } from '../services/sales';
 import type { ShiftSummary } from '../services/shifts';
-import { call } from './api';
+import { call, type ApiError } from './api';
+import { SearchBox } from './SearchBox';
 import { ProductName, useI18n } from './i18n';
 
 interface Line {
@@ -18,13 +20,24 @@ interface Line {
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
+/**
+ * Removes scanned characters from whatever box had focus (customer phone, search, cash…). The value is set through
+ * the native setter and an input event is fired, so React's state is updated too; setting el.value alone is undone
+ * by React on the next render (BUG-011).
+ */
+function removeScannedText(el: HTMLInputElement, code: string) {
+  if (!el.value.endsWith(code)) return;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, el.value.slice(0, -code.length));
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const { t } = useI18n();
   const [shift, setShift] = useState<ShiftSummary | null | undefined>(undefined);
   const [float, setFloat] = useState('0');
   const [lines, setLines] = useState<Line[]>([]);
-  const [manual, setManual] = useState('');
   const [cash, setCash] = useState('');
+  const [cardPart, setCardPart] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
   const [lastSaleId, setLastSaleId] = useState<number | null>(null);
@@ -35,6 +48,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   // One key per bill: a retry after an error re-sends the same key, so it can never create a second sale.
   const billKey = useRef<string>(crypto.randomUUID());
   const scanner = useRef(new ScanBuffer());
+  const busyRef = useRef(false); // scans while a payment is being saved must not be lost (BUG-002)
 
   const loadHeld = () => call<HeldBill[]>('hold.list').then(setHeld);
   useEffect(() => {
@@ -52,7 +66,23 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const hasDiscount = lines.some((l) => l.discount > 0);
   const needsApproval = hasDiscount && !canDiscount;
 
+  const addLine = useCallback((product: Product, qty: number) => {
+    setLines((prev) => {
+      const i = prev.findIndex((l) => l.product.id === product.id && product.sellMode === 'unit');
+      if (i < 0) return [...prev, { product, qty, discount: 0 }];
+      return prev.map((l, k) => (k === i ? { ...l, qty: l.qty + qty } : l));
+    });
+  }, []);
+
+  const pickProduct = (p: Product) => {
+    if (busyRef.current) return setMsg({ kind: 'warn', text: t('Wait until the payment is saved, then add the item.') });
+    if (p.sellMode === 'weight') return setMsg({ kind: 'warn', text: t('{0} is sold by weight. Scan the scale label.', p.nameEn) });
+    setMsg(null);
+    addLine(p, 1000);
+  };
+
   const addCode = useCallback(async (code: string, possibleDuplicate = false) => {
+    if (busyRef.current) return setMsg({ kind: 'warn', text: t('Wait until the payment is saved, then add the item.') });
     setMsg(null);
     try {
       const r = await call<LookupResult | null>('catalog.lookup', { code });
@@ -62,15 +92,11 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
         return setMsg({ kind: 'warn', text: t('{0} is sold by weight. Scan the scale label.', r.product.nameEn) });
       }
       if (possibleDuplicate && !window.confirm(t('{0} was scanned twice very quickly. Add it again?', r.product.nameEn))) return;
-      setLines((prev) => {
-        const i = prev.findIndex((l) => l.product.id === r.product.id && r.product.sellMode === 'unit');
-        if (i < 0) return [...prev, { product: r.product, qty: r.qty, discount: 0 }];
-        return prev.map((l, k) => (k === i ? { ...l, qty: l.qty + r.qty } : l));
-      });
+      addLine(r.product, r.qty);
     } catch (e) {
       setMsg({ kind: 'error', text: t((e as Error).message) });
     }
-  }, []);
+  }, [addLine]);
 
   // Scanner input is caught globally, whatever has focus (plan §I).
   useEffect(() => {
@@ -79,12 +105,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
       if (!scan) return;
       e.preventDefault();
       e.stopPropagation();
-      if (e.target instanceof HTMLInputElement) {
-        // Remove the scanned characters from whatever box had focus.
-        const el = e.target;
-        if (el.value.endsWith(scan.code)) el.value = el.value.slice(0, -scan.code.length);
-      }
-      setManual((m) => (m.endsWith(scan.code) ? m.slice(0, -scan.code.length) : m));
+      if (e.target instanceof HTMLInputElement) removeScannedText(e.target, scan.code);
       void addCode(scan.code, scan.possibleDuplicate);
     };
     window.addEventListener('keydown', onKey, true);
@@ -95,27 +116,34 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
     billKey.current = crypto.randomUUID();
     setLines([]);
     setCash('');
+    setCardPart('');
     setCustomer(null);
     setApprover({ username: '', pin: '' });
   };
 
   const pay = async (tender: 'cash' | 'card') => {
-    if (!totals) return;
-    let amount = totals.totalIncl;
-    if (tender === 'cash' && cash.trim()) {
-      try {
-        amount = parseSar(cash);
-      } catch {
-        return setMsg({ kind: 'error', text: t('Cash amount is not a valid number') });
+    if (!totals || busyRef.current) return;
+    let payments: { tender: 'cash' | 'card'; amount: number }[];
+    try {
+      const card = cardPart.trim() ? parseSar(cardPart) : 0;
+      if (tender === 'card') payments = [{ tender: 'card', amount: totals.totalIncl }];
+      else {
+        // Cash, optionally with part of the bill on card ("split").
+        const cashAmount = cash.trim() ? parseSar(cash) : totals.totalIncl - card;
+        payments = [...(card > 0 ? [{ tender: 'card' as const, amount: card }] : []), ...(cashAmount > 0 ? [{ tender: 'cash' as const, amount: cashAmount }] : [])];
       }
+    } catch {
+      return setMsg({ kind: 'error', text: t('Cash amount is not a valid number') });
     }
+    busyRef.current = true;
     setBusy(true);
     setMsg(null);
     try {
       const r = await call<SaleResult>('sale.finalize', {
         idempotencyKey: billKey.current,
-        lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty, discount: l.discount || undefined })),
-        payments: [{ tender, amount }],
+        // The prices the cashier sees are sent too: if a price changed meanwhile, the sale is refused, not charged differently.
+        lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty, discount: l.discount || undefined, expectedUnitPrice: l.product.priceIncl })),
+        payments,
         approver: needsApproval ? approver : undefined,
         customerId: customer?.id,
       });
@@ -131,9 +159,23 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
     } catch (e) {
       // The bill stays on screen with the same key, so pressing pay again is safe.
       setMsg({ kind: 'error', text: t('NOT SAVED: {0}', t((e as Error).message)) });
+      if ((e as ApiError).code === 'PRICE_CHANGED') await refreshPrices();
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
+  };
+
+  /** After a price change, reload current prices so the screen shows exactly what will be charged. */
+  const refreshPrices = async () => {
+    const fresh = new Map<number, Product>();
+    for (const l of lines) {
+      if (fresh.has(l.product.id)) continue;
+      const hits = await call<SearchHit[]>('catalog.suggest', { text: l.product.sku }).catch(() => [] as SearchHit[]);
+      const p = hits.find((h) => h.product.id === l.product.id)?.product;
+      if (p) fresh.set(p.id, p);
+    }
+    setLines((prev) => prev.map((l) => ({ ...l, product: fresh.get(l.product.id) ?? l.product })));
   };
 
   /** Every removal before payment is audited (voids report). The line goes even if logging fails, but staff are told. */
@@ -253,16 +295,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
         )}
       </div>
       <div className="side">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (manual.trim()) void addCode(manual.trim());
-            setManual('');
-          }}
-        >
-          <label>{t('Scan, or type barcode / PLU / SKU and press Enter')}</label>
-          <input autoFocus value={manual} onChange={(e) => setManual(e.target.value)} />
-        </form>
+        <SearchBox onPick={pickProduct} onCode={(c) => void addCode(c)} disabled={busy} />
         <div className="row">
           {customer ? (
             <span>{t('Customer:')} <strong>{customer.name}</strong> <button onClick={() => setCustomer(null)}>✕</button></span>
@@ -295,6 +328,8 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
         )}
         <label>{t('Cash received (blank = exact)')}</label>
         <input aria-label="cash received" value={cash} onChange={(e) => setCash(e.target.value)} />
+        <label>{t('Card part of a split payment (optional)')}</label>
+        <input aria-label="card part" value={cardPart} onChange={(e) => setCardPart(e.target.value)} />
         <div className="row">
           <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>{t('Cash')}</button>
           <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>{t('Card')}</button>

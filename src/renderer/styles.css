@@ -44,3 +44,9 @@ label { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 4px
 .ar { direction: rtl; text-align: start; font-size: 14px; color: var(--muted); }
 .list { width: 100%; border-collapse: collapse; background: var(--panel); }
 .list td, .list th { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: start; }
+.searchbox { position: relative; }
+.suggestions { position: absolute; z-index: 10; inset-inline: 0; margin: 2px 0 0; padding: 0; list-style: none; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; max-height: 360px; overflow: auto; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+.suggestions li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; cursor: pointer; }
+.suggestions li.active { background: #e3f4ec; }
+.suggestions li.none { color: var(--muted); cursor: default; }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatQty, formatSar } from '../core/money';
 import { storeDay } from '../core/store-time';
-import type { SalesSummary, VoidRow } from '../services/reports';
+import type { CashierActivity, SalesSummary, VoidRow } from '../services/reports';
 import { call } from './api';
 import { useI18n } from './i18n';
 
@@ -13,6 +13,7 @@ export function Reports() {
   const [to, setTo] = useState(today());
   const [r, setR] = useState<SalesSummary | null>(null);
   const [voids, setVoids] = useState<VoidRow[]>([]);
+  const [cashiers, setCashiers] = useState<CashierActivity[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export function Reports() {
     setError('');
     call<SalesSummary>('report.sales', { fromDay: from, toDay: to }).then(setR, (e: Error) => setError(e.message));
     call<VoidRow[]>('report.voids', { fromDay: from, toDay: to }).then(setVoids, () => setVoids([]));
+    call<CashierActivity[]>('report.cashiers', { fromDay: from, toDay: to }).then(setCashiers, () => setCashiers([]));
   }, [from, to]);
 
   return (
@@ -51,6 +53,20 @@ export function Reports() {
           <table className="list">
             <thead><tr><th>{t('Product')}</th><th className="num">{t('Qty')}</th><th className="num">{t('Total')}</th></tr></thead>
             <tbody>{r.topProducts.map((p) => <tr key={p.productId}><td>{p.nameEn}</td><td className="num">{formatQty(p.qty)}</td><td className="num">{formatSar(p.totalIncl)}</td></tr>)}</tbody>
+          </table>
+          <h4>{t('Activity by cashier')}</h4>
+          <p className="ar" style={{ direction: 'inherit' }}>{t('Facts for review, not accusations: high numbers can have innocent reasons.')}</p>
+          <table className="list">
+            <thead><tr><th>{t('User')}</th><th className="num">{t('Sales')}</th><th className="num">{t('Total')}</th><th className="num">{t('Cash')}</th><th className="num">{t('Card')}</th>
+              <th className="num">{t('Discounts')}</th><th className="num">{t('Removed')}</th><th className="num">{t('Reprints')}</th><th className="num">{t('Cash out')}</th><th className="num">{t('Over / short')}</th></tr></thead>
+            <tbody>{cashiers.map((c) => (
+              <tr key={c.userId}>
+                <td>{c.user}</td><td className="num">{c.sales}</td><td className="num">{formatSar(c.salesTotal)}</td><td className="num">{formatSar(c.cashNet)}</td><td className="num">{formatSar(c.card)}</td>
+                <td className="num">{c.discountCount} / {formatSar(c.discountTotal)}</td><td className="num">{c.removals} / {formatSar(c.removedValue)}</td><td className="num">{c.reprints}</td>
+                <td className="num">{c.cashOutCount} / {formatSar(c.cashOutTotal)}</td>
+                <td className="num" style={c.overShortTotal < 0 ? { color: 'var(--danger)' } : undefined}>{formatSar(c.overShortTotal)}</td>
+              </tr>
+            ))}</tbody>
           </table>
           <h4>{t('Items removed before payment ({0})', voids.length)}</h4>
           <table className="list">

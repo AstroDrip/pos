@@ -83,9 +83,29 @@ try {
 
   await step('typed SKU adds to the same line', async () => {
     await page.waitForTimeout(600); // outside the double-scan window
-    await page.locator('form input').first().fill('WAT');
+    await page.locator('input[aria-label="product search"]').fill('WAT');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.total:has-text("5.00 SAR")');
+  });
+
+  await step('search: typing "wat" suggests Water; arrow + Enter adds it; Arabic "ماء" finds it too', async () => {
+    const box = page.locator('input[aria-label="product search"]');
+    await box.fill('wat');
+    await page.waitForSelector('.suggestions li:has-text("Water 1.5L")');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.total:has-text("7.50 SAR")');
+    await box.fill('ماء');
+    await page.waitForSelector('.suggestions li:has-text("Water 1.5L")');
+    await page.keyboard.press('Escape');
+    await box.fill('');
+    await page.click('button[aria-label="remove line"]'); // removes the whole 3 x water line (audited removal)
+    await page.waitForSelector('.total:has-text("0.00 SAR")');
+    for (const expected of ['2.50', '5.00']) {
+      await box.fill('WAT');
+      await page.keyboard.press('Enter');
+      await page.waitForSelector(`.total:has-text("${expected} SAR")`);
+    }
   });
 
   await step('cash sale saves, shows change and prints', async () => {

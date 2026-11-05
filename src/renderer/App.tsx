@@ -65,6 +65,7 @@ export function App() {
         <span>{user.displayName}</span>
         <button onClick={() => call('auth.logout').then(refresh)}>{t('Log out')}</button>
       </div>
+      {can('reports.view') && <HealthBanner />}
       {tab === 'sell' && <Sell canDiscount={can('sale.discount')} />}
       {tab === 'stock' && <Stock can={can} />}
       {tab === 'products' && <Products />}
@@ -73,6 +74,15 @@ export function App() {
       {tab === 'admin' && <Admin can={can} />}
     </>
   );
+}
+
+/** Shows a red warning if the audit log has been tampered with (hash chain broken). */
+function HealthBanner() {
+  const { t } = useI18n();
+  const [h, setH] = useState<{ auditChainOk: boolean; firstBrokenAuditId: number | null } | null>(null);
+  useEffect(() => void call<typeof h>('system.health').then(setH, () => setH(null)), []);
+  if (!h || h.auditChainOk) return null;
+  return <div className="msg error" style={{ margin: 8 }}>{t('WARNING: the audit log has been altered outside the app (first bad record #{0}). Keep a copy of the database and contact support.', h.firstBrokenAuditId ?? '?')}</div>;
 }
 
 /** Always-visible backup state (plan §J): green under 24 h, amber older, red never/failed. */
