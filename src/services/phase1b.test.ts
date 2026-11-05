@@ -227,6 +227,11 @@ describe('CSV import', () => {
 /** Makes a fresh database look like one created by schema v1 (undoes migrations 2 and 3). */
 function rollBackToV1(db: ReturnType<typeof openDatabase>) {
   db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
+  // undo migration 9
+  db.exec(`DROP TABLE supplier_opening_balances; DROP TABLE supplier_payments; DROP TABLE purchase_return_lines; DROP TABLE purchase_returns;
+    DROP TABLE purchase_invoice_grns; DROP TABLE purchase_invoices;
+    DELETE FROM role_permissions WHERE permission_code LIKE 'purchase.%'; DELETE FROM permissions WHERE code LIKE 'purchase.%';
+    DELETE FROM accounts WHERE code = '5010'; DELETE FROM invoice_counters WHERE series IN ('PINV','PRET','SPAY');`);
   // undo migration 8
   db.exec("DROP TABLE sync_outbox; DROP TABLE sync_state; DELETE FROM settings WHERE key = 'dashboard_enabled';");
   // undo migration 7
