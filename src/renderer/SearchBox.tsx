@@ -13,7 +13,23 @@ const DEBOUNCE_MS = 200;
  * 200 ms debounce, ↑/↓ to move, Enter to pick (or to look up the typed code when nothing is highlighted), Esc to close.
  * Slow, older answers never replace newer ones, and nothing is searched while an Arabic IME is composing.
  */
-export function SearchBox({ onPick, onCode, disabled }: { onPick: (p: Product) => void; onCode: (code: string) => void; disabled?: boolean }) {
+export function SearchBox({
+  onPick,
+  onCode,
+  disabled,
+  inputRef,
+  onEmptyKey,
+  onFocusBox,
+}: {
+  onPick: (p: Product) => void;
+  onCode: (code: string) => void;
+  disabled?: boolean;
+  /** Lets the checkout put focus back here after each step. */
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  /** Keys pressed while the box is empty (Enter = payment, + = one more), see checkout-keys.ts. Return true if handled. */
+  onEmptyKey?: (e: React.KeyboardEvent<HTMLInputElement>) => boolean;
+  onFocusBox?: () => void;
+}) {
   const { t, lang } = useI18n();
   const [text, setText] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -23,7 +39,8 @@ export function SearchBox({ onPick, onCode, disabled }: { onPick: (p: Product) =
   const seq = useRef(0);
   const composing = useRef(false);
   const navigated = useRef(false); // the cashier moved the highlight with the arrow keys
-  const input = useRef<HTMLInputElement>(null);
+  const ownInput = useRef<HTMLInputElement>(null);
+  const input = inputRef ?? ownInput;
 
   useEffect(() => {
     const q = text.trim();
@@ -51,22 +68,23 @@ export function SearchBox({ onPick, onCode, disabled }: { onPick: (p: Product) =
     return () => clearTimeout(timer);
   }, [text]);
 
-  const reset = () => {
+  const reset = (refocus = true) => {
     seq.current++;
     navigated.current = false;
     setText('');
     setHits([]);
     setOpen(false);
     setActive(-1);
-    input.current?.focus();
+    if (refocus) input.current?.focus();
   };
   const pick = (h: SearchHit) => {
+    reset(false); // the checkout moves focus to the quantity step
     onPick(h.product);
-    reset();
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
+    if (!text.trim() && onEmptyKey?.(e)) return;
     if (e.key === 'ArrowDown' && hits.length) {
       e.preventDefault();
       setOpen(true);
@@ -114,7 +132,10 @@ export function SearchBox({ onPick, onCode, disabled }: { onPick: (p: Product) =
           setText(e.currentTarget.value);
         }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onFocus={() => hits.length && setOpen(true)}
+        onFocus={() => {
+          onFocusBox?.();
+          if (hits.length) setOpen(true);
+        }}
       />
       {open && text.trim() && (
         <ul className="suggestions" role="listbox">

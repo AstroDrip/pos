@@ -81,38 +81,84 @@ try {
     assert.equal(await page.locator('form input').first().inputValue(), '');
   });
 
-  await step('typed SKU adds to the same line', async () => {
+  await step('keyboard: typed SKU goes to the quantity step; Enter adds to the same line', async () => {
     await page.waitForTimeout(600); // outside the double-scan window
     await page.locator('input[aria-label="product search"]').fill('WAT');
     await page.keyboard.press('Enter');
+    await page.waitForSelector('input[aria-label="quantity"]:focus');
+    assert.equal(await page.locator('input[aria-label="quantity"]').inputValue(), '1');
+    await page.keyboard.press('Enter');
     await page.waitForSelector('.total:has-text("5.00 SAR")');
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'product search');
   });
 
-  await step('search: typing "wat" suggests Water; arrow + Enter adds it; Arabic "ماء" finds it too', async () => {
+  await step('search: "wat" suggests Water; arrow + Enter, then + and Enter in quantity; Arabic "ماء" finds it too', async () => {
     const box = page.locator('input[aria-label="product search"]');
     await box.fill('wat');
     await page.waitForSelector('.suggestions li:has-text("Water 1.5L")');
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
-    await page.waitForSelector('.total:has-text("7.50 SAR")');
+    await page.waitForSelector('input[aria-label="quantity"]:focus');
+    await page.keyboard.press('+'); // 1 -> 2
+    assert.equal(await page.locator('input[aria-label="quantity"]').inputValue(), '2');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.total:has-text("10.00 SAR")'); // 2 + 2 waters
+    await page.waitForTimeout(400);
+    await page.keyboard.press('+'); // empty search box: one more of the last item
+    await page.waitForSelector('.total:has-text("12.50 SAR")');
+    // invalid quantity is refused, Esc cancels without adding
+    await box.fill('WAT');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('input[aria-label="quantity"]:focus');
+    await page.locator('input[aria-label="quantity"]').fill('1.5');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('text=This item is sold by whole units');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('input[aria-label="quantity"]', { state: 'detached' });
+    assert.match(await page.locator('.total').innerText(), /12\.50/);
     await box.fill('ماء');
     await page.waitForSelector('.suggestions li:has-text("Water 1.5L")');
     await page.keyboard.press('Escape');
     await box.fill('');
-    await page.click('button[aria-label="remove line"]'); // removes the whole 3 x water line (audited removal)
+    await page.click('button[aria-label="remove line"]'); // removes the whole 5 x water line (audited removal)
     await page.waitForSelector('.total:has-text("0.00 SAR")');
     for (const expected of ['2.50', '5.00']) {
       await box.fill('WAT');
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('input[aria-label="quantity"]:focus');
       await page.keyboard.press('Enter');
       await page.waitForSelector(`.total:has-text("${expected} SAR")`);
     }
   });
 
-  await step('cash sale saves, shows change and prints', async () => {
-    await page.locator('input[aria-label="cash received"]').fill('10');
-    await page.click('button:has-text("Cash")');
+  await step('appearance: dark mode during an open bill keeps the bill', async () => {
+    const bg = () => page.evaluate(() => getComputedStyle(document.querySelector('.cart')).backgroundColor);
+    const light = await bg();
+    await page.locator('select[aria-label="appearance"]').selectOption('dark');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+    assert.notEqual(await bg(), light);
+    assert.match(await page.locator('.total').innerText(), /5\.00/); // bill untouched
+    if (shots) await page.screenshot({ path: join(shots, 'pos-dark-sell.png') });
+    await page.locator('select[aria-label="appearance"]').selectOption('light');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
+    assert.match(await page.locator('.total').innerText(), /5\.00/);
+  });
+
+  await step('keyboard: Enter on the empty box opens payment; Enter pays cash once; repeated Enter makes no second sale', async () => {
+    await page.locator('input[aria-label="product search"]').focus();
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('input[aria-label="cash received"]:focus');
+    await page.keyboard.type('10');
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Enter');
     await page.waitForSelector('text=SAVED INV-00000001');
     assert.match(await page.locator('.msg:has-text("SAVED")').innerText(), /Change: 5\.00/);
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Enter'); // focus is back on the empty search box, bill empty
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(() => window.pos.invoke('shift.current', null));
+    assert.equal(r.data.saleCount, 1);
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'product search');
     const html = readFileSync(receipt, 'utf8');
     assert.match(html, /INV-00000001/);
     assert.match(html, /ماء/);
@@ -173,7 +219,15 @@ try {
     await page.click('.side button:has-text("Card")');
     await page.waitForSelector('text=NOT SAVED');
     await page.fill('input[placeholder="PIN"]', '4321');
-    await page.click('.side button:has-text("Card")');
+    // keyboard card payment: refused while a split card part is typed, then Ctrl+Enter records the card sale
+    await page.locator('input[aria-label="card part"]').fill('1');
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Control+Enter');
+    await page.waitForSelector('text=A split payment is in progress');
+    await page.locator('input[aria-label="card part"]').fill('');
+    await page.locator('input[aria-label="cash received"]').focus();
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Control+Enter');
     await page.waitForSelector('text=SAVED INV-00000002');
   });
 
@@ -286,6 +340,15 @@ try {
     }, receipt);
     assert.ok(png.length > 1000);
     if (shots) writeFileSync(join(shots, 'receipt-80mm.png'), Buffer.from(png, 'base64'));
+  });
+
+  await step('appearance: the dark choice is kept after the window reloads', async () => {
+    await page.locator('select[aria-label="appearance"]').selectOption('dark');
+    await page.reload();
+    await page.waitForSelector('.top');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+    assert.equal(await page.locator('select[aria-label="appearance"]').inputValue(), 'dark');
+    await page.locator('select[aria-label="appearance"]').selectOption('light');
   });
 
   // Last: Playwright keeps waiting on a cancelled navigation.

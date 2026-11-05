@@ -10,6 +10,7 @@ import type { SaleResult } from '../services/sales';
 import type { ShiftSummary } from '../services/shifts';
 import { call, type ApiError } from './api';
 import { SearchBox } from './SearchBox';
+import { decideKey, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
 import { ProductName, useI18n } from './i18n';
 
 interface Line {
@@ -49,6 +50,38 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const billKey = useRef<string>(crypto.randomUUID());
   const scanner = useRef(new ScanBuffer());
   const busyRef = useRef(false); // scans while a payment is being saved must not be lost (BUG-002)
+  // Keyboard checkout (ADR-2): exactly one step is active and its input has focus.
+  const [step, setStep] = useState<CheckoutStep>('search');
+  const stepAt = useRef(0);
+  const [pending, setPending] = useState<{ product: Product; text: string; error?: string } | null>(null);
+  const lastUnitProduct = useRef<number | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const qtyRef = useRef<HTMLInputElement>(null);
+  const cashRef = useRef<HTMLInputElement>(null);
+  // Focus moves only when a keyboard step asks for it (moveFocus = true). When the cashier clicks into a field,
+  // the step follows the click but focus stays exactly where they clicked.
+  const focusWanted = useRef(true);
+  const [focusTick, setFocusTick] = useState(0);
+  const goStep = useCallback((s: CheckoutStep, moveFocus = true) => {
+    if (moveFocus) {
+      focusWanted.current = true;
+      setFocusTick((n) => n + 1);
+    }
+    setStep((prev) => {
+      if (prev !== s) stepAt.current = performance.now();
+      return s;
+    });
+  }, []);
+  // The search box is disabled while a payment is saving, so a pending focus request waits until saving ends.
+  useEffect(() => {
+    if (busy || !focusWanted.current) return;
+    focusWanted.current = false;
+    if (step === 'search') searchRef.current?.focus();
+    else if (step === 'qty') {
+      qtyRef.current?.focus();
+      qtyRef.current?.select();
+    } else cashRef.current?.focus();
+  }, [step, busy, focusTick]);
 
   const loadHeld = () => call<HeldBill[]>('hold.list').then(setHeld);
   useEffect(() => {
@@ -67,6 +100,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
   const needsApproval = hasDiscount && !canDiscount;
 
   const addLine = useCallback((product: Product, qty: number) => {
+    if (product.sellMode === 'unit') lastUnitProduct.current = product.id;
     setLines((prev) => {
       const i = prev.findIndex((l) => l.product.id === product.id && product.sellMode === 'unit');
       if (i < 0) return [...prev, { product, qty, discount: 0 }];
@@ -78,7 +112,33 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
     if (busyRef.current) return setMsg({ kind: 'warn', text: t('Wait until the payment is saved, then add the item.') });
     if (p.sellMode === 'weight') return setMsg({ kind: 'warn', text: t('{0} is sold by weight. Scan the scale label.', p.nameEn) });
     setMsg(null);
-    addLine(p, 1000);
+    setPending({ product: p, text: '1' }); // picked from the list: confirm the quantity first
+    goStep('qty');
+  };
+
+  /** A code typed by hand and confirmed with Enter. Scanner bursts never come here (they add straight away). */
+  const typedCode = async (code: string) => {
+    if (busyRef.current) return setMsg({ kind: 'warn', text: t('Wait until the payment is saved, then add the item.') });
+    setMsg(null);
+    try {
+      const r = await call<LookupResult | null>('catalog.lookup', { code });
+      if (!r) return setMsg({ kind: 'error', text: t('Not found: {0}', code) });
+      if (r.qty === 0) return setMsg({ kind: 'warn', text: t('{0} is sold by weight. Scan the scale label.', r.product.nameEn) });
+      if (r.source === 'scale') return addLine(r.product, r.qty); // the label carries the weight
+      setPending({ product: r.product, text: formatQty(r.qty, 0) });
+      goStep('qty');
+    } catch (e) {
+      setMsg({ kind: 'error', text: t((e as Error).message) });
+    }
+  };
+
+  const incLast = () => {
+    const id = lastUnitProduct.current;
+    if (id === null || !lines.some((l) => l.product.id === id && l.product.sellMode === 'unit')) {
+      return setMsg({ kind: 'warn', text: t('Nothing to add one to: the last item is sold by weight or was removed.') });
+    }
+    setMsg(null);
+    setLines((prev) => prev.map((l) => (l.product.id === id && l.product.sellMode === 'unit' ? { ...l, qty: l.qty + 1000 } : l)));
   };
 
   const addCode = useCallback(async (code: string, possibleDuplicate = false) => {
@@ -148,6 +208,7 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
         customerId: customer?.id,
       });
       resetBill();
+      goStep('search');
       setLastSaleId(r.saleId);
       const warn = r.negativeStockProducts.length ? t(' Stock went below zero for some items.') : '';
       setMsg({ kind: 'ok', text: t('SAVED {0}. Change: {1} SAR.', r.invoiceNo, formatSar(r.changeGiven)) + warn });
@@ -251,6 +312,38 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
     );
   }
 
+  /** Runs a key through the state machine for the focused field. Returns true when the key was used. */
+  const onStepKey = (field: KeyContext['field'], e: React.KeyboardEvent<HTMLInputElement>): boolean => {
+    const a = decideKey(
+      { key: e.key, ctrl: e.ctrlKey || e.metaKey, repeat: e.repeat, msSinceStepChange: performance.now() - stepAt.current },
+      { step, field, searchEmpty: true, billHasItems: lines.length > 0 && !!totals, splitCardTyped: cardPart.trim() !== '', busy: busyRef.current },
+    );
+    if (a.type === 'none') return false;
+    e.preventDefault();
+    switch (a.type) {
+      case 'openPay': goStep('pay'); break;
+      case 'incLast': incLast(); break;
+      case 'qtyInc': setPending((p) => (p ? { ...p, text: incrementQtyText(p.text), error: undefined } : p)); break;
+      case 'qtyConfirm': {
+        if (!pending) break;
+        const r = parseStepQty(pending.text, pending.product.sellMode);
+        if ('error' in r) setPending({ ...pending, error: r.error });
+        else {
+          addLine(pending.product, r.qty);
+          setPending(null);
+          goStep('search');
+        }
+        break;
+      }
+      case 'toSearch': setPending(null); goStep('search'); break;
+      case 'focusCash': cashRef.current?.focus(); break;
+      case 'payCash': void pay('cash'); break;
+      case 'payCard': void pay('card'); break;
+      case 'refuse': setMsg({ kind: 'warn', text: t('A split payment is in progress: press Enter in Cash received to finish it.') }); break;
+    }
+    return true;
+  };
+
   const setDiscount = (i: number, text: string) => {
     let d = 0;
     try {
@@ -295,7 +388,38 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
         )}
       </div>
       <div className="side">
-        <SearchBox onPick={pickProduct} onCode={(c) => void addCode(c)} disabled={busy} />
+        <div className={`step${step === 'search' ? ' current' : ''}`}>
+          <div className="step-label">{t('Scan or search')}</div>
+          <SearchBox
+            inputRef={searchRef}
+            onPick={pickProduct}
+            onCode={(c) => void typedCode(c)}
+            disabled={busy}
+            onEmptyKey={(e) => onStepKey('search', e)}
+            onFocusBox={() => goStep('search', false)}
+          />
+          <small className="ar" style={{ direction: 'inherit' }}>{t('Empty box: Enter = payment · + = one more of the last item')}</small>
+        </div>
+        {step === 'qty' && pending && (
+          <div className="step current" role="group" aria-label="quantity step">
+            <div className="step-label">{t('Quantity')}</div>
+            <div><ProductName en={pending.product.nameEn} ar={pending.product.nameAr} /> · {formatSar(pending.product.priceIncl)}</div>
+            <input
+              ref={qtyRef}
+              aria-label="quantity"
+              inputMode="numeric"
+              value={pending.text}
+              onChange={(e) => setPending({ ...pending, text: e.target.value, error: undefined })}
+              onKeyDown={(e) => onStepKey('qty', e)}
+              onBlur={() => setTimeout(() => {
+                // Clicking elsewhere cancels the quantity step instead of leaving it half done.
+                if (document.activeElement !== qtyRef.current) setPending((p) => (p ? null : p));
+              }, 200)}
+            />
+            {pending.error && <div className="msg error">{t(pending.error)}</div>}
+            <small className="ar" style={{ direction: 'inherit' }}>{t('Enter = add · + = one more · Esc = cancel')}</small>
+          </div>
+        )}
         <div className="row">
           {customer ? (
             <span>{t('Customer:')} <strong>{customer.name}</strong> <button onClick={() => setCustomer(null)}>✕</button></span>
@@ -326,13 +450,30 @@ export function Sell({ canDiscount }: { canDiscount: boolean }) {
             </div>
           </div>
         )}
-        <label>{t('Cash received (blank = exact)')}</label>
-        <input aria-label="cash received" value={cash} onChange={(e) => setCash(e.target.value)} />
-        <label>{t('Card part of a split payment (optional)')}</label>
-        <input aria-label="card part" value={cardPart} onChange={(e) => setCardPart(e.target.value)} />
-        <div className="row">
-          <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>{t('Cash')}</button>
-          <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>{t('Card')}</button>
+        <div className={`step${step === 'pay' ? ' current' : ''}`} role="group" aria-label="payment step">
+          <div className="step-label">{t('Payment')}</div>
+          <label>{t('Cash received (blank = exact)')}</label>
+          <input
+            ref={cashRef}
+            aria-label="cash received"
+            value={cash}
+            onChange={(e) => setCash(e.target.value)}
+            onFocus={() => lines.length > 0 && goStep('pay', false)}
+            onKeyDown={(e) => onStepKey('cash', e)}
+          />
+          <label>{t('Card part of a split payment (optional)')}</label>
+          <input
+            aria-label="card part"
+            value={cardPart}
+            onChange={(e) => setCardPart(e.target.value)}
+            onFocus={() => lines.length > 0 && goStep('pay', false)}
+            onKeyDown={(e) => onStepKey('cardPart', e)}
+          />
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>{t('Cash')} <span className="kbd">Enter</span></button>
+            <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>{t('Card')} <span className="kbd">Ctrl+Enter</span></button>
+          </div>
+          {step === 'pay' && <small className="ar" style={{ direction: 'inherit' }}>{t('Card: record only after the bank terminal shows APPROVED.')} {t('Esc = back to the bill')}</small>}
         </div>
         <div className="row">
           <button disabled={busy || lines.length === 0} onClick={hold}>{t('Hold bill')}</button>
