@@ -10,13 +10,13 @@ import { openDatabase } from '../db/connection';
 import { createProduct } from './catalog';
 import { DomainError, type Ctx } from './context';
 import {
-  applyCustomerAdvance, creditControls, customerAccount, customerStatement, receivablesAgeing, recordCustomerReceipt, reverseCustomerReceipt,
+  applyCustomerAdvance, creditControls, customerAccount, findCreditCustomers, customerStatement, receivablesAgeing, recordCustomerReceipt, reverseCustomerReceipt,
   setInvoiceDispute, suggestCustomerAllocation, updateCustomerCredit, writeOffInvoice,
 } from './credit';
 import { datedTrialBalance, ownerKpis, profitAndLoss } from './financials';
 import { receiveGoods, stockDrift } from './inventory';
 import { unbalancedEntries } from './ledger';
-import { createCustomer, createSupplier } from './parties';
+import { createCustomer, createSupplier, findCustomers } from './parties';
 import {
   applySupplierAdvance, createPurchaseInvoice, createPurchaseReturn, openSupplierItems, paySupplier, reverseSupplierPayment,
   supplierAccount, supplierAgeing, supplierControls,
@@ -314,5 +314,36 @@ describe('dashboard, recovery and migration', () => {
     expect(() => db.prepare('DELETE FROM payments').run()).toThrow(/immutable/);
     db.close();
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('customer search ranking', () => {
+  const credit = (q: string) => findCreditCustomers(ctx, u.cashier, q).map((c) => c.name);
+  const plain = (q: string) => findCustomers(ctx, q).map((c) => c.name);
+
+  it('exact phone or id comes first', () => {
+    createCustomer(ctx, u.cashier, { name: 'Aaron 0500000001 Trading', phone: '0599999999' });
+    expect(credit('0500000001')[0]).toBe('Ahmed');
+    expect(plain('0500000001')[0]).toBe('Ahmed');
+    expect(credit(String(ahmed))[0]).toBe('Ahmed');
+  });
+
+  it('name starting with the text comes before name containing it', () => {
+    createCustomer(ctx, u.cashier, { name: 'Abdul Ali', phone: '0500000011' });
+    createCustomer(ctx, u.cashier, { name: 'Ali', phone: '0500000012' });
+    expect(credit('al')).toEqual(['Ali', 'Abdul Ali']);
+    expect(plain('al')).toEqual(['Ali', 'Abdul Ali']);
+  });
+
+  it('among equal matches the customer seen most recently comes first', () => {
+    const mo1 = createCustomer(ctx, u.cashier, { name: 'Mohammed A', phone: '0500000021' });
+    const mo2 = createCustomer(ctx, u.cashier, { name: 'Mohammed B', phone: '0500000022' });
+    updateCustomerCredit(ctx, u.admin, { customerId: mo2, creditEnabled: true, creditLimit: 100_000, paymentTermsDays: 30 });
+    expect(credit('mo')).toEqual(['Mohammed A', 'Mohammed B']); // no activity: by name
+    t.advance(60_000);
+    creditSale(1, 0, { customer: mo2 });
+    expect(credit('mo')).toEqual(['Mohammed B', 'Mohammed A']);
+    expect(plain('mo')).toEqual(['Mohammed B', 'Mohammed A']);
+    expect(mo1).toBeGreaterThan(0);
   });
 });

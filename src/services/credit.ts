@@ -4,6 +4,7 @@ import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
 import { postEntry, type PostingLine } from './ledger';
 import { openShiftId } from './shifts';
+import { rankCustomers } from './parties';
 import { hasPermission, requirePermission } from './users';
 
 // Customer credit = accounts receivable subledger (docs/audit/CREDIT_MANAGEMENT_AUDIT.md). PROVISIONAL accounting.
@@ -499,9 +500,9 @@ export function findCreditCustomers(ctx: Ctx, userId: number, text: string) {
   const t = text.trim().replace(/[%_]/g, '');
   if (!t) return [];
   const rows = ctx.db
-    .prepare('SELECT id FROM customers WHERE phone LIKE ? OR name LIKE ? OR CAST(id AS TEXT) = ? ORDER BY name LIMIT 20')
-    .all(`%${t}%`, `%${t}%`, t) as { id: number }[];
-  return rows.map((r) => {
+    .prepare('SELECT id, name, phone FROM customers WHERE phone LIKE ? OR name LIKE ? OR CAST(id AS TEXT) = ? LIMIT 2000')
+    .all(`%${t}%`, `%${t}%`, t) as { id: number; name: string; phone: string | null }[];
+  return rankCustomers(ctx, rows, t).map((r) => {
     const c = customerRow(ctx, r.id);
     const chk = creditCheck(ctx, r.id, 0);
     return { id: c.id, name: c.name, phone: c.phone, creditEnabled: c.credit_enabled === 1, limit: c.credit_limit, outstanding: chk.outstanding, advance: chk.advance, available: chk.available };
