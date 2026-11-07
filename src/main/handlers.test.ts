@@ -136,7 +136,7 @@ describe('backup and restore over IPC', () => {
     // Once users exist, an anonymous session can no longer restore.
     expect(await d('restore.prepare', {}, { user: null })).toMatchObject({ ok: false, code: 'PERMISSION_DENIED' });
     rmSync(dir, { recursive: true, force: true });
-  });
+  }, 30_000); // scrypt key derivation + backup/restore: ~1.5 s alone, timed out once at 7.4 s under full-suite load
 });
 
 describe('permission matrix over IPC (audit 5.4: the backend enforces roles, not just hidden buttons)', () => {
