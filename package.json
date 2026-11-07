@@ -16,7 +16,8 @@
     "audit": "npm audit --omit=dev",
     "e2e": "npm run build && node e2e/smoke.mjs",
     "dist": "npm run build && electron-builder --win nsis --x64",
-    "demo": "npm run build && node scripts/demo.cjs"
+    "demo": "npm run build && node scripts/demo.cjs",
+    "ui-audit": "npm run build && node scripts/ui-audit.mjs"
   },
   "engines": {
     "node": ">=22"

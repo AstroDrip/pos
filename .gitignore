@@ -11,3 +11,4 @@ coverage/
 .env.*
 demo-data/
 ui-shots/
+ui-audit/

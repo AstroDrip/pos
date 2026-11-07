@@ -9,6 +9,7 @@ import { CHANNELS } from '../shared/ipc';
 import { appendAudit } from '../services/audit';
 import { backupStatus, createBackup, encryptedSnapshot, installRestore } from '../services/backup';
 import { createHandlers, type BackupEnv, type Printer, type Session } from './handlers';
+import { runUiAudit } from './ui-audit';
 import { receiptHtml } from './receipt-html';
 
 
@@ -167,6 +168,15 @@ app.whenReady().then(() => {
   win.webContents.on('destroyed', () => sessions.delete(wcId));
   win.once('ready-to-show', () => win.show());
   void win.loadFile(RENDERER_INDEX);
+  // Development-only UI audit (scripts/ui-audit.mjs). Never active in a packaged build.
+  const auditDir = process.env.POS_UI_AUDIT;
+  if (auditDir && !app.isPackaged) {
+    const [username = '', pin = ''] = (process.env.POS_UI_AUDIT_LOGIN ?? '').split(':');
+    void runUiAudit(win, auditDir, {
+      salesCount: () => (ctx.db.prepare('SELECT count(*) AS n FROM sales').get() as { n: number }).n,
+      login: { username, pin },
+    });
+  }
 });
 
 app.on('window-all-closed', () => {
