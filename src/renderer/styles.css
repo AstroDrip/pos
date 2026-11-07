@@ -84,6 +84,7 @@
   --fs-xs: 12px; --fs-sm: 13px; --fs-md: 14px; --fs-base: 15px; --fs-lg: 18px; --fs-xl: 22px; --fs-total: 34px;
   --control-h: 36px; --control-h-sm: 28px;
   --topbar-h: 48px;
+  --section-w: 1100px; /* width of page sections (account cards and the lists above them) */
   --font: 'Segoe UI', Tahoma, Arial, sans-serif; /* Segoe UI and Tahoma both carry Arabic glyphs on Windows */
   font: var(--fs-base)/1.45 var(--font);
   color: var(--text);
@@ -157,8 +158,8 @@ label:has(> input[type='checkbox']) { color: var(--text-2); }
 .card > h3:first-child, .card > h4:first-child, .subpanel > h4:first-child { margin-top: 0; }
 /* A section inside a card or account panel: flat, no second border (no cards inside cards). */
 .subpanel { background: var(--surface-2); border-radius: var(--r-md); padding: var(--sp-4); margin: var(--sp-4) 0; }
-.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--sp-4); align-items: start; }
-.grid-cards > .card { max-width: none; margin: 0; }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--sp-4); align-items: stretch; } /* cards in a row share one height */
+.grid-cards > .card, .grid-cards > .card.section { max-width: none; margin: 0; } /* .card.section's bottom margin would make it 16px shorter than its row */
 .row { display: flex; gap: var(--sp-2); }
 .row > * { flex: 1; }
 .row > button, .row > .fit { flex: 0 0 auto; }
@@ -267,7 +268,7 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
   .top .utils .who { display: none; }
 }
 /* A card used as a page section (not centred, aligned to the page's start). */
-.card.section { max-width: 1100px; margin: 0 0 var(--sp-4); }
+.card.section { max-width: var(--section-w); margin: 0 0 var(--sp-4); }
 
 /* Narrow windows: every tab stays visible on a second row instead of hiding behind sideways scrolling. */
 @media (max-width: 1100px) {

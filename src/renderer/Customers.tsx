@@ -48,7 +48,7 @@ export function Customers({ can }: { can: (p: string) => boolean }) {
       {view === 'ageing' ? <Ageing onOpen={(id) => { setView('accounts'); setOpenId(id); }} /> : (
         <>
           {found.length > 0 && (
-            <table className="list" style={{ maxWidth: 900 }}>
+            <table className="list" style={{ maxWidth: 'var(--section-w)' }}>
               <thead><tr><th>ID</th><th>{t('Name')}</th><th>{t('Phone')}</th><th>{t('Credit')}</th><th className="num">{t('Owed')}</th><th className="num">{t('Advance')}</th><th className="num">{t('Available')}</th></tr></thead>
               <tbody>{found.map((c) => (
                 <tr key={c.id} style={{ cursor: 'pointer' }} tabIndex={0} onClick={() => setOpenId(c.id)} onKeyDown={(e) => e.key === 'Enter' && setOpenId(c.id)}>

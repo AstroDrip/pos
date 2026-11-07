@@ -52,8 +52,11 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
 
   const summary: { screens: { name: string; findings: number; high: number }[]; flows: FlowResult[]; errors: string[] } = { screens: [], flows: [], errors: [] };
 
+  // capturePage returns the last painted frame: wait until the DOM change has been painted (two animation frames).
+  const painted = () => js('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))');
   const capture = async (name: string) => {
     await sleep(300);
+    await painted();
     const raw = await js<Omit<Snapshot, 'screen'> & { scrollHeight: number }>(COLLECT_SOURCE);
     const snap: Snapshot = { screen: name, viewport: raw.viewport, scrollWidth: raw.scrollWidth, boxes: raw.boxes, scrollers: raw.scrollers };
     const findings: Finding[] = auditGeometry(snap);
@@ -62,7 +65,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     const suspects = [...new Set(findings.filter((f) => f.severity !== 'low').flatMap((f) => f.ids))];
     if (suspects.length) {
       await js(outlineSource(suspects));
-      await sleep(80);
+      await painted();
       writeFileSync(join(outDir, `${name}__overlay.png`), (await wc.capturePage()).toPNG());
       await js(CLEAR_OUTLINE_SOURCE);
     }
