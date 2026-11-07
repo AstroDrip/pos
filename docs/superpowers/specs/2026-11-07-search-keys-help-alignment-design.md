@@ -48,10 +48,9 @@ The match levels stay first, and their order never changes:
 
 **Within a level**, products are ordered by **demand score**, then by the current tie-breakers (shorter name, then alphabetical). A popular product can therefore never jump above a stronger match. Typo tolerance is **not** added: it would weaken exact matching, and scanner and typed codes must stay exact.
 
-One- and two-character queries:
-- use the indexed name "starts with" range (B-tree on `name_en_norm` / `name_ar_norm`) and word prefixes;
-- FTS is used only from 2 characters (its prefix index covers 2–3);
-- a one-character FTS query is not run.
+Short queries:
+- **One character:** exact code matches plus the indexed name "starts with" range (B-tree on `name_en_norm` / `name_ar_norm`) only. No FTS query and no full-table scan.
+- **Two characters and more:** the above plus FTS word prefixes (its prefix index covers 2–3 characters), as today.
 
 Result limits: POS 8 for one character and 12 otherwise; pickers 20.
 
