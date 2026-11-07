@@ -10,3 +10,16 @@ export function moveActive(active: number, count: number, key: 'ArrowDown' | 'Ar
   if (count <= 0) return -1;
   return key === 'ArrowDown' ? Math.min(active + 1, count - 1) : Math.max(active - 1, 0);
 }
+
+/**
+ * Enter in a product search box: pick the highlighted suggestion, or look up the typed text as an exact code.
+ * A suggestion is picked only when the list belongs to exactly the text in the box and no answer is pending, so a
+ * code typed or scanned quickly after a letter is never swapped for an older suggestion. Codes (digits, or letters
+ * with digits) use the exact lookup unless the cashier moved the highlight with the arrow keys.
+ */
+export function enterAction(s: { text: string; itemsFor: string; loading: boolean; open: boolean; hasActive: boolean; navigated: boolean }): 'pick' | 'code' {
+  const q = s.text.trim();
+  if (!s.open || !s.hasActive || s.loading || s.itemsFor !== q) return 'code';
+  const codeLike = /\d/.test(q) && /^[0-9A-Za-z-]+$/.test(q);
+  return codeLike && !s.navigated ? 'code' : 'pick';
+}

@@ -12,6 +12,7 @@ export function useSuggest<T>(
   opts: { debounceMs?: number; composing?: RefObject<boolean>; onResults?: (items: T[]) => void } = {},
 ) {
   const [items, setItems] = useState<T[]>([]);
+  const [itemsFor, setItemsFor] = useState(''); // the text the current items answer
   const [loading, setLoading] = useState(false);
   const seq = useRef(0);
   const latest = useRef({ fetch, onResults: opts.onResults });
@@ -24,6 +25,7 @@ export function useSuggest<T>(
     if (!shouldQuery(q, composing?.current ?? false)) {
       seq.current++; // cancel anything in flight
       setItems([]);
+      setItemsFor('');
       setLoading(false);
       return;
     }
@@ -34,6 +36,7 @@ export function useSuggest<T>(
         (r) => {
           if (mine !== seq.current) return; // a newer search has started
           setItems(r);
+          setItemsFor(q);
           setLoading(false);
           latest.current.onResults?.(r);
         },
@@ -47,6 +50,7 @@ export function useSuggest<T>(
   const cancel = useCallback(() => {
     seq.current++;
     setItems([]);
+    setItemsFor('');
     setLoading(false);
   }, []);
   /** Ask again for the same text (e.g. after saving a change). */
@@ -54,8 +58,12 @@ export function useSuggest<T>(
     const q = text.trim();
     if (!q) return;
     const mine = ++seq.current;
-    void latest.current.fetch(q).then((r) => mine === seq.current && setItems(r));
+    void latest.current.fetch(q).then((r) => {
+      if (mine !== seq.current) return;
+      setItems(r);
+      setItemsFor(q);
+    });
   }, [text]);
 
-  return { items, loading, cancel, refresh };
+  return { items, itemsFor, loading, cancel, refresh };
 }

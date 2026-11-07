@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { formatSar } from '../core/money';
-import { moveActive } from '../core/suggest-keys';
+import { enterAction, moveActive } from '../core/suggest-keys';
 import type { Product } from '../services/catalog';
 import type { SearchHit } from '../services/search';
 import { call } from './api';
@@ -43,7 +43,7 @@ export function SearchBox({
   const ownInput = useRef<HTMLInputElement>(null);
   const input = inputRef ?? ownInput;
 
-  const { items: hits, loading, cancel } = useSuggest<SearchHit>(text, (q) => call<SearchHit[]>('catalog.suggest', { text: q }), {
+  const { items: hits, itemsFor, loading, cancel } = useSuggest<SearchHit>(text, (q) => call<SearchHit[]>('catalog.suggest', { text: q }), {
     debounceMs: DEBOUNCE_MS,
     composing,
     onResults: (r) => {
@@ -81,10 +81,9 @@ export function SearchBox({
       e.preventDefault();
       const q = text.trim();
       if (!q) return;
-      // Digits (barcodes, PLUs, scale labels) always use the exact lookup, never a "similar" suggestion.
-      // Text picks the highlighted suggestion; the cashier sees it highlighted before pressing Enter.
+      // Codes use the exact lookup; a suggestion is picked only if the list on screen answers exactly this text.
       const chosen = hits[active];
-      if (chosen && open && (navigated.current || !/^\d+$/.test(q))) {
+      if (chosen && enterAction({ text: q, itemsFor, loading, open, hasActive: true, navigated: navigated.current }) === 'pick') {
         pick(chosen);
       } else {
         onCode(q);

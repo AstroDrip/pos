@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { moveActive, shouldQuery } from './suggest-keys';
+import { enterAction, moveActive, shouldQuery } from './suggest-keys';
 
 describe('shouldQuery', () => {
   it('asks from the first character', () => {
@@ -25,5 +25,28 @@ describe('moveActive', () => {
   it('returns -1 when the list is empty', () => {
     expect(moveActive(0, 0, 'ArrowDown')).toBe(-1);
     expect(moveActive(-1, 0, 'ArrowUp')).toBe(-1);
+  });
+});
+
+describe('enterAction', () => {
+  const base = { text: 'apple', itemsFor: 'apple', loading: false, open: true, hasActive: true, navigated: false };
+  it('picks the highlighted suggestion when the list belongs to the typed text', () => {
+    expect(enterAction(base)).toBe('pick');
+  });
+  it('never picks a list that belongs to older text (typed fast, or a slow scanner)', () => {
+    expect(enterAction({ ...base, text: 'A12', itemsFor: 'a' })).toBe('code');
+    expect(enterAction({ ...base, text: 'a6281000000000', itemsFor: 'a' })).toBe('code');
+  });
+  it('never picks while an answer is still on its way', () => {
+    expect(enterAction({ ...base, loading: true })).toBe('code');
+  });
+  it('codes (digits, or letters with digits) use the exact lookup unless the cashier moved the highlight', () => {
+    expect(enterAction({ ...base, text: '6281000000000', itemsFor: '6281000000000' })).toBe('code');
+    expect(enterAction({ ...base, text: 'A12', itemsFor: 'A12' })).toBe('code');
+    expect(enterAction({ ...base, text: 'A12', itemsFor: 'A12', navigated: true })).toBe('pick');
+  });
+  it('looks up the text when nothing is highlighted or the list is closed', () => {
+    expect(enterAction({ ...base, hasActive: false })).toBe('code');
+    expect(enterAction({ ...base, open: false })).toBe('code');
   });
 });
