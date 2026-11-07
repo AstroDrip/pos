@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decrementLine, incrementLine, restoreLine, setLineQty, type CartLine } from './cart';
+import { decrementLine, incrementLine, reductionOf, restoreLine, setLineQty, type CartLine } from './cart';
 import { computeInvoice } from './vat';
 
 type P = { id: number; sellMode: 'unit' | 'weight'; priceIncl: number };
@@ -66,3 +66,29 @@ describe('cart quantity', () => {
     expect(c).toEqual(cart());
   });
 });
+
+describe('quantity drops are logged and never break the bill', () => {
+  const big: CartLine<P> = { product: { id: 9, sellMode: 'unit', priceIncl: 1000 }, qty: 5000, discount: 500 };
+
+  it('a lower quantity reports what left the bill and its share of the line amount', () => {
+    // line amount 50.00 - 5.00 = 45.00; 3 of 5 leave -> 27.00
+    expect(reductionOf(big, 2000)).toEqual({ productId: 9, qty: 3000, amount: 2700 });
+    expect(reductionOf(big, 0)).toEqual({ productId: 9, qty: 5000, amount: 4500 });
+  });
+
+  it('no report when the quantity does not go down', () => {
+    expect(reductionOf(big, 5000)).toBeNull();
+    expect(reductionOf(big, 6000)).toBeNull();
+  });
+
+  it('refuses a drop that would leave the discount larger than the line', () => {
+    const l: CartLine<P> = { product: { id: 9, sellMode: 'unit', priceIncl: 1000 }, qty: 2000, discount: 1500 };
+    const r = decrementLine([l], 0);
+    expect(r.blocked).toBe('discount');
+    expect(r.lines).toEqual([l]);
+    expect(r.removed).toBeNull();
+    expect(setLineQty([l], 0, 1).blocked).toBe('discount');
+    expect(setLineQty([l], 0, 0).removed?.line).toEqual(l); // removing the whole line is still allowed
+  });
+});
+

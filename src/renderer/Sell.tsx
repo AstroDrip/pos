@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatQty, formatSar, parseSar } from '../core/money';
 import { ScanBuffer } from '../core/scan-buffer';
-import { decrementLine, incrementLine, restoreLine, setLineQty, type CartLine, type Removed } from '../core/cart';
+import { decrementLine, incrementLine, reductionOf, restoreLine, setLineQty, type CartLine, type QtyChange, type Removed } from '../core/cart';
 import { computeInvoice } from '../core/vat';
 import type { LookupResult, Product } from '../services/catalog';
 import type { HeldBill } from '../services/held-bills';
@@ -277,8 +277,10 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   };
 
   /** Every removal before payment is audited (voids report). The line goes even if logging fails, but staff are told. */
-  const logRemoval = (kind: 'line_removed' | 'bill_cleared', idx: number[]) => {
-    const gone = idx.map((i) => ({ productId: lines[i]!.product.id, qty: lines[i]!.qty, amount: totals ? totals.lines[i]!.lineIncl : 0 }));
+  /** Logs what left the bill: whole lines (newQty 0) or the part of a line removed by lowering its quantity. */
+  const logRemoval = (kind: 'line_removed' | 'bill_cleared', idx: number[], newQty = 0) => {
+    const gone = idx.map((i) => reductionOf(lines[i]!, newQty)).filter((g) => g !== null);
+    if (!gone.length) return;
     const billRef = billKey.current;
     if (kind === 'bill_cleared') billKey.current = crypto.randomUUID(); // the cleared bill is finished; the next one is new
     call('bill.removed', { kind, lines: gone, billKey: billRef }).catch((e: Error) => setMsg({ kind: 'warn', text: t('Removed, but the removal could not be logged: {0}', e.message) }));
@@ -288,12 +290,18 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     setUndo(null);
     setLines(lines.filter((_, k) => !idx.includes(k)));
   };
-  /** − button, − key and typed quantities share one path; a line that reaches 0 is removed (audited) with Undo. */
-  const changeQty = (idx: number, r: { lines: Line[]; removed: Removed<Product> | null }) => {
+  /**
+   * − button, − key and typed quantities share one path. Every drop is logged (the removed part); a line that reaches
+   * 0 is removed with Undo. A drop that would leave the discount larger than the line is refused.
+   */
+  const changeQty = (idx: number, r: QtyChange<Product>) => {
+    if (r.blocked === 'discount') return setMsg({ kind: 'warn', text: t('Lower the discount on this line first: it would be larger than the line amount.') });
     if (r.lines === lines) return;
     if (r.removed) {
       logRemoval('line_removed', [idx]);
       setUndo({ removed: r.removed, after: r.lines });
+    } else if (r.lines[idx] && r.lines[idx]!.qty < lines[idx]!.qty) {
+      logRemoval('line_removed', [idx], r.lines[idx]!.qty);
     }
     setLines(r.lines);
   };

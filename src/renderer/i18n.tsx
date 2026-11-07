@@ -274,6 +274,7 @@ const AR: Record<string, string> = {
   'Type a whole number from 0 to 9999.': 'اكتب عددًا صحيحًا من 0 إلى 9999.',
   '{0} removed from the bill.': 'تمت إزالة {0} من الفاتورة.',
   'Undo': 'تراجع',
+  'Lower the discount on this line first: it would be larger than the line amount.': 'خفّض الخصم على هذا السطر أولًا: سيصبح أكبر من مبلغ السطر.',
   'Help': 'المساعدة',
   'Step-by-step guides for every part of the app.': 'شرح خطوة بخطوة لكل جزء من البرنامج.',
   'Text size': 'حجم الخط',
