@@ -19,6 +19,10 @@ Only commands that were actually run are recorded here.
 | 2026-11-06 | red-green | refund offset disabled on purpose → credit test fails; restored → passes | confirmed |
 | 2026-11-06 | `feature/owner-tools` (UI polish) | typecheck / lint / vitest / e2e | 0 / 0 / **200 passed** / **29/29** |
 | 2026-11-06 | UI polish | `node scripts/ui-shots.mjs` before and after | 45 + 45 screenshots in `ui-shots/` (not committed) |
+| 2026-11-08 | `feature/owner-tools` @ 2bfe211 (search/keys/help/alignment) | typecheck / lint / `npm test` / build | 0 / 0 / 28 files **261 passed** / 0 |
+| 2026-11-08 | same | `npm run ui-audit -- ui-audit/after` (Electron-native, no Playwright) | 58 screens, 0 geometry findings, 8/8 key flows ok |
+| 2026-11-08 | same | `node scripts/search-bench.cjs 1000,10000,100000` | 100k products p95: 1 letter 1.8–2.4 ms, 2–3 letters 5–7 ms |
+| 2026-11-08 | same | `npm run e2e` | **not run** (Playwright forbidden for this task) |
 
 Earlier during T2–T4 the e2e scanner step failed twice on the first run straight after a build. Playwright's 5 ms "scanner"
 keystrokes arrived slower than the 35 ms burst limit while the app was still warming up. It passed on every later run,

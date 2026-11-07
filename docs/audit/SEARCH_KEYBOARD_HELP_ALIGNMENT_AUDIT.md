@@ -127,15 +127,15 @@ The Playwright files stay in the repo unchanged. The only edit is that `ui-shots
 | Task | Status | Evidence |
 |---|---|---|
 | T0 Phase 0 audit | done | this file |
-| T1 Geometry checks | pending | |
-| T2 Electron audit runner, "before" captures | pending | |
-| T3 Demand score | pending | |
-| T4 First-character search | pending | |
-| T5 Customer ranking | pending | |
-| T6 Shared suggestion hook | pending | |
-| T7 `[−] qty [+]` with undo | pending | |
-| T8 `-` key and Shift+Enter | pending | |
-| T9 Help content and manual | pending | |
-| T10 Help tab and links | pending | |
-| T11 Alignment fixes, "after" captures | pending | |
-| T12 Verification, reports, review | pending | |
+| T1 Geometry checks | done | `core/geometry-audit.test.ts` 9 tests |
+| T2 Electron audit runner, "before" captures | done | `npm run ui-audit`; `ui-audit/before` |
+| T3 Demand score | done | `services/demand.test.ts` 11 tests; bench in SEARCH_INTELLIGENCE_IMPLEMENTATION.md |
+| T4 First-character search | done | `services/search.test.ts`; bench p95 ≤ 2.5 ms (1 letter, 100k) |
+| T5 Customer ranking | done | `credit.test.ts` "customer search ranking" |
+| T6 Shared suggestion hook | done | `core/suggest-keys.test.ts`; real-app first-letter flow ok |
+| T7 `[−] qty [+]` with undo | done | `core/cart.test.ts` 8 tests; real-app minus/undo flows ok |
+| T8 `-` key and Shift+Enter | done | `checkout-keys.test.ts`; real-app flows ok (no sale on payment step) |
+| T9 Help content and manual | done | `help-search.test.ts`, `help/manual.test.ts` (drift check) |
+| T10 Help tab and links | done | `help/links.test.ts`; hidden-tab fix |
+| T11 Alignment fixes, "after" captures | done | `UI_ALIGNMENT_REPORT.md`; 0 findings |
+| T12 Verification, reports, review | done | `IMPLEMENTATION_REPORT_SEARCH_HELP_ALIGNMENT.md` |
