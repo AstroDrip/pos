@@ -63,6 +63,9 @@ for (const n of sizes) {
     'barcode exact': lastBarcode + ean13CheckDigit(lastBarcode),
     'SKU exact': `SKU${String(n - 1).padStart(6, '0')}`,
     'SKU prefix "SKU0001"': 'SKU0001',
+    'name 1 letter "b"': 'b',
+    'name 1 letter Arabic "م"': 'م',
+    'name 2 letters "ba"': 'ba',
     'name 3 letters "ban"': 'ban',
     'name 2 letters Arabic "مو"': 'مو',
     'word prefix "prem"': 'prem',
@@ -71,7 +74,7 @@ for (const n of sizes) {
     'no results "zzzq"': 'zzzq',
   };
   const results = {};
-  for (const [label, q] of Object.entries(queries)) results[label] = time(() => searchProducts(b.ctx, q, 20));
+  for (const [label, q] of Object.entries(queries)) results[label] = time(() => searchProducts(b.ctx, q, [...q].length <= 1 ? 8 : 12)); // POS suggestion limits
   report.push({ products: n, dbBytes: b.size, insertMs: +b.tInsert.toFixed(0), indexBuildMs: +b.tIndex.toFixed(0), results });
   b.db.close();
   rmSync(b.dir, { recursive: true, force: true });

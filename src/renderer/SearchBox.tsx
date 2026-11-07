@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatSar } from '../core/money';
-import { minNameChars } from '../core/search-normalize';
+import { MIN_NAME_CHARS } from '../core/search-normalize';
 import type { Product } from '../services/catalog';
 import type { SearchHit } from '../services/search';
 import { call } from './api';
@@ -45,7 +45,7 @@ export function SearchBox({
   useEffect(() => {
     const q = text.trim();
     const isCode = /^[0-9A-Za-z-]+$/.test(q) && /\d/.test(q);
-    if (!q || composing.current || (!isCode && q.length < minNameChars(q))) {
+    if (!q || composing.current || (!isCode && q.length < MIN_NAME_CHARS)) {
       seq.current++; // cancel anything in flight
       setHits([]);
       setLoading(false);

@@ -10,6 +10,7 @@ import { appendAudit } from '../services/audit';
 import { backupStatus, createBackup, encryptedSnapshot, installRestore } from '../services/backup';
 import { createHandlers, type BackupEnv, type Printer, type Session } from './handlers';
 import { runUiAudit } from './ui-audit';
+import { demandScores } from '../services/demand';
 import { receiptHtml } from './receipt-html';
 
 
@@ -126,6 +127,14 @@ app.whenReady().then(() => {
     }),
   );
   const dispatch = createHandlers(ctx, printer, backupEnv);
+  // Read 90 days of sales once now, so the first search does not pay for it (later updates are incremental).
+  setTimeout(() => {
+    try {
+      demandScores(ctx);
+    } catch {
+      // ranking falls back to name order until the next search computes it
+    }
+  }, 0);
 
   // Scheduled local backup while the app is open (plan §J). Failures show in backup status.
   setInterval(() => {

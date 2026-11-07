@@ -28,7 +28,8 @@ export function tokens(text: string): string[] {
 
 export const hasArabic = (text: string) => /[؀-ۿ]/.test(text);
 
-/** Minimum characters before name suggestions appear: 3 for Latin text, 2 for Arabic (short words). Codes have no minimum. */
-export function minNameChars(text: string): number {
-  return hasArabic(text) ? 2 : 3;
-}
+/**
+ * Minimum characters before name suggestions appear: 1 for every script (owner decision 2026-11-07).
+ * One character uses only indexed lookups (codes and "name starts with"), see services/search.ts.
+ */
+export const MIN_NAME_CHARS = 1;

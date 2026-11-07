@@ -1,6 +1,7 @@
 import { normalizeForSearch, tokens } from '../core/search-normalize';
 import type { Product } from './catalog';
 import type { Statement } from 'better-sqlite3';
+import { demandScores } from './demand';
 import type { Ctx } from './context';
 
 // Indexed product search (audit Part 2). Every query below uses an index; see SEARCH_PERFORMANCE_REPORT.md
@@ -81,6 +82,7 @@ export function searchProducts(ctx: Ctx, text: string, limit = 20): SearchHit[] 
   const raw = text.trim();
   if (!raw) return [];
   const norm = normalizeForSearch(raw);
+  const oneChar = [...norm].length <= 1;
   const hits = new Map<number, SearchHit>();
   const add = (rows: Row[], rank: number, matchedBy: SearchHit['matchedBy']) => {
     for (const r of rows) {
@@ -104,9 +106,10 @@ export function searchProducts(ctx: Ctx, text: string, limit = 20): SearchHit[] 
       add(rows.filter((r) => r[col as 'name_en_norm'] === norm), 3, 'name');
       add(rows.filter((r) => r[col as 'name_en_norm'] !== norm), 4, 'name_prefix');
     }
-    // 5–6: word-prefix matches through FTS5 (prefix indexes for 2 and 3 characters)
+    // 5–6: word-prefix matches through FTS5 (prefix indexes for 2 and 3 characters).
+    // One character: skipped, because a 1-character FTS prefix has no index and would scan every term.
     const words = tokens(raw);
-    if (words.length) {
+    if (words.length && !oneChar) {
       const q = ftsQuery(words);
       const inNames = ctx.db
         .prepare(`SELECT ${PRODUCT_COLUMNS} FROM product_fts f JOIN products p ON p.id = f.rowid JOIN units u ON u.id = p.unit_id WHERE product_fts MATCH ? LIMIT ?`)
@@ -118,10 +121,14 @@ export function searchProducts(ctx: Ctx, text: string, limit = 20): SearchHit[] 
       add(elsewhere, 6, 'alias');
     }
   }
-  // 7: SKU starts with the text (unique index range scan)
-  add(ctx.db.prepare(`SELECT ${PRODUCT_COLUMNS} ${from} WHERE p.sku >= ? AND p.sku < ? AND p.active = 1 LIMIT ?`).all(raw, upper(raw), limit) as Row[], 7, 'sku_prefix');
+  // 7: SKU starts with the text (unique index range scan); from 2 characters
+  if (!oneChar) add(ctx.db.prepare(`SELECT ${PRODUCT_COLUMNS} ${from} WHERE p.sku >= ? AND p.sku < ? AND p.active = 1 LIMIT ?`).all(raw, upper(raw), limit) as Row[], 7, 'sku_prefix');
 
+  // Inside one match level, products customers buy more often come first (completed sales, net of refunds).
+  // Demand never moves a product above a stronger match level.
+  const demand = demandScores(ctx);
+  const d = (h: SearchHit) => demand.get(h.product.id) ?? 0;
   return [...hits.values()]
-    .sort((a, b) => a.rank - b.rank || a.product.nameEn.length - b.product.nameEn.length || a.product.nameEn.localeCompare(b.product.nameEn))
+    .sort((a, b) => a.rank - b.rank || d(b) - d(a) || a.product.nameEn.length - b.product.nameEn.length || a.product.nameEn.localeCompare(b.product.nameEn))
     .slice(0, limit);
 }

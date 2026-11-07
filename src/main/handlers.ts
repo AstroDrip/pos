@@ -107,7 +107,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'catalog.lookup': (p) => lookup(ctx, p.code),
     'catalog.search': (p) => searchProducts(ctx, p.text),
     'catalog.create': (p, s) => createProduct(ctx, userId(s), p),
-    'catalog.suggest': (p) => indexedSearch(ctx, p.text, 20),
+    'catalog.suggest': (p) => indexedSearch(ctx, p.text, [...p.text.trim()].length <= 1 ? 8 : 12),
     'catalog.setPrice': (p, s) => setPrice(ctx, userId(s), p.productId, p.priceIncl),
     'catalog.setActive': (p, s) => setProductActive(ctx, userId(s), p.productId, p.active, p.reason),
     'catalog.aliases': (p, s) => {

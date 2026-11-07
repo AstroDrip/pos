@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProduct } from './catalog';
 import type { Ctx } from './context';
-import { DEMAND_MIN_SALES, demandScores } from './demand';
+import { DEMAND_MIN_SALES, demandScores, resetDemandCache } from './demand';
 import { holdBill } from './held-bills';
 import { receiveGoods } from './inventory';
 import { createSupplier } from './parties';
@@ -89,6 +89,44 @@ describe('demandScores', () => {
     const first = demandScores(ctx).get(a)!;
     sell(a);
     expect(demandScores(ctx).get(a)!).toBeGreaterThan(first);
+  });
+
+  it('new sales and refunds added after a score give the same result as a full recompute', () => {
+    for (let i = 0; i < 3; i++) sell(a);
+    for (let i = 0; i < 3; i++) sell(b);
+    demandScores(ctx); // warm the cache
+    t.advance(60_000);
+    const s1 = sell(b, 2000);
+    refund(sell(a).invoiceNo, 1000);
+    refund(s1.invoiceNo, 1000);
+    const incremental = new Map(demandScores(ctx));
+    resetDemandCache();
+    const full = demandScores(ctx);
+    expect([...incremental.keys()].sort()).toEqual([...full.keys()].sort());
+    for (const [k, v] of full) expect(incremental.get(k)).toBeCloseTo(v, 12);
+    expect(full.get(b)).toBeCloseTo(0.5 * 3.5 / 7 + 0.3 * 3.5 / 30 + 0.2 * 3.5 / 90, 10); // 4 sales, one half refunded
+  });
+
+  it('a sale older than 7 days leaves the 7-day window but stays in the 30-day one', () => {
+    for (let i = 0; i < 5; i++) sell(a);
+    t.advance(10 * 86_400_000);
+    expect(demandScores(ctx).get(a)).toBeCloseTo(0.3 * 5 / 30 + 0.2 * 5 / 90, 10);
+  });
+
+  it('ageing a warm cache across the 7, 30 and 90-day edges matches a full recompute', () => {
+    for (let i = 0; i < 4; i++) sell(a);
+    refund(sell(a, 2000).invoiceNo, 1000);
+    t.advance(5 * 86_400_000);
+    for (let i = 0; i < 3; i++) sell(b);
+    demandScores(ctx); // warm
+    for (const days of [3, 25, 61, 5]) {
+      t.advance(days * 86_400_000);
+      const aged = new Map(demandScores(ctx));
+      resetDemandCache();
+      const full = demandScores(ctx);
+      expect([...aged.keys()].sort()).toEqual([...full.keys()].sort());
+      for (const [k, v] of full) expect(aged.get(k)).toBeCloseTo(v, 12);
+    }
   });
 
   it('does not count held bills', () => {
