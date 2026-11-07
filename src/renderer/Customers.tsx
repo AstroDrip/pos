@@ -6,6 +6,7 @@ import type { ArAgeingRow, CreditInvoice, CustomerAccount, StatementLine } from 
 import { call } from './api';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
+import { useSuggest } from './useSuggest';
 import { StatusBadge, StatusLegend, statusLabel } from './StatusBadge';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -23,19 +24,11 @@ const FILTERS: (FinStatus | 'all' | 'open')[] = ['all', 'open', 'paid', 'partial
 export function Customers({ can }: { can: (p: string) => boolean }) {
   const { t } = useI18n();
   const [text, setText] = useState('');
-  const [found, setFound] = useState<Found[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
   const [view, setView] = useState<'accounts' | 'ageing'>('accounts');
   const [newCust, setNewCust] = useState({ name: '', phone: '' });
   const [msg, setMsg] = useState<Msg>(null);
-  const search = async (q = text) => {
-    if (!q.trim()) return setFound([]);
-    setFound(await call<Found[]>('credit.find', { text: q }).catch(() => []));
-  };
-  useEffect(() => {
-    const h = setTimeout(() => void search(), 250);
-    return () => clearTimeout(h);
-  }, [text]);
+  const { items: found, refresh: search } = useSuggest<Found>(text, (q) => call<Found[]>('credit.find', { text: q }).catch(() => []), { debounceMs: 250 });
 
   return (
     <div className="page">
@@ -81,7 +74,7 @@ export function Customers({ can }: { can: (p: string) => boolean }) {
             </div>
           )}
           {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
-          {openId !== null && <Account id={openId} can={can} onClose={() => { setOpenId(null); void search(); }} />}
+          {openId !== null && <Account id={openId} can={can} onClose={() => { setOpenId(null); search(); }} />}
         </>
       )}
     </div>

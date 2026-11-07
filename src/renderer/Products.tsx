@@ -3,6 +3,7 @@ import { formatSar, parseSar } from '../core/money';
 import type { Product } from '../services/catalog';
 import { call } from './api';
 import { PageHeader } from './PageHeader';
+import { useSuggest } from './useSuggest';
 import { ProductName, useI18n } from './i18n';
 
 const empty = { sku: '', nameAr: '', nameEn: '', sellMode: 'unit' as 'unit' | 'weight', vat: '15', price: '', barcode: '', plu: '' };
@@ -10,13 +11,11 @@ const empty = { sku: '', nameAr: '', nameEn: '', sellMode: 'unit' as 'unit' | 'w
 export function Products() {
   const { t } = useI18n();
   const [form, setForm] = useState(empty);
-  const [list, setList] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Product | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  const load = (text: string) => call<Product[]>('catalog.search', { text }).then(setList);
-  useEffect(() => void load(search), [search]);
+  const { items: list, refresh } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
 
   const set = (k: keyof typeof empty) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
@@ -37,7 +36,7 @@ export function Products() {
       });
       setMsg({ kind: 'ok', text: t('Saved {0}', form.nameEn) });
       setForm(empty);
-      void load(search);
+      refresh();
     } catch (err) {
       setMsg({ kind: 'error', text: t((err as Error).message) });
     }
@@ -80,7 +79,7 @@ export function Products() {
             ))}
           </tbody>
         </table>
-        {editing && <EditProduct key={editing.id} product={editing} onDone={() => { setEditing(null); void load(search); }} />}
+        {editing && <EditProduct key={editing.id} product={editing} onDone={() => { setEditing(null); refresh(); }} />}
       </div>
       </div>
     </div>

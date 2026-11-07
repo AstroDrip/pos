@@ -7,6 +7,7 @@ import type { AgeingRow, StatementLine, SupplierAccount, UninvoicedGrn } from '.
 import { StatusBadge, StatusLegend } from './StatusBadge';
 import { call } from './api';
 import { PageHeader } from './PageHeader';
+import { useSuggest } from './useSuggest';
 import { ProductName, useI18n } from './i18n';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -169,16 +170,12 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
   const { t } = useI18n();
   const [supplierId, setSupplierId] = useState(0);
   const [search, setSearch] = useState('');
-  const [found, setFound] = useState<Product[]>([]);
   const [lines, setLines] = useState<{ product: Product; qty: string }[]>([]);
   const [f, setF] = useState({ ref: '', date: todayDay(), reason: '', net: '', vat: '', recoverable: true });
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const requestKey = useRef(crypto.randomUUID());
-  useEffect(() => {
-    if (search.trim()) void call<Product[]>('catalog.search', { text: search }).then(setFound);
-    else setFound([]);
-  }, [search]);
+  const { items: found } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
   const save = async () => {
     if (busy) return;
     setBusy(true);

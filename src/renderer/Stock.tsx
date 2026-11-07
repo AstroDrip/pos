@@ -5,6 +5,7 @@ import type { Supplier } from '../services/parties';
 import type { StockRow } from '../services/reports';
 import { call } from './api';
 import { EmptyRow, PageHeader } from './PageHeader';
+import { useSuggest } from './useSuggest';
 import { ProductName, useI18n } from './i18n';
 
 interface GrnLine {
@@ -19,7 +20,6 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   const [supplierId, setSupplierId] = useState(0);
   const [reference, setReference] = useState('');
   const [search, setSearch] = useState('');
-  const [found, setFound] = useState<Product[]>([]);
   const [lines, setLines] = useState<GrnLine[]>([]);
   const [rows, setRows] = useState<StockRow[]>([]);
   const [onlyLow, setOnlyLow] = useState(true);
@@ -31,10 +31,7 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   useEffect(() => {
     if (can('reports.view')) void call<StockRow[]>('report.stock', { onlyLow }).then(setRows);
   }, [onlyLow, msg, can]);
-  useEffect(() => {
-    if (search.trim()) void call<Product[]>('catalog.search', { text: search }).then(setFound);
-    else setFound([]);
-  }, [search]);
+  const { items: found } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
 
   const save = async () => {
     if (saving) return;
@@ -140,7 +137,6 @@ interface AdjLine {
 function AdjustCard({ kind, onDone }: { kind: 'waste' | 'count'; onDone: () => void }) {
   const { t } = useI18n();
   const [search, setSearch] = useState('');
-  const [found, setFound] = useState<Product[]>([]);
   const [lines, setLines] = useState<AdjLine[]>([]);
   const [reason, setReason] = useState(kind === 'waste' ? 'Expired' : '');
   const [other, setOther] = useState('');
@@ -148,10 +144,7 @@ function AdjustCard({ kind, onDone }: { kind: 'waste' | 'count'; onDone: () => v
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const requestKey = useRef(crypto.randomUUID());
 
-  useEffect(() => {
-    if (search.trim()) void call<Product[]>('catalog.search', { text: search }).then(setFound);
-    else setFound([]);
-  }, [search]);
+  const { items: found } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
 
   const reasonText = kind === 'waste' && reason === 'Other' ? other.trim() : reason.trim();
 

@@ -1,16 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { formatSar } from '../core/money';
-import { MIN_NAME_CHARS } from '../core/search-normalize';
+import { moveActive } from '../core/suggest-keys';
 import type { Product } from '../services/catalog';
 import type { SearchHit } from '../services/search';
 import { call } from './api';
 import { useI18n } from './i18n';
+import { useSuggest } from './useSuggest';
 
-const DEBOUNCE_MS = 200;
+const DEBOUNCE_MS = 150;
 
 /**
- * Product search for the cashier (audit Part 2.5): suggestions after 3 Latin / 2 Arabic letters (codes at any length),
- * 200 ms debounce, ↑/↓ to move, Enter to pick (or to look up the typed code when nothing is highlighted), Esc to close.
+ * Product search for the cashier: suggestions from the first character (codes and names), ranked by match and then
+ * by how often customers buy each product; 150 ms pause, ↑/↓ to move, Enter to pick (or to look up the typed code when nothing is highlighted), Esc to close.
  * Slow, older answers never replace newer ones, and nothing is searched while an Arabic IME is composing.
  */
 export function SearchBox({
@@ -32,47 +33,26 @@ export function SearchBox({
 }) {
   const { t, lang } = useI18n();
   const [text, setText] = useState('');
-  const [hits, setHits] = useState<SearchHit[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const [loading, setLoading] = useState(false);
-  const seq = useRef(0);
   const composing = useRef(false);
   const navigated = useRef(false); // the cashier moved the highlight with the arrow keys
   const ownInput = useRef<HTMLInputElement>(null);
   const input = inputRef ?? ownInput;
 
-  useEffect(() => {
-    const q = text.trim();
-    const isCode = /^[0-9A-Za-z-]+$/.test(q) && /\d/.test(q);
-    if (!q || composing.current || (!isCode && q.length < MIN_NAME_CHARS)) {
-      seq.current++; // cancel anything in flight
-      setHits([]);
-      setLoading(false);
-      return;
-    }
-    const mine = ++seq.current;
-    setLoading(true);
-    const timer = setTimeout(() => {
-      call<SearchHit[]>('catalog.suggest', { text: q }).then(
-        (r) => {
-          if (mine !== seq.current) return; // a newer search has started
-          setHits(r);
-          setActive(r.length ? 0 : -1);
-          setOpen(true);
-          setLoading(false);
-        },
-        () => mine === seq.current && setLoading(false),
-      );
-    }, DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [text]);
+  const { items: hits, loading, cancel } = useSuggest<SearchHit>(text, (q) => call<SearchHit[]>('catalog.suggest', { text: q }), {
+    debounceMs: DEBOUNCE_MS,
+    composing,
+    onResults: (r) => {
+      setActive(r.length ? 0 : -1);
+      setOpen(true);
+    },
+  });
 
   const reset = (refocus = true) => {
-    seq.current++;
+    cancel();
     navigated.current = false;
     setText('');
-    setHits([]);
     setOpen(false);
     setActive(-1);
     if (refocus) input.current?.focus();
@@ -85,15 +65,12 @@ export function SearchBox({
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
     if (!text.trim() && onEmptyKey?.(e)) return;
-    if (e.key === 'ArrowDown' && hits.length) {
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && hits.length) {
       e.preventDefault();
-      setOpen(true);
+      if (e.key === 'ArrowDown') setOpen(true);
       navigated.current = true;
-      setActive((a) => Math.min(a + 1, hits.length - 1));
-    } else if (e.key === 'ArrowUp' && hits.length) {
-      e.preventDefault();
-      navigated.current = true;
-      setActive((a) => Math.max(a - 1, 0));
+      const key = e.key;
+      setActive((a) => moveActive(a, hits.length, key));
     } else if (e.key === 'Escape') {
       setOpen(false);
     } else if (e.key === 'Enter') {
