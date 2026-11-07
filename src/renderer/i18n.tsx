@@ -266,6 +266,11 @@ const AR: Record<string, string> = {
   'This item is sold by whole units': 'هذا الصنف يباع بالحبة',
   'Quantity is too large': 'الكمية كبيرة جداً',
   'Nothing to add one to: the last item is sold by weight or was removed.': 'لا يمكن الإضافة: آخر صنف يباع بالوزن أو تمت إزالته.',
+  'One less': 'واحد أقل',
+  'One more': 'واحد أكثر',
+  'Type a whole number from 0 to 9999.': 'اكتب عددًا صحيحًا من 0 إلى 9999.',
+  '{0} removed from the bill.': 'تمت إزالة {0} من الفاتورة.',
+  'Undo': 'تراجع',
   // scale labels
   'Scale labels': 'ملصقات الميزان',
   'The real label layout is not confirmed yet. Scan a real label below and check product and weight before using it.': 'تنسيق الملصق الحقيقي لم يُؤكد بعد. امسح ملصقاً حقيقياً بالأسفل وتحقق من الصنف والوزن قبل الاستخدام.',

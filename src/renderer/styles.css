@@ -181,6 +181,10 @@ label:has(> input[type='checkbox']) { color: var(--text-2); }
 .cart td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border); text-align: start; vertical-align: middle; }
 .cart td input { min-height: var(--control-h-sm); }
 .cart td button { min-height: var(--control-h-sm); padding: 0 var(--sp-2); }
+.qty-stepper { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.cart .qty-stepper button { min-width: var(--control-h-sm); padding: 0; font-size: var(--fs-lg); line-height: 1; }
+.cart .qty-stepper input { width: 4.5em; text-align: center; padding: 0 var(--sp-1); font-variant-numeric: tabular-nums; }
+.undo-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--border); }
 .side { display: flex; flex-direction: column; gap: var(--sp-3); overflow-y: auto; }
 .side label { margin-top: var(--sp-2); }
 .total { font-size: var(--fs-total); font-weight: 700; text-align: end; font-variant-numeric: tabular-nums; line-height: 1.1; }

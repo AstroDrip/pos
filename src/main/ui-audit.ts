@@ -71,7 +71,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   const flow = (name: string, ok: boolean, detail: string) => summary.flows.push({ flow: name, ok, detail });
 
   const qtyOfLastLine = () =>
-    js<string>(`(() => { const rows = document.querySelectorAll('.cart tbody tr'); const r = rows[rows.length - 1]; if (!r) return ''; const i = r.querySelector('input[aria-label="quantity"]'); return i ? i.value : r.cells[1].textContent.trim(); })()`);
+    js<string>(`(() => { const rows = document.querySelectorAll('.cart tbody tr'); const r = rows[rows.length - 1]; if (!r) return ''; const i = r.querySelector('input[aria-label="line quantity"]'); return i ? i.value : r.cells[1].textContent.trim(); })()`);
   const lineCount = () => js<number>(`document.querySelectorAll('.cart tbody tr').length`);
   const clearBill = async () => {
     for (let i = 0; i < 20 && (await lineCount()) > 0; i++) {

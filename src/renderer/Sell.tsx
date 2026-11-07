@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatQty, formatSar, parseSar } from '../core/money';
 import { ScanBuffer } from '../core/scan-buffer';
+import { decrementLine, incrementLine, restoreLine, setLineQty, type CartLine, type Removed } from '../core/cart';
 import { computeInvoice } from '../core/vat';
 import type { LookupResult, Product } from '../services/catalog';
 import type { HeldBill } from '../services/held-bills';
@@ -13,12 +14,8 @@ import { SearchBox } from './SearchBox';
 import { decideKey, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
 import { ProductName, useI18n } from './i18n';
 
-interface Line {
-  product: Product;
-  qty: number;
-  discount: number; // halalas
-  scanCode?: string; // scale label scanned, kept on the sale line for audit
-}
+/** A bill line; scanCode = the scale label scanned, kept on the sale line for audit. */
+type Line = CartLine<Product>;
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
@@ -36,7 +33,7 @@ function removeScannedText(el: HTMLInputElement, code: string) {
 type CreditInfo = { id: number; creditEnabled: boolean; limit: number | null; outstanding: number; advance: number; available: number | null };
 
 export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean; canCredit?: boolean }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [shift, setShift] = useState<ShiftSummary | null | undefined>(undefined);
   const [float, setFloat] = useState('0');
   const [lines, setLines] = useState<Line[]>([]);
@@ -60,6 +57,13 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   const stepAt = useRef(0);
   const [pending, setPending] = useState<{ product: Product; text: string; error?: string } | null>(null);
   const lastUnitProduct = useRef<number | null>(null);
+  // Undo for a line removed with − or a typed 0: offered only while the bill is exactly as the removal left it.
+  const [undo, setUndo] = useState<{ removed: Removed<Product>; after: Line[] } | null>(null);
+  useEffect(() => {
+    if (!undo) return;
+    const h = setTimeout(() => setUndo(null), 6000);
+    return () => clearTimeout(h);
+  }, [undo]);
   const searchRef = useRef<HTMLInputElement>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
   const cashRef = useRef<HTMLInputElement>(null);
@@ -149,7 +153,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
       return setMsg({ kind: 'warn', text: t('Nothing to add one to: the last item is sold by weight or was removed.') });
     }
     setMsg(null);
-    setLines((prev) => prev.map((l) => (l.product.id === id && l.product.sellMode === 'unit' ? { ...l, qty: l.qty + 1000 } : l)));
+    setLines((prev) => incrementLine(prev, prev.findIndex((l) => l.product.id === id && l.product.sellMode === 'unit')));
   };
 
   const addCode = useCallback(async (code: string, possibleDuplicate = false) => {
@@ -263,12 +267,40 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   };
 
   /** Every removal before payment is audited (voids report). The line goes even if logging fails, but staff are told. */
-  const removeLines = (kind: 'line_removed' | 'bill_cleared', idx: number[]) => {
+  const logRemoval = (kind: 'line_removed' | 'bill_cleared', idx: number[]) => {
     const gone = idx.map((i) => ({ productId: lines[i]!.product.id, qty: lines[i]!.qty, amount: totals ? totals.lines[i]!.lineIncl : 0 }));
     const billRef = billKey.current;
-    setLines(lines.filter((_, k) => !idx.includes(k)));
     if (kind === 'bill_cleared') billKey.current = crypto.randomUUID(); // the cleared bill is finished; the next one is new
     call('bill.removed', { kind, lines: gone, billKey: billRef }).catch((e: Error) => setMsg({ kind: 'warn', text: t('Removed, but the removal could not be logged: {0}', e.message) }));
+  };
+  const removeLines = (kind: 'line_removed' | 'bill_cleared', idx: number[]) => {
+    logRemoval(kind, idx);
+    setUndo(null);
+    setLines(lines.filter((_, k) => !idx.includes(k)));
+  };
+  /** − button, − key and typed quantities share one path; a line that reaches 0 is removed (audited) with Undo. */
+  const changeQty = (idx: number, r: { lines: Line[]; removed: Removed<Product> | null }) => {
+    if (r.lines === lines) return;
+    if (r.removed) {
+      logRemoval('line_removed', [idx]);
+      setUndo({ removed: r.removed, after: r.lines });
+    }
+    setLines(r.lines);
+  };
+  const lessOf = (idx: number) => changeQty(idx, decrementLine(lines, idx));
+  const typedQty = (idx: number, text: string, el: HTMLInputElement) => {
+    const m = /^\s*(\d{1,4})\s*$/.exec(text);
+    const units = lines[idx] ? lines[idx]!.qty / 1000 : 0;
+    if (!m) {
+      el.value = String(units);
+      return setMsg({ kind: 'warn', text: t('Type a whole number from 0 to 9999.') });
+    }
+    if (Number(m[1]) !== units) changeQty(idx, setLineQty(lines, idx, Number(m[1])));
+  };
+  const undoRemoval = () => {
+    if (!undo || lines !== undo.after) return;
+    setLines(restoreLine(lines, undo.removed));
+    setUndo(null);
   };
 
   const hold = async () => {
@@ -388,7 +420,25 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             {lines.map((l, i) => (
               <tr key={i}>
                 <td><ProductName en={l.product.nameEn} ar={l.product.nameAr} /></td>
-                <td className="num">{formatQty(l.qty, l.product.sellMode === 'unit' ? 0 : 3)}</td>
+                <td className="num">
+                  {l.product.sellMode === 'unit' ? (
+                    <span className="qty-stepper">
+                      <button type="button" aria-label="one less" title={t('One less')} disabled={busy} onClick={() => lessOf(i)}>−</button>
+                      <input
+                        key={l.qty}
+                        aria-label="line quantity"
+                        inputMode="numeric"
+                        defaultValue={formatQty(l.qty, 0)}
+                        disabled={busy}
+                        onBlur={(e) => typedQty(i, e.target.value, e.target)}
+                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                      />
+                      <button type="button" aria-label="one more" title={t('One more')} disabled={busy} onClick={() => setLines(incrementLine(lines, i))}>+</button>
+                    </span>
+                  ) : (
+                    formatQty(l.qty, 3)
+                  )}
+                </td>
                 <td className="num">{formatSar(l.product.priceIncl)}</td>
                 <td className="num" style={{ width: 90 }}>
                   <input aria-label="discount" defaultValue={l.discount ? formatSar(l.discount) : ''} onBlur={(e) => setDiscount(i, e.target.value)} />
@@ -399,6 +449,12 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             ))}
           </tbody>
         </table>
+        {undo && lines === undo.after && (
+          <div className="undo-bar" role="status">
+            <span>{t('{0} removed from the bill.', lang === 'ar' ? undo.removed.line.product.nameAr : undo.removed.line.product.nameEn)}</span>
+            <button type="button" onClick={undoRemoval}>{t('Undo')}</button>
+          </div>
+        )}
         {held.length > 0 && (
           <div className="page">
             <strong>{t('Held bills:')}</strong>{' '}
