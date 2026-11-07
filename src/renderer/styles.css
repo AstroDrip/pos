@@ -83,7 +83,8 @@
   --r-sm: 4px; --r-md: 6px; --r-lg: 8px; --r-pill: 999px;
   --fs-xs: 12px; --fs-sm: 13px; --fs-md: 14px; --fs-base: 15px; --fs-lg: 18px; --fs-xl: 22px; --fs-total: 34px;
   --control-h: 36px; --control-h-sm: 28px;
-  --topbar-h: 48px;
+  --topbar-h: 48px; /* real height of the top bar; App.tsx keeps it current when the tabs wrap */
+  --topbar-min-h: 48px;
   --section-w: 1100px; /* width of page sections (account cards and the lists above them) */
   --font: 'Segoe UI', Tahoma, Arial, sans-serif; /* Segoe UI and Tahoma both carry Arabic glyphs on Windows */
   font: var(--fs-base)/1.45 var(--font);
@@ -129,7 +130,7 @@ label:has(> input[type='checkbox']) { color: var(--text-2); }
 
 /* ── Shell ────────────────────────────────────────────────── */
 .top {
-  display: flex; align-items: center; gap: var(--sp-3); min-height: var(--topbar-h); padding: 0 var(--sp-4);
+  display: flex; align-items: center; gap: var(--sp-3); min-height: var(--topbar-min-h); padding: 0 var(--sp-4); /* not --topbar-h: that follows this bar's height and would never let it shrink */
   background: var(--topbar-bg); color: var(--topbar-text); position: sticky; top: 0; z-index: 20;
 }
 .top .brand { font-weight: 700; letter-spacing: 0.02em; flex: 0 0 auto; }
@@ -285,6 +286,9 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 :root[dir='rtl'] .sub-name { text-align: right; }
 
 /* ── Help Centre ───────────────────────────────────────────── */
+.help-overlay { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.45); }
+.help-overlay-panel { position: absolute; top: 0; bottom: 0; inset-inline-end: 0; width: min(1000px, 94vw); overflow: auto; background: var(--bg); box-shadow: var(--shadow); }
+.help-overlay-panel > .close { position: sticky; top: var(--sp-3); float: inline-end; margin: var(--sp-3) var(--sp-4) 0; z-index: 1; }
 .help-link { min-height: 22px; min-width: 22px; padding: 0; border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 700; line-height: 1; vertical-align: middle; margin-inline-start: var(--sp-1); color: var(--primary); }
 .page-header .actions .help-link { min-height: var(--control-h); min-width: var(--control-h); font-size: var(--fs-md); }
 .top nav .help-mark { display: inline-block; margin-inline-end: var(--sp-1); font-weight: 700; }

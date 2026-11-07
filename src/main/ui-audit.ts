@@ -106,7 +106,15 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       { id: 'dark-en-1366x768', theme: 'dark', ar: false, w: 1366, h: 768 },
       { id: 'light-ar-1366x768', theme: 'light', ar: true, w: 1366, h: 768 },
       { id: 'light-en-1024x700', theme: 'light', ar: false, w: 1024, h: 700 },
-    ];
+    ].filter((v) => !v.ar || process.env.POS_UI_AUDIT_ARABIC === '1'); // Arabic deferred by the owner (2026-11-08); set POS_UI_AUDIT_ARABIC=1 to include
+    // The top bar must shrink back after its tabs wrapped (it used to keep the taller height)
+    win.setContentSize(1024, 700);
+    await sleep(400);
+    const tall = await js<number>(`document.querySelector('.top').getBoundingClientRect().height`);
+    win.setContentSize(1900, 900);
+    await sleep(400);
+    const wide = await js<number>(`document.querySelector('.top').getBoundingClientRect().height`);
+    flow('top-bar-shrinks-back', tall > 60 && wide < 60, `height at 1024px: ${tall}, at 1900px: ${wide}`);
     for (const [vi, v] of variants.entries()) {
       win.setContentSize(v.w, v.h);
       await setSelect('select[aria-label="appearance"]', v.theme);
@@ -231,11 +239,27 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     } else flow('shift-enter-on-pay-no-sale', false, 'not reached');
     // Typing 0 on the first line removes it; the next line must keep its own quantity (no reused input showing "0")
     await clearBill();
-    for (const code of ['6281000000000', '6281000000000', '6281000000077', '6281000000077']) await scan(code);
+    // Each code is scanned once and doubled with "+": the same code twice within 400 ms opens a blocking
+    // "scanned twice" confirm box, which would stall the audit.
+    for (const code of ['6281000000000', '6281000000077']) {
+      await scan(code);
+      await focus('input[aria-label="product search"]');
+      await sleep(400);
+      key('+');
+      await sleep(300);
+    }
     await js(`(() => { const e = document.querySelector('.cart tbody tr input[aria-label="line quantity"]'); e.focus(); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, '0'); e.dispatchEvent(new Event('input', { bubbles: true })); e.blur(); })()`);
     await sleep(400);
     const left = await js<string[]>(`[...document.querySelectorAll('.cart tbody tr input[aria-label="line quantity"]')].map((i) => i.value)`);
     flow('type-zero-keeps-next-line', left.length === 1 && left[0] === '2', `quantities left: ${JSON.stringify(left)}`);
+    // The "?" beside Payment opens help; coming back, the bill must still be there
+    await click('.help-link');
+    await sleep(400);
+    const helpShown = await js<boolean>(`!!document.querySelector('.help-article')`);
+    if (!(await click('.help-overlay .close'))) await js(`document.querySelectorAll('.top nav button')[0].click()`);
+    await sleep(400);
+    const kept = await lineCount();
+    flow('help-link-keeps-bill', helpShown && kept === 1, `help shown: ${helpShown}, lines after coming back: ${kept}`);
     await clearBill();
   }
 }

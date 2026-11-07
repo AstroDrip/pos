@@ -41,11 +41,9 @@ export function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [tab, setTab] = useState<Tab>('sell');
   const [error, setError] = useState('');
-  const [helpAt, setHelpAt] = useState<string | undefined>(undefined);
-  const openHelp = (id: string) => {
-    setHelpAt(id);
-    setTab('help');
-  };
+  // A "?" link opens help OVER the current screen, so a bill or a half-filled form is never lost.
+  const [helpAt, setHelpAt] = useState<string | null>(null);
+  const openHelp = (id: string) => setHelpAt(id);
 
   // Every login starts on Sell: the previous user's tab may be one the new user is not allowed to see.
   const refresh = () =>
@@ -87,7 +85,7 @@ export function App() {
           {TABS.filter((tb) => !tb.perm || can(tb.perm)).map((tb, i, shown) => (
             <span key={tb.id} style={{ display: 'contents' }}>
               {i > 0 && shown[i - 1]!.group !== tb.group && <span className="sep" aria-hidden="true" />}
-              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => { if (tb.id === 'help') setHelpAt(undefined); setTab(tb.id); }}>{tb.id === 'help' && <span className="help-mark" aria-hidden="true">?</span>}{t(tb.label)}</button>
+              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => setTab(tb.id)}>{tb.id === 'help' && <span className="help-mark" aria-hidden="true">?</span>}{t(tb.label)}</button>
             </span>
           ))}
         </nav>
@@ -111,8 +109,24 @@ export function App() {
       {tab === 'accounting' && <Accounting />}
       {tab === 'shift' && <Shift can={can} />}
       {tab === 'admin' && <Admin can={can} />}
-      {tab === 'help' && <Help initial={helpAt} />}
+      {tab === 'help' && <Help />}
+      {helpAt && <HelpOverlay article={helpAt} onClose={() => setHelpAt(null)} />}
     </HelpContext.Provider>
+  );
+}
+
+/** Help shown over the current screen (from a "?" link). Esc or Close returns to exactly where the user was. */
+function HelpOverlay({ article, onClose }: { article: string; onClose: () => void }) {
+  const { t } = useI18n();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => closeRef.current?.focus(), []);
+  return (
+    <div className="help-overlay" role="dialog" aria-modal="true" aria-label={t('Help')} onKeyDown={(e) => e.key === 'Escape' && onClose()} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="help-overlay-panel">
+        <button ref={closeRef} type="button" className="close" onClick={onClose}>{t('Close')}</button>
+        <Help initial={article} />
+      </div>
+    </div>
   );
 }
 
