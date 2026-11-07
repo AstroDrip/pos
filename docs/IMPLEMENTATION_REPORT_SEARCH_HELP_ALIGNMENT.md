@@ -36,6 +36,32 @@ Bugs in my own audit tool (fixed):
 
 Both are explained in the alignment report.
 
+## 2b. Independent code review (fresh reviewer, whole branch) and fixes
+
+The reviewer confirmed the hard constraints: no money, VAT, ZATCA, numbering, stock or permission changes; no migration; no new packages; the audit only runs in development. Seven findings were fixed. Each fix started with a test that failed first (unit test, or a real-app flow in `npm run ui-audit`).
+
+| # | Finding | Fix | Proof |
+|---|---|---|---|
+| C1 | Enter could pick the old first-letter suggestion instead of a code typed or scanned just after (for example `a` then `A12`) | Enter picks a suggestion only when the list answers exactly the text in the box and no answer is pending; codes use the exact lookup | `enterAction` tests |
+| I2 | Demand only re-sorted the first 8 names alphabetically, so a best seller later in the alphabet never appeared | Products with a demand score that match are added by id | `search.test.ts` "finds a best seller…" |
+| I3 | Lowering a quantity was not logged (only removing the line was) | Every drop logs the removed part and its share of the line amount | `cart.test.ts` |
+| I7 | − could leave a discount larger than the line (bill blocked), and the log recorded amount 0 | Such a drop is refused with a message; logged amounts come from the line itself | `cart.test.ts` |
+| I4 | After typing 0 on a line, the next line reused the input showing 0 (and could be removed too); discount boxes could move to another line | Stable line ids for rows and inputs | flow `type-zero-keeps-next-line` |
+| I5 | The "?" on the payment step switched tab and lost the bill | "?" opens Help over the screen; Esc or Close returns | flow `help-link-keeps-bill` |
+| I6 | The top bar never shrank back after its tabs wrapped | Fixed min-height (48 px) instead of its own measured height | flow `top-bar-shrinks-back` |
+
+**Deferred (minor, not fixed):**
+1. The demand cache misses on every keystroke, because the window bounds move every millisecond. It runs about 8 small queries per search, which stays fast. My earlier note that "the key includes the hour" was wrong.
+2. The Help "Where" line says "Scan or search" box; the visible label is "Scan, or type barcode / PLU / SKU and press Enter".
+3. A letter typed before a scan stays in the box with its list.
+4. Customer search reads at most 2000 matches before ranking (only matters with more than 2000 customers matching one letter).
+5. The audit refuses nothing if `POS_USER_DATA` is not set. It is meant to be run only through `scripts/ui-audit.mjs`, which uses a temporary folder.
+6. Shift+Enter on the very first key after leaving the quantity step may act as Enter. Low risk.
+
+**Rulings the reviewer questioned:**
+- The undo of a removal is not written to the log. I kept this. The removal stays in the voids report even if it was undone.
+- The demand cache note (see minor 1 above).
+
 ## 3. What did not change
 
 - No changes to VAT, invoice numbering, ZATCA processing, stock movements, journal posting or permissions.
@@ -43,15 +69,15 @@ Both are explained in the alignment report.
 - No new npm packages.
 - No Playwright use. The existing Playwright files are unchanged, except that `scripts/ui-shots.mjs` now imports its seed function from `scripts/ui-seed.mjs`. That script was **not run**.
 
-## 4. Tests (fresh run at `2bfe211`)
+## 4. Tests (fresh run at `6d2adc0`, after the review fixes)
 
 | Command | Result |
 |---|---|
 | `npm run typecheck` | exit 0 |
 | `npm run lint` | exit 0 |
-| `npm test` | 28 files, **261 passed** (200 before this work) |
+| `npm test` | 28 files, **270 passed** (200 before this work) |
 | `npm run build` | exit 0 |
-| `npm run ui-audit -- ui-audit/after` | 58 screens, **0 findings**, 8/8 key flows ok |
+| `npm run ui-audit -- ui-audit/final` | 44 screens (English; Arabic skipped by owner request), **0 findings**, **11/11** key flows ok |
 | `npm run e2e` | **Not run** (Playwright, forbidden for this task) |
 
 **Test changes to note:**

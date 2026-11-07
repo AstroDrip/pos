@@ -78,6 +78,14 @@ No negative margins, no `overflow: hidden` to hide spill, and no `!important` we
 - **Stale screenshots.** `capturePage` can return the last frame painted before the DOM change. A screenshot named Expenses showed Purchases, while its JSON (taken from the DOM) was correct. The runner now waits for two animation frames before each capture.
   - Screenshots in `ui-audit/before` were taken before this fix, so some may show the previous screen. Their JSON findings are correct.
 
+## 4b. After the code review (2026-11-08)
+
+- **Help overlay.** "?" links now open Help over the current screen instead of switching tab.
+- **Top bar.** It uses a fixed minimum height, so it shrinks back after the tabs unwrap (88 → 48 px).
+- **Three more real flows:** `type-zero-keeps-next-line`, `help-link-keeps-bill`, `top-bar-shrinks-back`.
+- **Arabic skipped.** By the owner's request ("dont check arabic, we will solve that section later"), the audit now skips the Arabic variant unless `POS_UI_AUDIT_ARABIC=1` is set.
+- **Final run:** 44 screens, 0 findings, 11/11 flows.
+
 ## 5. Real key-press flows
 
 All 8 flows passed in the final run.

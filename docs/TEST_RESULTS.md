@@ -23,6 +23,8 @@ Only commands that were actually run are recorded here.
 | 2026-11-08 | same | `npm run ui-audit -- ui-audit/after` (Electron-native, no Playwright) | 58 screens, 0 geometry findings, 8/8 key flows ok |
 | 2026-11-08 | same | `node scripts/search-bench.cjs 1000,10000,100000` | 100k products p95: 1 letter 1.8–2.4 ms, 2–3 letters 5–7 ms |
 | 2026-11-08 | same | `npm run e2e` | **not run** (Playwright forbidden for this task) |
+| 2026-11-08 | `feature/owner-tools` @ 6d2adc0 (after code-review fixes) | typecheck / lint / `npm test` / build | 0 / 0 / 28 files **270 passed** / 0 |
+| 2026-11-08 | same | `node scripts/ui-audit.mjs ui-audit/final` | 44 screens (English only, owner: Arabic later), 0 findings, 11/11 key flows ok |
 
 Earlier during T2–T4 the e2e scanner step failed twice on the first run straight after a build. Playwright's 5 ms "scanner"
 keystrokes arrived slower than the 35 ms burst limit while the app was still warming up. It passed on every later run,
