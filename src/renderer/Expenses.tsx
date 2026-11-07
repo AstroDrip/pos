@@ -5,6 +5,7 @@ import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, VatClass }
 import { call } from './api';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
+import { HelpLink } from './HelpLink';
 import { StatusBadge } from './StatusBadge';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -68,7 +69,7 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
 
   return (
     <div className="page">
-      <PageHeader title={t('Expenses')} desc={t('Rent, bills, salaries and other store costs: owed, paid and overdue.')} actions={can('expense.create') && <button className="primary" onClick={() => setEditing('new')}>{t('New expense')}</button>} />
+      <PageHeader title={t('Expenses')} desc={t('Rent, bills, salaries and other store costs: owed, paid and overdue.')} actions={<>{can('expense.create') && <button className="primary" onClick={() => setEditing('new')}>{t('New expense')}</button>}<HelpLink article="expenses-record" /></>} />
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', maxWidth: 1100 }}>
         <div>
           <label>{t('Period')}</label>

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { User } from '../services/users';
 import { Admin, Restore, type FullBackupStatus } from './Admin';
 import { call } from './api';
 import { LangToggle, useI18n } from './i18n';
 import { Accounting } from './Accounting';
 import { Expenses } from './Expenses';
+import { Help } from './Help';
+import { HelpContext } from './help/HelpContext';
 import { Customers } from './Customers';
 import { Products } from './Products';
 import { Purchases } from './Purchases';
@@ -16,7 +18,7 @@ import { Stock } from './Stock';
 import { ThemeSelect } from './theme';
 
 type Status = { needsSetup: boolean; user: User | null };
-type Tab = 'sell' | 'refund' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin';
+type Tab = 'sell' | 'refund' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin' | 'help';
 
 // Grouped by workflow: till · goods · money · day and settings. A thin separator is drawn between groups.
 const TABS: { id: Tab; label: string; perm?: string; group: number }[] = [
@@ -31,6 +33,7 @@ const TABS: { id: Tab; label: string; perm?: string; group: number }[] = [
   { id: 'reports', label: 'Reports', perm: 'reports.view', group: 3 },
   { id: 'shift', label: 'Shift', group: 4 },
   { id: 'admin', label: 'Admin', perm: 'backup.run', group: 4 },
+  { id: 'help', label: 'Help', group: 4 }, // every role
 ];
 
 export function App() {
@@ -38,6 +41,11 @@ export function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [tab, setTab] = useState<Tab>('sell');
   const [error, setError] = useState('');
+  const [helpAt, setHelpAt] = useState<string | undefined>(undefined);
+  const openHelp = (id: string) => {
+    setHelpAt(id);
+    setTab('help');
+  };
 
   // Every login starts on Sell: the previous user's tab may be one the new user is not allowed to see.
   const refresh = () =>
@@ -72,14 +80,14 @@ export function App() {
   const user = status.user;
   const can = (p: string) => user.permissions.includes(p);
   return (
-    <>
-      <div className="top">
+    <HelpContext.Provider value={openHelp}>
+      <TopBar>
         <strong className="brand">POS</strong>
         <nav aria-label="main">
           {TABS.filter((tb) => !tb.perm || can(tb.perm)).map((tb, i, shown) => (
             <span key={tb.id} style={{ display: 'contents' }}>
               {i > 0 && shown[i - 1]!.group !== tb.group && <span className="sep" aria-hidden="true" />}
-              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => setTab(tb.id)}>{t(tb.label)}</button>
+              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => { if (tb.id === 'help') setHelpAt(undefined); setTab(tb.id); }}>{tb.id === 'help' && <span className="help-mark" aria-hidden="true">?</span>}{t(tb.label)}</button>
             </span>
           ))}
         </nav>
@@ -90,7 +98,7 @@ export function App() {
           <span className="who" title={user.displayName}>{user.displayName}</span>
           <button onClick={() => call('auth.logout').then(refresh)}>{t('Log out')}</button>
         </div>
-      </div>
+      </TopBar>
       {can('reports.view') && <HealthBanner />}
       {tab === 'sell' && <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} />}
       {tab === 'refund' && <Refund canApprove={can('sale.refund')} />}
@@ -103,8 +111,27 @@ export function App() {
       {tab === 'accounting' && <Accounting />}
       {tab === 'shift' && <Shift can={can} />}
       {tab === 'admin' && <Admin can={can} />}
-    </>
+      {tab === 'help' && <Help initial={helpAt} />}
+    </HelpContext.Provider>
   );
+}
+
+/** The top bar. Its height changes when the tabs wrap; --topbar-h follows it so full-height screens (Sell) still fit. */
+function TopBar({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const set = () => document.documentElement.style.setProperty('--topbar-h', `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty('--topbar-h');
+    };
+  }, []);
+  return <div className="top" ref={ref}>{children}</div>;
 }
 
 /** Shows a red warning if the audit log has been tampered with (hash chain broken). */

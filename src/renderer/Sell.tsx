@@ -12,6 +12,7 @@ import type { ShiftSummary } from '../services/shifts';
 import { call, type ApiError } from './api';
 import { SearchBox } from './SearchBox';
 import { decideKey, decrementQtyText, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
+import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
 
 /** A bill line; scanCode = the scale label scanned, kept on the sale line for audit. */
@@ -552,7 +553,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
           </div>
         )}
         <div className={`step${step === 'pay' ? ' current' : ''}`} role="group" aria-label="payment step">
-          <div className="step-label">{t('Payment')}</div>
+          <div className="step-label">{t('Payment')} <HelpLink article="payments-take-payment" /></div>
           <label>{t('Cash received (blank = exact)')}</label>
           <input
             ref={cashRef}

@@ -4,6 +4,7 @@ import { storeDateTime } from '../core/store-time';
 import type { RefundableSale, RefundResult } from '../services/refunds';
 import { call } from './api';
 import { PageHeader } from './PageHeader';
+import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
 
 // Owner policy (D1): receipt required, within the refund window, cash only, supervisor approval for every refund.
@@ -92,7 +93,7 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
 
   return (
     <div className="page">
-      <PageHeader title={t('Refund')} desc={t('Find the sale by its receipt number, choose what comes back, pay the cash.')} />
+      <PageHeader title={t('Refund')} desc={t('Find the sale by its receipt number, choose what comes back, pay the cash.')} actions={<HelpLink article="returns-refund" />} />
       <form className="row" style={{ maxWidth: 520 }} onSubmit={find}>
         <div style={{ flex: 1 }}>
           <label>{t('Invoice number from the receipt')}</label>

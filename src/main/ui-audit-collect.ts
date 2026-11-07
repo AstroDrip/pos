@@ -83,8 +83,18 @@ export const COLLECT_SOURCE = String.raw`(() => {
       });
     }
   });
+  // Sideways scroll areas with a hidden scrollbar (content can be cut off with no sign).
+  const scrollers = [];
+  for (const b of boxes) {
+    const cs = getComputedStyle(b._el);
+    if (cs.overflowX !== 'auto' && cs.overflowX !== 'scroll') continue;
+    if (b._el.scrollWidth <= b._el.clientWidth + 1) continue;
+    const hidden = cs.scrollbarWidth === 'none' || b._el.offsetHeight - b._el.clientHeight < 2;
+    scrollers.push({ id: b.id, scrollWidth: b._el.scrollWidth, clientWidth: b._el.clientWidth, hiddenScrollbar: hidden });
+  }
   const de = document.documentElement;
   return {
+    scrollers,
     viewport: { w: de.clientWidth, h: de.clientHeight },
     scrollWidth: de.scrollWidth,
     scrollHeight: de.scrollHeight,

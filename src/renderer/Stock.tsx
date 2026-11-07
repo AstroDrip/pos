@@ -6,6 +6,7 @@ import type { StockRow } from '../services/reports';
 import { call } from './api';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
+import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
 
 interface GrnLine {
@@ -58,7 +59,7 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
 
   return (
     <div className="page">
-      <PageHeader title={t('Stock')} desc={t('Receive deliveries, record wastage, count the shelves.')} />
+      <PageHeader title={t('Stock')} desc={t('Receive deliveries, record wastage, count the shelves.')} actions={<HelpLink article="stock-overview" />} />
       <div className="grid-cards">
       {can('stock.receive') && (
         <div className="card section">

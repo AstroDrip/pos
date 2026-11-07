@@ -132,7 +132,8 @@ label:has(> input[type='checkbox']) { color: var(--text-2); }
   background: var(--topbar-bg); color: var(--topbar-text); position: sticky; top: 0; z-index: 20;
 }
 .top .brand { font-weight: 700; letter-spacing: 0.02em; flex: 0 0 auto; }
-.top nav { display: flex; gap: 2px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+/* Tabs wrap onto a second line when they do not fit: a tab is never hidden. App.tsx keeps --topbar-h equal to the bar's real height. */
+.top nav { display: flex; flex-wrap: wrap; row-gap: 2px; column-gap: 2px; flex: 1 1 auto; min-width: 0; padding-block: 4px; }
 .top nav button, .top .utils button {
   min-height: 32px; padding: 0 var(--sp-3); background: transparent; color: var(--topbar-text); border-color: transparent; font-weight: 500;
 }
@@ -259,8 +260,6 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; border: 3px solid var(--bg); }
 ::-webkit-scrollbar-track { background: var(--bg); }
 /* The tab strip scrolls sideways (wheel, keyboard focus) without showing a bulky scrollbar. */
-.top nav { scrollbar-width: none; }
-.top nav::-webkit-scrollbar { display: none; }
 @media (max-width: 1280px) {
   .top { gap: var(--sp-2); padding: 0 var(--sp-3); }
   .top nav button { padding: 0 var(--sp-2); font-size: var(--fs-sm); }
@@ -272,7 +271,6 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 
 /* Narrow windows: every tab stays visible on a second row instead of hiding behind sideways scrolling. */
 @media (max-width: 1100px) {
-  :root { --topbar-h: 84px; }
   .top { flex-wrap: wrap; padding-block: 4px; }
   .top nav { flex-wrap: wrap; overflow: visible; order: 3; flex-basis: 100%; }
 }
@@ -284,3 +282,38 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 /* Second-language product name sits under the main name, on the page's reading side. */
 :root[dir='ltr'] .sub-name { text-align: left; }
 :root[dir='rtl'] .sub-name { text-align: right; }
+
+/* ── Help Centre ───────────────────────────────────────────── */
+.help-link { min-height: 22px; min-width: 22px; padding: 0; border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 700; line-height: 1; vertical-align: middle; margin-inline-start: var(--sp-1); color: var(--primary); }
+.page-header .actions .help-link { min-height: var(--control-h); min-width: var(--control-h); font-size: var(--fs-md); }
+.top nav .help-mark { display: inline-block; margin-inline-end: var(--sp-1); font-weight: 700; }
+.help-layout { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: var(--sp-4); align-items: start; }
+.help-nav { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--sp-3); max-height: calc(100vh - var(--topbar-h) - 140px); overflow: auto; }
+.help-nav input { width: 100%; margin-bottom: var(--sp-2); }
+.help-nav h4 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.help-nav ul { list-style: none; margin: 0; padding: 0; }
+.help-nav li button { width: 100%; text-align: start; border-color: transparent; background: transparent; min-height: 32px; padding: var(--sp-1) var(--sp-2); font-size: var(--fs-sm); white-space: normal; }
+.help-nav li button.on { background: var(--selected-bg); border-color: var(--border); font-weight: 600; }
+.help-nav li.none { color: var(--muted); font-size: var(--fs-sm); padding: var(--sp-2); }
+.help-article { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--sp-5) var(--sp-6); max-width: 820px; line-height: 1.6; font-size: var(--help-fs, var(--fs-md)); }
+.help-article h3 { margin: 0 0 var(--sp-3); font-size: calc(var(--help-fs, var(--fs-md)) * 1.5); }
+.help-article h4 { margin: var(--sp-5) 0 var(--sp-2); }
+.help-section { margin: 0 0 var(--sp-1); color: var(--muted); font-size: var(--fs-sm); }
+.help-steps { list-style: none; counter-reset: step; padding: 0; margin: 0; }
+.help-steps li { counter-increment: step; position: relative; padding-inline-start: 3em; margin-bottom: var(--sp-3); min-height: 2.2em; }
+.help-steps li::before { content: counter(step); position: absolute; inset-inline-start: 0; top: 0; width: 2.2em; height: 2.2em; border-radius: var(--r-pill); background: var(--primary); color: var(--on-primary); font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.help-keys kbd, .help-article kbd { display: inline-block; padding: 0 var(--sp-2); margin-inline-end: var(--sp-1); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--r-sm); background: var(--surface-2); font: inherit; font-size: 0.9em; }
+.help-problems { margin: 0; }
+.help-problems div { margin-bottom: var(--sp-3); }
+.help-problems dt { font-weight: 600; }
+.help-problems dd { margin: var(--sp-1) 0 0; }
+.help-supervisor { margin-top: var(--sp-5); padding: var(--sp-3); border-radius: var(--r-md); background: var(--warning-bg); color: var(--text); }
+.help[data-size="1"] { --help-fs: var(--fs-sm); }
+.help[data-size="2"] { --help-fs: var(--fs-md); }
+.help[data-size="3"] { --help-fs: var(--fs-lg); }
+@media (max-width: 900px) { .help-layout { grid-template-columns: 1fr; } .help-nav { max-height: none; } }
+@media print {
+  .top, .help-nav, .help .page-header .actions, .help .msg { display: none; }
+  .help-layout { display: block; }
+  .help-article { border: none; max-width: none; padding: 0; }
+}

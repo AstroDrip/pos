@@ -274,6 +274,11 @@ const AR: Record<string, string> = {
   'Type a whole number from 0 to 9999.': 'اكتب عددًا صحيحًا من 0 إلى 9999.',
   '{0} removed from the bill.': 'تمت إزالة {0} من الفاتورة.',
   'Undo': 'تراجع',
+  'Help': 'المساعدة',
+  'Step-by-step guides for every part of the app.': 'شرح خطوة بخطوة لكل جزء من البرنامج.',
+  'Text size': 'حجم الخط',
+  'Print this guide': 'طباعة هذا الشرح',
+  'Help is available in English for now.': 'المساعدة متوفرة باللغة الإنجليزية حاليًا.',
   // scale labels
   'Scale labels': 'ملصقات الميزان',
   'The real label layout is not confirmed yet. Scan a real label below and check product and weight before using it.': 'تنسيق الملصق الحقيقي لم يُؤكد بعد. امسح ملصقاً حقيقياً بالأسفل وتحقق من الصنف والوزن قبل الاستخدام.',

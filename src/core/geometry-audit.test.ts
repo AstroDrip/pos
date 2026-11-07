@@ -68,4 +68,12 @@ describe('auditGeometry', () => {
   it('flags elements outside the viewport horizontally', () => {
     expect(kinds(snap([box({ rect: { x: 950, y: 0, w: 100, h: 20 } })]))).toContain('out-of-viewport');
   });
+
+  it('flags content hidden in a sideways scroll area whose scrollbar is hidden', () => {
+    const f = auditGeometry(snap([], { scrollers: [{ id: 'nav', scrollWidth: 1100, clientWidth: 865, hiddenScrollbar: true }] })).find((x) => x.kind === 'hidden-overflow');
+    expect(f?.severity).toBe('high');
+    expect(f?.ids).toEqual(['nav']);
+    expect(kinds(snap([], { scrollers: [{ id: 'nav', scrollWidth: 866, clientWidth: 865, hiddenScrollbar: true }] }))).not.toContain('hidden-overflow');
+    expect(kinds(snap([], { scrollers: [{ id: 'cart', scrollWidth: 1100, clientWidth: 865, hiddenScrollbar: false }] }))).not.toContain('hidden-overflow');
+  });
 });

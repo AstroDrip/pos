@@ -8,6 +8,7 @@ import { StatusBadge, StatusLegend } from './StatusBadge';
 import { call } from './api';
 import { PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
+import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -457,7 +458,7 @@ function SupplierPay({ suppliers, onDone }: { suppliers: Supplier[]; onDone: (m:
   };
   return (
     <div className="card section" role="group" aria-label="pay supplier" style={{ marginTop: 'var(--sp-4)' }}>
-      <h4>{t('Pay a supplier')}</h4>
+      <h4>{t('Pay a supplier')} <HelpLink article="suppliers-pay" /></h4>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div><label>{t('Supplier')}</label><SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} /></div>
         <div><label>{t('Amount (SAR)')}</label><input aria-label="supplier pay amount" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></div>

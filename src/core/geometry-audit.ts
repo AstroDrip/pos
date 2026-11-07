@@ -17,9 +17,11 @@ export interface BoxInfo {
   clipsChildren: boolean;
   text?: string;
 }
-export interface Snapshot { screen: string; viewport: { w: number; h: number }; scrollWidth: number; boxes: BoxInfo[] }
+/** An element that scrolls sideways; hiddenScrollbar = the user gets no sign that more content is off to the side. */
+export interface Scroller { id: string; scrollWidth: number; clientWidth: number; hiddenScrollbar: boolean }
+export interface Snapshot { screen: string; viewport: { w: number; h: number }; scrollWidth: number; boxes: BoxInfo[]; scrollers?: Scroller[] }
 export interface Finding {
-  kind: 'overlap' | 'misaligned-top' | 'misaligned-height' | 'out-of-parent' | 'out-of-viewport' | 'page-overflow' | 'column-edge';
+  kind: 'overlap' | 'misaligned-top' | 'misaligned-height' | 'out-of-parent' | 'out-of-viewport' | 'page-overflow' | 'column-edge' | 'hidden-overflow';
   severity: 'high' | 'medium' | 'low';
   ids: string[];
   detail: string;
@@ -37,6 +39,12 @@ export function auditGeometry(s: Snapshot, tolerancePx = 1.5): Finding[] {
 
   if (s.scrollWidth > s.viewport.w + 1) {
     out.push({ kind: 'page-overflow', severity: 'high', ids: [], detail: `page is ${s.scrollWidth}px wide in a ${s.viewport.w}px window` });
+  }
+
+  for (const sc of s.scrollers ?? []) {
+    if (sc.hiddenScrollbar && sc.scrollWidth > sc.clientWidth + 1) {
+      out.push({ kind: 'hidden-overflow', severity: 'high', ids: [sc.id], detail: `${sc.scrollWidth - sc.clientWidth}px of content hidden sideways with no scrollbar` });
+    }
   }
 
   // Overlaps between siblings

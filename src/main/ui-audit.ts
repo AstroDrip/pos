@@ -55,7 +55,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   const capture = async (name: string) => {
     await sleep(300);
     const raw = await js<Omit<Snapshot, 'screen'> & { scrollHeight: number }>(COLLECT_SOURCE);
-    const snap: Snapshot = { screen: name, viewport: raw.viewport, scrollWidth: raw.scrollWidth, boxes: raw.boxes };
+    const snap: Snapshot = { screen: name, viewport: raw.viewport, scrollWidth: raw.scrollWidth, boxes: raw.boxes, scrollers: raw.scrollers };
     const findings: Finding[] = auditGeometry(snap);
     writeFileSync(join(outDir, `${name}.png`), (await wc.capturePage()).toPNG());
     writeFileSync(join(outDir, `${name}.json`), JSON.stringify({ ...snap, scrollHeight: raw.scrollHeight, findings }, null, 1));
@@ -113,7 +113,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       for (const [i, tab] of tabs.entries()) {
         await js(`document.querySelectorAll('.top nav button')[${i}].click()`);
         await sleep(350);
-        const slug = `${String(i + 1).padStart(2, '0')}-${tab.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+        const slug = `${String(i + 1).padStart(2, '0')}-${tab.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '')}`;
         if (tab === 'Sell') {
           if (await js<boolean>(`!document.querySelector('input[aria-label="product search"]')`)) {
             await click('button.primary'); // open shift with the default float (temporary data only)

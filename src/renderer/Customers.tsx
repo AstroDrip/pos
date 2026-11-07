@@ -7,6 +7,7 @@ import { call } from './api';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { useSuggest } from './useSuggest';
+import { HelpLink } from './HelpLink';
 import { StatusBadge, StatusLegend, statusLabel } from './StatusBadge';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -261,7 +262,7 @@ function Collect({ account, can, onDone }: { account: CustomerAccount; can: (p: 
   };
   return (
     <div className="subpanel" role="group" aria-label="collect payment">
-      <h4>{t('Receive a payment')}</h4>
+      <h4>{t('Receive a payment')} <HelpLink article="customers-receive-payment" /></h4>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div><label>{t('Amount received (SAR)')}</label><input aria-label="payment amount" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
         <div><label>{t('Method')}</label>
