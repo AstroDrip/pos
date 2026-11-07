@@ -25,6 +25,7 @@ beforeEach(() => {
   t = makeTestCtx();
   ctx = t.ctx;
   u = seedUsers(ctx);
+  for (const k of Object.keys(ids)) delete ids[k]; // ids from the previous test belong to another database
   P('APL', 'Apple', 'تفاح');
   P('APR', 'Apricot', 'مشمش');
   P('BAN', 'Banana', 'موز');
@@ -83,5 +84,14 @@ describe('demand ranking', () => {
     P('APN', 'Apple New', 'تفاح جديد');
     // both name-prefix matches come first; "Green Apple" (a word match, allowed from 2 letters) follows
     expect(names('app')).toEqual(['Apple', 'Apple New', 'Green Apple']);
+  });
+
+  it('finds a best seller even when it is not among the first names alphabetically', () => {
+    for (let i = 1; i <= 12; i++) P(`BB${i}`, `Biscuit ${String(i).padStart(2, '0')}`, `بسكويت ${i}`);
+    P('BZC', 'Bz Cola', 'بز كولا');
+    receiveGoods(ctx, u.admin, { supplierId: createSupplier(ctx, u.admin, { name: 'S2' }), lines: [{ productId: ids.BZC!, qty: 100_000, unitCost: 100 }] });
+    sellTimes('BZC', 3);
+    expect(names('b', 8)[0]).toBe('Bz Cola');
+    expect(names('bz', 12)[0]).toBe('Bz Cola');
   });
 });

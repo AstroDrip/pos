@@ -106,6 +106,21 @@ export function searchProducts(ctx: Ctx, text: string, limit = 20): SearchHit[] 
       add(rows.filter((r) => r[col as 'name_en_norm'] === norm), 3, 'name');
       add(rows.filter((r) => r[col as 'name_en_norm'] !== norm), 4, 'name_prefix');
     }
+    // The range scans above stop after `limit` names in A–Z order, so a best seller later in the alphabet would be
+    // cut off before ranking. Products with a demand score (few: 3+ sales in 90 days) are added by id.
+    const scored = demandScores(ctx);
+    if (scored.size) {
+      const rows = ctx.db
+        .prepare(
+          `SELECT ${PRODUCT_COLUMNS}, p.name_en_norm, p.name_ar_norm ${from}
+            WHERE p.active = 1 AND p.id IN (SELECT value FROM json_each(?))
+              AND ((p.name_en_norm >= ? AND p.name_en_norm < ?) OR (p.name_ar_norm >= ? AND p.name_ar_norm < ?))`,
+        )
+        .all(JSON.stringify([...scored.keys()]), norm, upper(norm), norm, upper(norm)) as Row[];
+      const exact = (r: Row) => r.name_en_norm === norm || r.name_ar_norm === norm;
+      add(rows.filter(exact), 3, 'name');
+      add(rows.filter((r) => !exact(r)), 4, 'name_prefix');
+    }
     // 5–6: word-prefix matches through FTS5 (prefix indexes for 2 and 3 characters).
     // One character: skipped, because a 1-character FTS prefix has no index and would scan every term.
     const words = tokens(raw);
