@@ -229,5 +229,13 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       key('Escape');
       await sleep(300);
     } else flow('shift-enter-on-pay-no-sale', false, 'not reached');
+    // Typing 0 on the first line removes it; the next line must keep its own quantity (no reused input showing "0")
+    await clearBill();
+    for (const code of ['6281000000000', '6281000000000', '6281000000077', '6281000000077']) await scan(code);
+    await js(`(() => { const e = document.querySelector('.cart tbody tr input[aria-label="line quantity"]'); e.focus(); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, '0'); e.dispatchEvent(new Event('input', { bubbles: true })); e.blur(); })()`);
+    await sleep(400);
+    const left = await js<string[]>(`[...document.querySelectorAll('.cart tbody tr input[aria-label="line quantity"]')].map((i) => i.value)`);
+    flow('type-zero-keeps-next-line', left.length === 1 && left[0] === '2', `quantities left: ${JSON.stringify(left)}`);
+    await clearBill();
   }
 }

@@ -11,6 +11,8 @@ export interface CartLine<P extends { id: number; sellMode: 'unit' | 'weight'; p
   qty: number;
   discount: number; // halalas
   scanCode?: string;
+  /** Stable id for the screen (row and input keys), so inputs never move to another line when lines shift. */
+  uid?: string;
 }
 type Item = { id: number; sellMode: 'unit' | 'weight'; priceIncl: number };
 export interface Removed<P extends Item> { line: CartLine<P>; index: number }

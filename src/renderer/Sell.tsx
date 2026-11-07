@@ -119,7 +119,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     if (product.sellMode === 'unit') lastUnitProduct.current = product.id;
     setLines((prev) => {
       const i = prev.findIndex((l) => l.product.id === product.id && product.sellMode === 'unit');
-      if (i < 0) return [...prev, { product, qty, discount: 0, scanCode }];
+      if (i < 0) return [...prev, { product, qty, discount: 0, scanCode, uid: crypto.randomUUID() }];
       return prev.map((l, k) => (k === i ? { ...l, qty: l.qty + qty } : l));
     });
   }, []);
@@ -338,7 +338,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     try {
       const r = await call<{ billKey?: string; lines: { product: Product; qty: number }[] }>('hold.recall', { id });
       if (r.billKey) billKey.current = r.billKey; // removals made before holding stay linked to this bill
-      setLines(r.lines.map((l) => ({ ...l, discount: 0 })));
+      setLines(r.lines.map((l) => ({ ...l, discount: 0, uid: crypto.randomUUID() })));
       void loadHeld();
     } catch (e) {
       setMsg({ kind: 'error', text: t((e as Error).message) });
@@ -446,14 +446,14 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
           </thead>
           <tbody>
             {lines.map((l, i) => (
-              <tr key={i}>
+              <tr key={l.uid ?? i}>
                 <td><ProductName en={l.product.nameEn} ar={l.product.nameAr} /></td>
                 <td className="num">
                   {l.product.sellMode === 'unit' ? (
                     <span className="qty-stepper">
                       <button type="button" aria-label="one less" title={t('One less')} disabled={busy} onClick={() => lessOf(i)}>−</button>
                       <input
-                        key={l.qty}
+                        key={`${l.uid}:${l.qty}`}
                         aria-label="line quantity"
                         inputMode="numeric"
                         defaultValue={formatQty(l.qty, 0)}
@@ -469,7 +469,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
                 </td>
                 <td className="num">{formatSar(l.product.priceIncl)}</td>
                 <td className="num" style={{ width: 90 }}>
-                  <input aria-label="discount" defaultValue={l.discount ? formatSar(l.discount) : ''} onBlur={(e) => setDiscount(i, e.target.value)} />
+                  <input key={`${l.uid}:${l.discount}`} aria-label="discount" defaultValue={l.discount ? formatSar(l.discount) : ''} onBlur={(e) => setDiscount(i, e.target.value)} />
                 </td>
                 <td className="num">{totals ? formatSar(totals.lines[i]!.lineIncl) : '—'}</td>
                 <td><button className="danger" aria-label="remove line" onClick={() => removeLines('line_removed', [i])}>✕</button></td>
