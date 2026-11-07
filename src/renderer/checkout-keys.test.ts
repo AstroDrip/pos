@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ENTER_GUARD_MS, decideKey, incrementQtyText, parseStepQty, type KeyContext, type KeyInfo } from './checkout-keys';
+import { ENTER_GUARD_MS, decideKey, decrementQtyText, incrementQtyText, parseStepQty, type KeyContext, type KeyInfo } from './checkout-keys';
 
-const key = (k: string, o: Partial<KeyInfo> = {}): KeyInfo => ({ key: k, ctrl: false, repeat: false, msSinceStepChange: 10_000, ...o });
+const key = (k: string, o: Partial<KeyInfo> = {}): KeyInfo => ({ key: k, ctrl: false, shift: false, composing: false, repeat: false, msSinceStepChange: 10_000, ...o });
 const ctx = (o: Partial<KeyContext> = {}): KeyContext => ({ step: 'search', field: 'search', searchEmpty: true, billHasItems: true, splitCardTyped: false, busy: false, ...o });
 const act = (k: KeyInfo, c: KeyContext) => decideKey(k, c).type;
 
@@ -63,5 +63,67 @@ describe('checkout key state machine (ADR-2)', () => {
     expect(incrementQtyText('1')).toBe('2');
     expect(incrementQtyText('')).toBe('1');
     expect(incrementQtyText('9999')).toBe('9999');
+  });
+
+  it('search: - on an empty box takes one off the last line; with text it is ordinary typing', () => {
+    expect(act(key('-'), ctx())).toBe('decLast');
+    expect(act(key('-'), ctx({ billHasItems: false }))).toBe('swallow');
+    expect(act(key('-'), ctx({ searchEmpty: false }))).toBe('none');
+    expect(act(key('-', { repeat: true }), ctx())).toBe('swallow');
+  });
+
+  it('qty: - takes one off what is typed', () => {
+    expect(act(key('-'), ctx({ step: 'qty', field: 'qty' }))).toBe('qtyDec');
+    expect(decrementQtyText('5')).toBe('4');
+    expect(decrementQtyText('1')).toBe('1');
+    expect(decrementQtyText('')).toBe('1');
+    expect(decrementQtyText('abc')).toBe('1');
+  });
+
+  const shiftEnter = (o: Partial<KeyInfo> = {}) => key('Enter', { shift: true, ...o });
+
+  it('Shift+Enter on an empty search box goes to payment, with the same guards as Enter', () => {
+    expect(act(shiftEnter(), ctx())).toBe('openPay');
+    expect(act(shiftEnter(), ctx({ billHasItems: false }))).toBe('swallow');
+    expect(act(shiftEnter(), ctx({ busy: true }))).toBe('swallow');
+    expect(act(shiftEnter({ msSinceStepChange: ENTER_GUARD_MS - 1 }), ctx())).toBe('swallow');
+    expect(act(shiftEnter({ repeat: true }), ctx())).toBe('swallow');
+  });
+
+  it('Shift+Enter is refused while a search or a quantity is unfinished', () => {
+    expect(decideKey(shiftEnter(), ctx({ searchEmpty: false }))).toEqual({ type: 'refuse', reason: 'pendingSearch' });
+    expect(decideKey(shiftEnter(), ctx({ step: 'qty', field: 'qty' }))).toEqual({ type: 'refuse', reason: 'pendingQty' });
+  });
+
+  it('Shift+Enter never pays', () => {
+    for (const field of ['cash', 'cardPart', 'other'] as const) {
+      for (const repeat of [false, true]) {
+        for (const splitCardTyped of [false, true]) {
+          const a = act(shiftEnter({ repeat }), ctx({ step: 'pay', field, splitCardTyped }));
+          expect(a).not.toBe('payCash');
+          expect(a).not.toBe('payCard');
+          expect(a).toBe('swallow');
+        }
+      }
+    }
+    expect(act(shiftEnter({ ctrl: true }), ctx({ step: 'pay', field: 'cash' }))).toBe('swallow');
+  });
+
+  it('Shift+Enter in other fields (PIN, discount) does nothing special', () => {
+    expect(act(shiftEnter(), ctx({ field: 'other' }))).toBe('none');
+  });
+
+  it('nothing happens while an IME is composing', () => {
+    for (const k of ['Enter', '+', '-']) {
+      expect(act(key(k, { composing: true }), ctx())).toBe('none');
+      expect(act(key(k, { composing: true, shift: true }), ctx({ step: 'pay', field: 'cash' }))).toBe('none');
+    }
+  });
+
+  it('plain Enter and Ctrl+Enter keep their behaviour', () => {
+    expect(act(key('Enter'), ctx())).toBe('openPay');
+    expect(act(key('Enter'), ctx({ step: 'pay', field: 'cash' }))).toBe('payCash');
+    expect(act(key('Enter', { ctrl: true }), ctx({ step: 'pay', field: 'cash' }))).toBe('payCard');
+    expect(act(key('Enter'), ctx({ step: 'qty', field: 'qty' }))).toBe('qtyConfirm');
   });
 });

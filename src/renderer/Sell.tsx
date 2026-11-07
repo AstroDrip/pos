@@ -11,7 +11,7 @@ import type { SaleResult } from '../services/sales';
 import type { ShiftSummary } from '../services/shifts';
 import { call, type ApiError } from './api';
 import { SearchBox } from './SearchBox';
-import { decideKey, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
+import { decideKey, decrementQtyText, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
 import { ProductName, useI18n } from './i18n';
 
 /** A bill line; scanCode = the scale label scanned, kept on the sale line for audit. */
@@ -154,6 +154,15 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     }
     setMsg(null);
     setLines((prev) => incrementLine(prev, prev.findIndex((l) => l.product.id === id && l.product.sellMode === 'unit')));
+  };
+
+  /** − on the empty search box: one fewer of the last unit item (removing it, with Undo, at zero). */
+  const decLast = () => {
+    const id = lastUnitProduct.current;
+    const idx = lines.findIndex((l) => l.product.id === id && l.product.sellMode === 'unit');
+    if (idx < 0) return setMsg({ kind: 'warn', text: t('Nothing to take one off: the last item is sold by weight or was removed.') });
+    setMsg(null);
+    lessOf(idx);
   };
 
   const addCode = useCallback(async (code: string, possibleDuplicate = false) => {
@@ -368,17 +377,19 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   }
 
   /** Runs a key through the state machine for the focused field. Returns true when the key was used. */
-  const onStepKey = (field: KeyContext['field'], e: React.KeyboardEvent<HTMLInputElement>): boolean => {
+  const onStepKey = (field: KeyContext['field'], e: React.KeyboardEvent<HTMLInputElement>, searchEmpty = true): boolean => {
     const a = decideKey(
-      { key: e.key, ctrl: e.ctrlKey || e.metaKey, repeat: e.repeat, msSinceStepChange: performance.now() - stepAt.current },
-      { step, field, searchEmpty: true, billHasItems: lines.length > 0 && !!totals, splitCardTyped: cardPart.trim() !== '', busy: busyRef.current },
+      { key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, repeat: e.repeat, msSinceStepChange: performance.now() - stepAt.current },
+      { step, field, searchEmpty, billHasItems: lines.length > 0 && !!totals, splitCardTyped: cardPart.trim() !== '', busy: busyRef.current },
     );
     if (a.type === 'none') return false;
     e.preventDefault();
     switch (a.type) {
       case 'openPay': goStep('pay'); break;
       case 'incLast': incLast(); break;
+      case 'decLast': decLast(); break;
       case 'qtyInc': setPending((p) => (p ? { ...p, text: incrementQtyText(p.text), error: undefined } : p)); break;
+      case 'qtyDec': setPending((p) => (p ? { ...p, text: decrementQtyText(p.text), error: undefined } : p)); break;
       case 'qtyConfirm': {
         if (!pending) break;
         const r = parseStepQty(pending.text, pending.product.sellMode);
@@ -394,7 +405,15 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
       case 'focusCash': cashRef.current?.focus(); break;
       case 'payCash': void pay('cash'); break;
       case 'payCard': void pay('card'); break;
-      case 'refuse': setMsg({ kind: 'warn', text: t('A split payment is in progress: press Enter in Cash received to finish it.') }); break;
+      case 'refuse':
+        setMsg({
+          kind: 'warn',
+          text:
+            a.reason === 'pendingSearch' ? t('Pick the product (↑↓ Enter) or clear the search first.')
+            : a.reason === 'pendingQty' ? t('Press Enter to add the item, or Esc to cancel.')
+            : t('A split payment is in progress: press Enter in Cash received to finish it.'),
+        });
+        break;
     }
     return true;
   };
@@ -474,10 +493,10 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             onPick={pickProduct}
             onCode={(c) => void typedCode(c)}
             disabled={busy}
-            onEmptyKey={(e) => onStepKey('search', e)}
+            onCheckoutKey={(e, empty) => onStepKey('search', e, empty)}
             onFocusBox={() => goStep('search', false)}
           />
-          <small className="hint">{t('Empty box: Enter = payment · + = one more of the last item')}</small>
+          <small className="hint">{t('Empty box: Enter or Shift+Enter = payment · + / − = one more / one less of the last item')}</small>
         </div>
         {step === 'qty' && pending && (
           <div className="step current" role="group" aria-label="quantity step">

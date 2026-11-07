@@ -127,7 +127,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
           await capture(`${slug}-lines__${v.id}`);
           await focus('input[aria-label="product search"]');
           key('Enter');
-          await waitFor(`document.querySelector('[aria-label="payment step"]')`, 1500);
+          await waitFor(`document.querySelector('[aria-label="payment step"].current')`, 1500);
           await capture(`${slug}-pay__${v.id}`);
           key('Escape');
           await sleep(200);
@@ -180,10 +180,38 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(300);
     const afterMinus = await qtyOfLastLine();
     flow('minus', afterMinus === '1', `qty after - = ${afterMinus}`);
+    // - on the last unit removes the line and offers Undo; Undo puts it back
+    const linesBefore = await lineCount();
+    key('-');
+    await sleep(300);
+    const removed = (await lineCount()) === linesBefore - 1;
+    const undoShown = await js<boolean>(`!!document.querySelector('.undo-bar button')`);
+    flow('minus-to-zero-undo-offered', removed && undoShown, `line removed: ${removed}, undo shown: ${undoShown}`);
+    await capture('01-sell-undo__light-en-1366x768');
+    await click('.undo-bar button');
+    await sleep(300);
+    const back = (await lineCount()) === linesBefore && (await qtyOfLastLine()) === '1';
+    flow('undo-restores-line', back, `lines ${await lineCount()}, qty ${await qtyOfLastLine()}`);
+    // Shift+Enter with text in the box is refused (no product picked, no payment step)
+    await focus(box);
+    await type('W', 30);
+    await sleep(500);
+    const linesNow = await lineCount();
+    key('Enter', ['shift']);
+    await sleep(400);
+    const onPay = await js<boolean>(`!!document.querySelector('[aria-label="payment step"].current')`);
+    const onQty = await js<boolean>(`!!document.querySelector('[aria-label="quantity step"]')`);
+    const warn = await js<string>(`document.querySelector('.msg.warn')?.textContent ?? ''`);
+    const linesAfter = await lineCount();
+    const refused = !onPay && !onQty && linesAfter === linesNow && warn !== '';
+    flow('shift-enter-with-text-refused', refused, `payment step: ${onPay}, qty step: ${onQty}, lines ${linesNow}->${linesAfter}, warning: "${warn}"`);
+    if (onQty) key('Escape');
+    key('Escape');
+    await js(`(() => { const e = document.querySelector(${JSON.stringify(box)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, ''); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     // Shift+Enter: to payment, and never a sale
     await sleep(400);
     key('Enter', ['shift']);
-    const toPay = await waitFor(`document.querySelector('[aria-label="payment step"]')`, 1500);
+    const toPay = await waitFor(`document.querySelector('[aria-label="payment step"].current')`, 1500);
     flow('shift-enter-to-pay', toPay, toPay ? 'payment step shown' : 'payment step not shown');
     if (toPay) {
       const before = hooks.salesCount();

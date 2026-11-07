@@ -19,7 +19,7 @@ export function SearchBox({
   onCode,
   disabled,
   inputRef,
-  onEmptyKey,
+  onCheckoutKey,
   onFocusBox,
 }: {
   onPick: (p: Product) => void;
@@ -27,8 +27,11 @@ export function SearchBox({
   disabled?: boolean;
   /** Lets the checkout put focus back here after each step. */
   inputRef?: React.RefObject<HTMLInputElement | null>;
-  /** Keys pressed while the box is empty (Enter = payment, + = one more), see checkout-keys.ts. Return true if handled. */
-  onEmptyKey?: (e: React.KeyboardEvent<HTMLInputElement>) => boolean;
+  /**
+   * Checkout keys (see checkout-keys.ts): every key while the box is empty (Enter = payment, + / - = one more / less),
+   * and Shift+Enter even with text (so it can be refused instead of picking a product). Return true if handled.
+   */
+  onCheckoutKey?: (e: React.KeyboardEvent<HTMLInputElement>, searchEmpty: boolean) => boolean;
   onFocusBox?: () => void;
 }) {
   const { t, lang } = useI18n();
@@ -64,7 +67,8 @@ export function SearchBox({
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
-    if (!text.trim() && onEmptyKey?.(e)) return;
+    const empty = !text.trim();
+    if ((empty || (e.key === 'Enter' && e.shiftKey)) && onCheckoutKey?.(e, empty)) return;
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && hits.length) {
       e.preventDefault();
       if (e.key === 'ArrowDown') setOpen(true);

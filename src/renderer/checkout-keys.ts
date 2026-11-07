@@ -23,6 +23,9 @@ export const ENTER_GUARD_MS = 350;
 export interface KeyInfo {
   key: string;
   ctrl: boolean;
+  shift: boolean;
+  /** An IME (e.g. Arabic) is still composing: the key belongs to the IME, never to the checkout. */
+  composing: boolean;
   repeat: boolean;
   msSinceStepChange: number;
 }
@@ -41,33 +44,46 @@ export type KeyAction =
   | { type: 'swallow' } // stop the key, do nothing (guards)
   | { type: 'openPay' }
   | { type: 'incLast' }
+  | { type: 'decLast' }
   | { type: 'qtyInc' }
+  | { type: 'qtyDec' }
   | { type: 'qtyConfirm' }
   | { type: 'toSearch' }
   | { type: 'focusCash' }
   | { type: 'payCash' }
   | { type: 'payCard' }
-  | { type: 'refuse'; reason: 'split' };
+  | { type: 'refuse'; reason: 'split' | 'pendingSearch' | 'pendingQty' };
 
 const NONE: KeyAction = { type: 'none' };
 const SWALLOW: KeyAction = { type: 'swallow' };
 
+/**
+ * Shift+Enter = "the order is complete, go to payment". It only ever opens the payment step: on the payment step it
+ * does nothing, so a held or repeated Shift+Enter can never take a payment or create a sale.
+ */
 export function decideKey(k: KeyInfo, c: KeyContext): KeyAction {
+  if (k.composing) return NONE;
   const isEnter = k.key === 'Enter';
-  if (k.repeat && (isEnter || k.key === '+')) return SWALLOW;
+  const shiftEnter = isEnter && k.shift;
+  if (shiftEnter && c.step === 'pay') return SWALLOW;
+  if (k.repeat && (isEnter || k.key === '+' || k.key === '-')) return SWALLOW;
   // Enter right after a step change cannot open payment or pay. Confirming a quantity quickly is allowed:
   // it only adds the item the cashier just chose, which is the fast path.
   if (isEnter && c.step !== 'qty' && k.msSinceStepChange < ENTER_GUARD_MS) return SWALLOW;
 
   switch (c.step) {
     case 'search':
-      if (c.field !== 'search' || !c.searchEmpty || k.ctrl) return NONE;
+      if (c.field !== 'search' || k.ctrl) return NONE;
+      if (!c.searchEmpty) return shiftEnter ? { type: 'refuse', reason: 'pendingSearch' } : NONE;
       if (isEnter) return c.billHasItems && !c.busy ? { type: 'openPay' } : SWALLOW;
       if (k.key === '+') return c.billHasItems ? { type: 'incLast' } : SWALLOW;
+      if (k.key === '-') return c.billHasItems ? { type: 'decLast' } : SWALLOW;
       return NONE;
     case 'qty':
       if (c.field !== 'qty') return NONE;
+      if (shiftEnter) return { type: 'refuse', reason: 'pendingQty' };
       if (k.key === '+') return { type: 'qtyInc' };
+      if (k.key === '-') return { type: 'qtyDec' };
       if (isEnter && !k.ctrl) return { type: 'qtyConfirm' };
       if (k.key === 'Escape') return { type: 'toSearch' };
       return NONE;
@@ -91,6 +107,12 @@ export function parseStepQty(text: string, sellMode: 'unit' | 'weight'): { qty: 
   if (sellMode === 'unit' && qty % 1000 !== 0) return { error: 'This item is sold by whole units' };
   if (qty > 9_999_000) return { error: 'Quantity is too large' };
   return { qty };
+}
+
+/** "-" in the qty step: one whole unit fewer than what is typed, never below 1 (blank or invalid gives 1). */
+export function decrementQtyText(text: string): string {
+  const n = /^\s*\d{1,4}\s*$/.test(text) ? Number(text) : 1;
+  return String(Math.max(n - 1, 1));
 }
 
 /** "+" in the qty step: add one whole unit to what is typed (blank or invalid counts as 0). */
