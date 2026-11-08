@@ -52,7 +52,7 @@ describe('suppliers and customers', () => {
   it('validates Saudi VAT numbers and phones', () => {
     expect(code(() => createSupplier(ctx, u.admin, { name: 'X', vatNumber: '123' }))).toBe('VALIDATION');
     const id = createSupplier(ctx, u.admin, { name: 'Almarai', vatNumber: '300000000000003', phone: '050 123 4567', paymentTermsDays: 30 });
-    expect(listSuppliers(ctx)).toEqual([{ id, name: 'Almarai', phone: '0501234567', vatNumber: '300000000000003', paymentTermsDays: 30 }]);
+    expect(listSuppliers(ctx)).toEqual([{ id, name: 'Almarai', phone: '0501234567', vatNumber: '300000000000003', paymentTermsDays: 30, address: null, crNumber: null, ourCustomerNo: null, salesman: null }]);
     expect(code(() => createSupplier(ctx, u.cashier, { name: 'Y' }))).toBe('PERMISSION_DENIED');
   });
 
@@ -227,6 +227,9 @@ describe('CSV import', () => {
 /** Makes a fresh database look like one created by schema v1 (undoes migrations 2 and 3). */
 function rollBackToV1(db: ReturnType<typeof openDatabase>) {
   db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
+  // undo migration 11
+  db.exec(`DROP TABLE supplier_bill_lines; DROP TABLE supplier_bills; DROP TABLE supplier_items;
+    ALTER TABLE suppliers DROP COLUMN cr_number; ALTER TABLE suppliers DROP COLUMN our_customer_no; ALTER TABLE suppliers DROP COLUMN salesman;`);
   // undo migration 10
   db.exec(`DROP TABLE supplier_payment_allocations; DROP TABLE invoice_disputes; DROP TABLE refund_account_offsets; DROP TABLE customer_writeoffs;
     DROP TABLE receipt_allocations; DROP TABLE customer_receipts; DROP TABLE receivables;
