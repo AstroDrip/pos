@@ -138,7 +138,7 @@ export function canonicalize(k: KeyLike, b: Bindings, active: readonly ShortcutI
   for (const id of active) {
     if (combo === DEFAULT_COMBOS[id] && b.direct[id] !== DEFAULT_COMBOS[id]) return { ...k, key: 'Unidentified', code: '' };
   }
-  return k;
+  return k.alt ? { ...k, key: 'Unidentified', code: '' } : k; // the checkout rules have no Alt: Alt+Enter must not act as Enter
 }
 
 /** The changeable checkout functions that apply in each box. */
@@ -184,10 +184,11 @@ export function decideGlobal(k: KeyLike, e: GlobalEnv, b: Bindings = DEFAULT_BIN
 
 /** The palette letter for a key: the typed Latin letter, or the physical key on another layout such as Arabic. */
 export function commandLetter(k: KeyLike): string | null {
-  if (k.ctrl || k.meta || k.alt || k.key.length !== 1) return null;
+  if (k.ctrl || k.meta || k.alt) return null;
   if (/^[a-zA-Z]$/.test(k.key)) return k.key.toUpperCase();
+  if (!/[^ -~]/.test(k.key)) return null; // plain ASCII that is not a letter: digits, Enter, Tab…
   const m = /^Key([A-Z])$/.exec(k.code);
-  return m ? m[1]! : null;
+  return m ? m[1]! : null; // another layout: some Arabic keys type two characters
 }
 
 export interface ScreenState {

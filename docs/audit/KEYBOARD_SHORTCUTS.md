@@ -28,10 +28,19 @@ The central listener ignores the payment keys, so one key press cannot be handle
 | A scanned code that starts with a letter | A letter waits 40 ms; another key that soon means a scanner, and the command is dropped |
 | Item information for cashiers | Price and stock are shown with no extra permission, as requested. Cost is never sent |
 
+## Changing keys (Admin → Keyboard shortcuts)
+
+- Needs `settings.manage`. Audited as `settings.shortcuts`. Stored in `settings` under `keyboard_shortcuts`.
+- Rules are in `src/core/shortcuts.ts`. A function key, or Ctrl or Alt with a letter or digit. Not allowed: keys used for typing, editing, or closing or reloading the window; AltGr; two functions on one key.
+- A changed checkout key is translated by `canonicalize` into the key `decideKey` already knows, so every guard stays the same.
+- If Enter is moved away from cash, Enter still picks items and confirms quantities. Moved keys apply only in their own box.
+- Alt+Enter never counts as Enter.
+- Arrow keys, Tab and `/` inside Quick Actions, and Enter for picking items, are fixed.
+
 ## Checks
 
 - `npm test`, `typecheck`, `lint`, `build`: see the commit message.
-- `npm run ui-audit`: 46 screens, 0 findings, 49/49 real key flows.
+- `npm run ui-audit`: see the final run in the commit message.
 - Each review finding had a real-app flow that failed before the fix and passes after it.
 
 ## Not checked in the real app

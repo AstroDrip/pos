@@ -328,6 +328,23 @@ describe('changed keys', () => {
     expect(c(k('Enter'), checkoutActive('search')).key).toBe('Enter'); // and still picks a suggestion
   });
 
+  it('Alt+Enter never counts as Enter', () => {
+    for (const bindings of [resolveBindings({}), b]) {
+      expect(canonicalize(k('Enter', { alt: true }), bindings, pay).key).toBe('Unidentified');
+      expect(canonicalize(k('Enter', { alt: true, ctrl: true }), bindings, pay).key).toBe('Unidentified');
+    }
+  });
+
+  it('Alt+Enter chosen for going to payment does not pay in the cash box', () => {
+    const moved = resolveBindings({ 'checkout.open': 'Alt+Enter' });
+    expect(canonicalize(k('Enter', { alt: true }), moved, checkoutActive('search'))).toMatchObject({ key: 'Enter', shift: true, alt: false });
+    expect(canonicalize(k('Enter', { alt: true }), moved, checkoutActive('cash')).key).toBe('Unidentified');
+  });
+
+  it('the Arabic key that types two characters still works as its letter', () => {
+    expect(commandLetter(k('لا', { code: 'KeyB' }))).toBe('B');
+  });
+
   it('nothing changed: keys pass straight through', () => {
     const d = resolveBindings({});
     expect(canonicalize(k('Enter'), d, pay)).toEqual(k('Enter'));

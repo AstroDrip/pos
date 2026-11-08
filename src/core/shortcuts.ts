@@ -42,7 +42,7 @@ export function comboOf(k: ComboKey): string | null {
   const physical = /^Key([A-Z])$/.exec(k.code)?.[1] ?? /^Digit(\d)$/.exec(k.code)?.[1];
   let name: string;
   if (/^[a-zA-Z0-9]$/.test(k.key)) name = k.key.toUpperCase();
-  else if (k.key.length === 1 && physical) name = physical; // another layout, e.g. Arabic: use the physical key
+  else if (/[^ -~]/.test(k.key) && physical) name = physical; // another layout, e.g. Arabic: use the physical key
   else if (k.key === 'Escape') name = 'Esc';
   else if (k.key === ' ') name = 'Space';
   else name = k.key;
@@ -61,7 +61,7 @@ export const DEFAULT_BINDINGS: Bindings = resolveBindings({});
 
 // Normal editing, closing or reloading the window.
 const RESERVED = new Set([
-  'Ctrl+A', 'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+Z', 'Ctrl+Y', 'Ctrl+Shift+Z', 'Alt+F4', 'Ctrl+R', 'Ctrl+Shift+R', 'Ctrl+W', 'Ctrl+Q', 'Ctrl+M',
+  'Ctrl+A', 'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+Z', 'Ctrl+Y', 'Ctrl+Shift+Z', 'Ctrl+Shift+V', 'Alt+F4', 'Ctrl+R', 'Ctrl+Shift+R', 'Ctrl+W', 'Ctrl+Q', 'Ctrl+M',
   'Ctrl+Shift+I', 'Ctrl+0', 'Ctrl++', 'Ctrl+-', 'Ctrl+=', 'F11', 'F12',
 ]);
 
@@ -70,15 +70,15 @@ const BAD_KEY = 'That key is needed for typing or the window. Choose a function 
 function comboProblem(id: ShortcutId, combo: string): string | null {
   if (combo === DEFAULT_COMBOS[id]) return null;
   if (RESERVED.has(combo)) return BAD_KEY;
-  const parts = combo.split('+');
-  const key = combo.endsWith('+') ? '+' : parts[parts.length - 1]!;
-  const mods = new Set(combo.endsWith('+') ? parts.slice(0, -2) : parts.slice(0, -1));
-  const known = [...mods].every((m) => m === 'Ctrl' || m === 'Alt' || m === 'Shift');
-  if (!known) return BAD_KEY;
-  if (mods.has('Ctrl') && mods.has('Alt')) return BAD_KEY; // AltGr on Windows types characters
-  if (/^F([1-9]|1[0-2])$/.test(key)) return null;
-  const typing = /^[A-Z0-9]$/.test(key) || key === 'Enter' || key === 'Esc' || key === '+' || key === '-';
-  return typing && (mods.has('Ctrl') || mods.has('Alt')) ? null : BAD_KEY;
+  // The same order comboOf writes, so a stored value can always be pressed.
+  const m = /^(Ctrl\+)?(Alt\+)?(Shift\+)?(.+)$/.exec(combo);
+  if (!m) return BAD_KEY;
+  const [, ctrl, alt, shift, key] = m;
+  if (ctrl && alt) return BAD_KEY; // AltGr on Windows types characters
+  if (/^F([1-9]|1[0-2])$/.test(key!)) return null;
+  if ((key === '+' || key === '-') && shift) return BAD_KEY; // comboOf never adds Shift to a symbol
+  const typing = /^[A-Z0-9]$/.test(key!) || key === 'Enter' || key === 'Esc' || key === '+' || key === '-';
+  return typing && (ctrl || alt) ? null : BAD_KEY;
 }
 
 /** Returns what is wrong with a set of changes, or null if it can be saved. */

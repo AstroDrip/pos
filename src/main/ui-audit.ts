@@ -201,6 +201,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     // Refused keys
     await press('palette.open', 'c', ['control']);
     flow('reserved-key-refused', (await shownKey('palette.open')) === 'Ctrl+K' && (await note()) !== '', `key ${await shownKey('palette.open')}, "${await note()}"`);
+    await js(`document.querySelector('[aria-label="keyboard shortcuts"]').scrollIntoView()`);
     await capture('62-keyboard-settings__light-en-1366x768');
     await press('palette.open', 'F6');
     await press('pay.cash', 'F9');

@@ -79,7 +79,7 @@ export function Help({ initial }: { initial?: string }) {
           {article.keys && (
             <p className="help-keys"><strong>Keys.</strong> {article.keys.map((k) => <kbd key={k}>{k}</kbd>)}</p>
           )}
-          {(article.id === 'start-keys' || article.id === 'start-quick-actions') && <LiveKeys />}
+          {article.keys && <LiveKeys />}
           <h4>Steps</h4>
           <ol className="help-steps">
             {article.steps.map((s, i) => <li key={i}>{s}</li>)}

@@ -21,6 +21,9 @@ describe('comboOf', () => {
     expect(comboOf(k('ن', { ctrl: true, code: 'KeyK' }))).toBe('Ctrl+K');
     expect(comboOf(k('١', { alt: true, code: 'Digit1' }))).toBe('Alt+1');
   });
+  it('an Arabic key that types two characters uses its physical key', () => {
+    expect(comboOf(k('لا', { ctrl: true, code: 'KeyB' }))).toBe('Ctrl+B');
+  });
   it('a modifier alone is not a shortcut', () => {
     for (const m of ['Control', 'Shift', 'Alt', 'Meta']) expect(comboOf(k(m))).toBeNull();
   });
@@ -53,6 +56,12 @@ describe('validateOverrides', () => {
   });
   it('refuses normal editing and window keys', () => {
     for (const c of ['Ctrl+A', 'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+Z', 'Ctrl+Y', 'Alt+F4', 'Ctrl+R', 'Ctrl+W', 'Ctrl+Q', 'Ctrl+M', 'Ctrl+Shift+I', 'F11', 'F12', 'Ctrl+0']) expect(bad({ 'help.open': c }), c).not.toBeNull();
+  });
+  it('refuses text the keyboard could never produce', () => {
+    for (const c of ['Alt+Ctrl+', 'Shift+Alt+K', 'Alt+Ctrl+K', 'Ctrl+Shift++']) expect(bad({ 'help.open': c }), c).not.toBeNull();
+  });
+  it('keeps paste as plain text', () => {
+    expect(bad({ 'help.open': 'Ctrl+Shift+V' })).not.toBeNull();
   });
   it('refuses AltGr (Ctrl+Alt), which types characters', () => {
     expect(bad({ 'help.open': 'Ctrl+Alt+Q' })).not.toBeNull();

@@ -512,7 +512,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
           text:
             a.reason === 'pendingSearch' ? t('Pick the product (↑↓ Enter) or clear the search first.')
             : a.reason === 'pendingQty' ? t('Press Enter to add the item, or {0} to cancel.', keys.escape)
-            : t('A split payment is in progress: press Enter in Cash received to finish it.'),
+            : t('A split payment is in progress: press {0} in Cash received to finish it.', keys['pay.cash']),
         });
         break;
     }

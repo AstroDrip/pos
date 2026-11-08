@@ -64,5 +64,5 @@ describe('computeInvoice', () => {
       }
       for (const r of t.byRate) expect(r.vat).toBe(vatFromInclusive(r.incl, r.vatRate));
     }
-  });
+  }, 30_000); // 5,000 invoices: timed out at 5 s when the PC was busy; the seed is fixed
 });

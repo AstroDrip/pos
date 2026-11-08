@@ -316,7 +316,7 @@ const AR: Record<string, string> = {
   'Enter = add · {0} = one more · {1} = cancel': 'Enter = إضافة · {0} = واحد آخر · {1} = إلغاء',
   'Card: record only after the bank terminal shows APPROVED.': 'البطاقة: سجّل فقط بعد أن يظهر جهاز البنك "مقبولة".',
   '{0} = back to the bill': '{0} = العودة للفاتورة',
-  'A split payment is in progress: press Enter in Cash received to finish it.': 'يوجد دفع مقسّم: اضغط Enter في خانة النقد المستلم لإكماله.',
+  'A split payment is in progress: press {0} in Cash received to finish it.': 'يوجد دفع مقسّم: اضغط {0} في خانة النقد المستلم لإكماله.',
   'Quantity must be a number': 'الكمية يجب أن تكون رقماً',
   'Quantity must be more than zero': 'الكمية يجب أن تكون أكبر من صفر',
   'This item is sold by whole units': 'هذا الصنف يباع بالحبة',
