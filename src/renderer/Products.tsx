@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatSar, parseSar } from '../core/money';
 import type { Product } from '../services/catalog';
 import { call } from './api';
 import { PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { ProductName, useI18n } from './i18n';
+
+const PAGE = 100;
+type Status = 'active' | 'inactive' | 'all';
 
 const empty = { sku: '', nameAr: '', nameEn: '', sellMode: 'unit' as 'unit' | 'weight', vat: '15', price: '', barcode: '', plu: '' };
 
@@ -15,7 +18,28 @@ export function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  const { items: list, refresh } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
+  const [status, setStatus] = useState<Status>('active');
+  const [browse, setBrowse] = useState<{ items: Product[]; total: number }>({ items: [], total: 0 });
+  const seq = useRef(0);
+  const { items: found, refresh } = useSuggest<Product>(status === 'active' ? search : '', (q) => call<Product[]>('catalog.search', { text: q }));
+  // With nothing typed, or when looking at turned-off items, the list comes page by page. Typing still uses the normal search.
+  const browsing = status !== 'active' || !search.trim();
+  const load = async (offset: number) => {
+    const mine = ++seq.current;
+    const r = await call<{ items: Product[]; total: number }>('catalog.list', { status, text: search.trim() || undefined, offset, limit: PAGE });
+    if (mine === seq.current) setBrowse((b) => ({ items: offset === 0 ? r.items : [...b.items, ...r.items], total: r.total }));
+  };
+  const loadFailed = (e: Error) => setMsg({ kind: 'error', text: t(e.message) });
+  useEffect(() => {
+    if (!browsing) return;
+    const h = setTimeout(() => void load(0).catch(loadFailed), search.trim() ? 150 : 0);
+    return () => clearTimeout(h);
+  }, [status, search, browsing]);
+  const list = browsing ? browse.items : found;
+  const reload = () => {
+    refresh();
+    if (browsing) void load(0).catch(loadFailed);
+  };
 
   const set = (k: keyof typeof empty) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
@@ -65,21 +89,30 @@ export function Products() {
         <p><button className="primary">{t('Save product')}</button></p>
       </form>
       <div>
-        <input data-kb-search="product" data-kb-suggest placeholder={t('Search products')} value={search} onChange={(e) => setSearch(e.target.value)} />
-        <table className="list">
+        <div className="row">
+          <input data-kb-search="product" data-kb-suggest placeholder={t('Search products')} value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select aria-label="product status" style={{ flex: '0 0 150px' }} value={status} onChange={(e) => { setEditing(null); setStatus(e.target.value as Status); }}>
+            <option value="active">{t('Active')}</option>
+            <option value="inactive">{t('Turned off')}</option>
+            <option value="all">{t('All')}</option>
+          </select>
+        </div>
+        {browsing && <p className="hint">{t('Showing {0} of {1}', browse.items.length, browse.total)}</p>}
+        <table className="list" aria-label="products list">
           <thead><tr><th>SKU</th><th>{t('Name')}</th><th>{t('Sold by')}</th><th className="num">{t('Price')}</th></tr></thead>
           <tbody>
             {list.map((p) => (
               <tr key={p.id} onClick={() => setEditing(p)} style={{ cursor: 'pointer' }}>
                 <td>{p.sku}</td>
-                <td><ProductName en={p.nameEn} ar={p.nameAr} /></td>
+                <td><ProductName en={p.nameEn} ar={p.nameAr} />{!p.active && <small> · {t('Turned off')}</small>}</td>
                 <td>{p.sellMode === 'weight' ? t('kg') : t('piece')}</td>
                 <td className="num">{formatSar(p.priceIncl)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {editing && <EditProduct key={editing.id} product={editing} onDone={() => { setEditing(null); refresh(); }} />}
+        {browsing && browse.items.length < browse.total && <p><button type="button" aria-label="show more products" onClick={() => void load(browse.items.length).catch(loadFailed)}>{t('Show more')}</button></p>}
+        {editing && <EditProduct key={editing.id} product={editing} onDone={() => { setEditing(null); reload(); }} />}
       </div>
       </div>
     </div>
@@ -117,8 +150,10 @@ function EditProduct({ product, onDone }: { product: Product; onDone: () => void
       </div>
       <label>{t('Reason')}</label>
       <div className="row">
-        <input value={reason} onChange={(e) => setReason(e.target.value)} />
-        <button className="danger" onClick={() => run(() => call('catalog.setActive', { productId: product.id, active: false, reason }))}>{t('Deactivate product')}</button>
+        <input aria-label="status reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+        {product.active
+          ? <button className="danger" onClick={() => run(() => call('catalog.setActive', { productId: product.id, active: false, reason }))}>{t('Deactivate product')}</button>
+          : <button onClick={() => run(() => call('catalog.setActive', { productId: product.id, active: true, reason }))}>{t('Turn product back on')}</button>}
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       <p><button onClick={onDone}>{t('Close')}</button></p>

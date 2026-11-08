@@ -180,6 +180,26 @@ export function itemInfo(ctx: Ctx, productId: number): ItemInfo {
   return r;
 }
 
+export type ProductStatus = 'active' | 'inactive' | 'all';
+
+/** Every product, A to Z, one page at a time, for the Products screen. Includes turned-off products when asked. */
+export function listProducts(ctx: Ctx, userId: number, q: { status: ProductStatus; text?: string; offset: number; limit: number }): { items: Product[]; total: number } {
+  requirePermission(ctx, userId, 'product.manage');
+  const where: string[] = [];
+  const args: (string | number)[] = [];
+  if (q.status !== 'all') where.push(`p.active = ${q.status === 'active' ? 1 : 0}`);
+  const text = q.text?.trim();
+  if (text) {
+    const like = `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    where.push("(p.name_en LIKE ? ESCAPE '\\' OR p.name_ar LIKE ? ESCAPE '\\' OR p.sku LIKE ? ESCAPE '\\')");
+    args.push(like, like, like);
+  }
+  const filter = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const total = (ctx.db.prepare(`SELECT count(*) AS n FROM products p ${filter}`).get(...args) as { n: number }).n;
+  const rows = ctx.db.prepare(`${SELECT_PRODUCT} ${filter} ORDER BY p.name_en COLLATE NOCASE, p.id LIMIT ? OFFSET ?`).all(...args, q.limit, q.offset) as never[];
+  return { items: rows.map((r) => toProduct(r)!), total };
+}
+
 export interface LookupResult {
   product: Product;
   qty: number; // milli-units to add

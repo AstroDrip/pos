@@ -110,6 +110,11 @@ const AR: Record<string, string> = {
   "Clear this bill and start over?": "مسح هذه الفاتورة والبدء من جديد؟",
   "I checked: these are different goods": "راجعت: هذه بضاعة مختلفة",
   "Start over": "البدء من جديد",
+  // supplier bills and store details
+  "Turned off": "موقوف",
+  "Showing {0} of {1}": "عرض {0} من {1}",
+  "Show more": "عرض المزيد",
+  "Turn product back on": "إعادة تفعيل الصنف",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

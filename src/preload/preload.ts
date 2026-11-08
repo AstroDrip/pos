@@ -26,6 +26,7 @@ const PRELOAD_CHANNELS = [
   'store.save',
   'shortcuts.get',
   'shortcuts.save',
+  'catalog.list',
   'catalog.itemInfo',
   'catalog.suggest',
   'catalog.setPrice',

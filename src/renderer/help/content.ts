@@ -468,6 +468,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
     problems: [NO_TAB],
   },
   {
+    id: 'stock-find-products',
+    section: 'stock',
+    title: 'See all products',
+    keywords: ['all products', 'list', 'browse', 'turned off', 'inactive', 'deactivated', 'turn back on', 'show more'],
+    what: 'See every product without searching, and bring back a product that was turned off.',
+    where: 'Products tab.',
+    steps: [
+      'Open the Products tab. With the search box empty, the list shows your products from A to Z.',
+      'If there are many, press Show more at the bottom.',
+      'To narrow the list, type in the search box.',
+      'To see products that were turned off, choose Turned off in the box beside the search.',
+      'Click a product to change it. To bring one back, type a Reason and press Turn product back on.',
+    ],
+    expect: 'The line above the list says how many products are shown. A product turned back on can be scanned and sold again.',
+    problems: [NO_TAB],
+  },
+  {
     id: 'suppliers-edit',
     section: 'suppliers',
     title: 'Change a supplier',

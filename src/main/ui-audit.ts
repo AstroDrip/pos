@@ -137,6 +137,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
             await shortcutFlows();
             await rebindFlows();
             await billFlows();
+            await productListFlows();
           }
           await clearBill();
           for (const code of ['6281000000000', '6281000000077', '6281000000033']) await scan(code); // fake seed barcodes
@@ -171,6 +172,37 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   } finally {
     writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 1));
     app.quit();
+  }
+
+  /** Products lists everything with no search, and a turned-off item can be found and turned back on. */
+  async function productListFlows() {
+    const setVal = (sel: string, v: string) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) throw new Error('missing ' + ${JSON.stringify(sel)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, ${JSON.stringify(v)}); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    const rows = () => js<number>(`document.querySelectorAll('table[aria-label="products list"] tbody tr').length`);
+    await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith('Products'))?.click()`);
+    await sleep(600);
+    const all = await rows();
+    flow('products-listed-without-search', all > 0, `rows ${all}`);
+    await js(`document.querySelector('table[aria-label="products list"] tbody tr')?.click()`);
+    await sleep(300);
+    await setVal('input[aria-label="status reason"]', 'Audit test');
+    await click('button', 'Deactivate product');
+    await sleep(500);
+    const fewer = await rows();
+    await setSelect('select[aria-label="product status"]', 'inactive');
+    await sleep(500);
+    const off = await rows();
+    await js(`document.querySelector('table[aria-label="products list"] tbody tr')?.click()`);
+    await sleep(300);
+    await setVal('input[aria-label="status reason"]', 'Audit test');
+    await click('button', 'Turn product back on');
+    await sleep(500);
+    const offAfter = await rows();
+    await setSelect('select[aria-label="product status"]', 'active');
+    await sleep(500);
+    const back = await rows();
+    flow('product-off-found-and-back-on', fewer === all - 1 && off === 1 && offAfter === 0 && back === all, `all ${all}, after off ${fewer}, inactive ${off}, inactive after on ${offAfter}, active ${back}`);
+    await js(`document.querySelectorAll('.top nav button')[0].click()`);
+    await sleep(400);
   }
 
   /** The real bill screen and a real printed receipt, with made-up details. */

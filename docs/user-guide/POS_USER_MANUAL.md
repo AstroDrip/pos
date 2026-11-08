@@ -43,6 +43,7 @@ Names and numbers in the examples are made up.
   - [See what the store owes suppliers](#suppliers-balances)
   - [Return goods to a supplier](#suppliers-return)
 - **Stock and products**
+  - [See all products](#stock-find-products)
   - [View stock on hand](#stock-overview)
   - [Record damaged or expired goods (wastage)](#stock-wastage)
   - [Count the shelves (stock count)](#stock-count)
@@ -797,6 +798,28 @@ Names and numbers in the examples are made up.
 **What you should see:** "Return saved as …" and stock is taken out at cost.
 
 ## Stock and products
+
+<a id="stock-find-products"></a>
+
+### See all products
+
+**What this does:** See every product without searching, and bring back a product that was turned off.
+
+**Where:** Products tab.
+
+**Steps**
+
+1. Open the Products tab. With the search box empty, the list shows your products from A to Z.
+2. If there are many, press Show more at the bottom.
+3. To narrow the list, type in the search box.
+4. To see products that were turned off, choose Turned off in the box beside the search.
+5. Click a product to change it. To bring one back, type a Reason and press Turn product back on.
+
+**What you should see:** The line above the list says how many products are shown. A product turned back on can be scanned and sold again.
+
+**If something goes wrong**
+
+- *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
 
 <a id="stock-overview"></a>
 

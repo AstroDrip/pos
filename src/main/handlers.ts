@@ -5,7 +5,7 @@ import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto'
 import { getShortcuts, saveShortcuts } from '../services/shortcuts';
 import { billProductCost, createSupplierBill, findSupplierItem, getBill, listBills, priceHistory, purchasesBySupplier, supplierItemsFor } from '../services/supplier-bills';
 import { getStoreDetails, saveStoreDetails } from '../services/store-details';
-import { createProduct, getAliases, getProduct, itemInfo, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
+import { createProduct, getAliases, getProduct, itemInfo, listProducts, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit, verifyAuditChain } from '../services/audit';
@@ -137,6 +137,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'store.save': (p, s) => saveStoreDetails(ctx, userId(s), p),
     'shortcuts.get': () => getShortcuts(ctx),
     'shortcuts.save': (p, s) => saveShortcuts(ctx, userId(s), p.overrides),
+    'catalog.list': (p, s) => listProducts(ctx, userId(s), p),
     'catalog.itemInfo': (p) => itemInfo(ctx, p.productId),
     'catalog.setPrice': (p, s) => setPrice(ctx, userId(s), p.productId, p.priceIncl),
     'catalog.setActive': (p, s) => setProductActive(ctx, userId(s), p.productId, p.active, p.reason),
