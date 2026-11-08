@@ -46,7 +46,7 @@ export const schemas = {
     salesAgent: z.string().max(80).optional(), payType: z.enum(['paid', 'credit']), payMethod: z.enum(['till', 'bank']).optional(), paidNow: money.optional(), dueDate: z.iso.date().optional(), noDueDate: z.boolean().optional(),
     claimVat: z.boolean().optional(), pages: int.min(1).max(99), billDiscount: money, billCharge: money,
     paper: z.object({ gross: money.optional(), discount: money.optional(), net: money.positive(), vat: money, total: money.positive() }),
-    differenceReason: z.string().max(200).optional(), supplierVatNo: z.string().max(15).optional(), notes: z.string().max(500).optional(),
+    differenceReason: z.string().max(200).optional(), supplierVatNo: z.string().max(15).optional(), notes: z.string().max(500).optional(), notSameGoods: z.boolean().optional(),
     lines: z.array(z.object({
       productId: int.positive(), supplierCode: z.string().max(40).optional(), billText: z.string().max(200).optional(), tariffCode: z.string().max(20).optional(), packName: z.string().min(1).max(20), pageNo: int.min(1).max(99),
       unitsPerPack: int.positive(), packs: money, looseQty: money, freeQty: money, receivedQty: money.optional(), priceBasis: z.enum(['pack', 'unit']), price: money, discountAmount: money.optional(), discountBp: int.min(0).max(10_000).optional(),

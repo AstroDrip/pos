@@ -78,6 +78,13 @@ describe('customer receipt', () => {
     expect(h).toContain('CREDIT NOTE');
   });
 
+  it('a refund against a credit sale shows what came off the account and what was paid in cash', () => {
+    const h = html({ kind: 'refund', originalInvoiceNo: 'INV-1', reason: 'Test', totalIncl: 1350, payments: [{ tender: 'account', amount: 600 }, { tender: 'cash', amount: 750 }] });
+    expect(h).toContain('6.00');
+    expect(h).toContain('7.50');
+    expect(h).not.toMatch(/Paid back in cash[^<]*<\/td><td class="r">13\.50/);
+  });
+
   it('a payment receipt uses the same header', () => {
     const h = html({ kind: 'payment', allocations: [] });
     expect(h).toContain('Test District - Test Street');

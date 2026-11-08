@@ -7,7 +7,8 @@ import { vatFromInclusive } from '../core/vat';
 import type { LookupResult, Product } from '../services/catalog';
 import type { Supplier } from '../services/parties';
 import type { DocType, SupplierItem } from '../services/supplier-bills';
-import { call } from './api';
+import { singleMatch } from '../core/suggest-keys';
+import { call, type ApiError } from './api';
 import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
 import { useSuggest } from './useSuggest';
@@ -41,7 +42,7 @@ interface Row {
 
 const blankHead = () => ({
   supplierId: 0, docType: 'tax_invoice' as DocType, docNo: '', docDate: today(), deliveryDate: today(), salesAgent: '', payType: '' as '' | 'paid' | 'credit', payMethod: 'till' as 'till' | 'bank',
-  paidNow: '', dueDate: '', noDue: false, claim: null as boolean | null, vatNo: '', pages: '1', billDiscount: '', billCharge: '', reason: '', notes: '',
+  paidNow: '', dueDate: '', noDue: false, claim: null as boolean | null, vatNo: '', pages: '1', billDiscount: '', billCharge: '', reason: '', notes: '', notSame: false,
 });
 const blankPaper = () => ({ gross: '', discount: '', net: '', vat: '', total: '' });
 type Head = ReturnType<typeof blankHead>;
@@ -102,7 +103,8 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
   const [busy, setBusy] = useState(false);
   const [checked, setChecked] = useState(false);
   const [creating, setCreating] = useState<{ nameAr: string; nameEn: string; sku: string; barcode: string; unit: 'PCS' | 'KG'; price: string } | null>(null);
-  const { items: found } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
+  const [needConfirm, setNeedConfirm] = useState(false);
+  const { items: found, itemsFor } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
   const set = (patch: Partial<Head>) => setHead((h) => ({ ...h, ...patch }));
   const delivery = head.docType === 'delivery_note';
   const supplier = suppliers.find((s) => s.id === head.supplierId);
@@ -115,6 +117,7 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
   useEffect(() => {
     try {
       if (head.docNo || rows.length) localStorage.setItem(DRAFT, JSON.stringify({ key: requestKey.current, head, paper, rows }));
+      else localStorage.removeItem(DRAFT);
     } catch {
       // the draft is only a convenience
     }
@@ -143,8 +146,9 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
       }
       const r = await call<LookupResult | null>('catalog.lookup', { code: text });
       if (r) return void addRow(r.product, undefined, /^\d+$/.test(text) ? '' : text);
-      if (found[0]) return void addRow(found[0], undefined, '');
-      setMsg({ kind: 'warn', text: t('Not found: {0}', text) });
+      const only = singleMatch(found, itemsFor, text);
+      if (only) return void addRow(only, undefined, '');
+      setMsg({ kind: 'warn', text: found.length ? t('Choose the item from the list.') : t('Not found: {0}', text) });
     } catch (e) {
       setMsg({ kind: 'error', text: t((e as Error).message) });
     }
@@ -201,6 +205,22 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
   const claim = head.claim ?? claimDefault;
   const ready = !!head.supplierId && !!head.docNo.trim() && !!totals && allMatch && (delivery || !!head.payType) && (!anyWarning || checked) && (!short || !!head.reason.trim()) && !Number.isNaN(sarOf(head.paidNow));
 
+  const startOver = () => {
+    if (!window.confirm(t('Clear this bill and start over?'))) return;
+    try {
+      localStorage.removeItem(DRAFT);
+    } catch {
+      // nothing to clear
+    }
+    requestKey.current = crypto.randomUUID();
+    setHead(blankHead());
+    setPaper(blankPaper());
+    setRows([]);
+    setChecked(false);
+    setNeedConfirm(false);
+    setMsg(null);
+  };
+
   const save = async () => {
     if (busy || !totals) return;
     setBusy(true);
@@ -211,7 +231,7 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
         payType: head.payType || 'credit', payMethod: head.payMethod, paidNow: head.payType === 'credit' && sarOf(head.paidNow) > 0 ? sarOf(head.paidNow) : undefined, dueDate: head.dueDate || undefined, noDueDate: head.noDue || undefined,
         claimVat: claim, pages: Math.max(1, Number(head.pages) || 1), billDiscount: sarOf(head.billDiscount), billCharge: sarOf(head.billCharge),
         paper: { gross: paper.gross.trim() ? sarOf(paper.gross) : undefined, discount: paper.discount.trim() ? sarOf(paper.discount) : undefined, net: sarOf(paper.net), vat: sarOf(paper.vat), total: sarOf(paper.total) },
-        differenceReason: head.reason || undefined, supplierVatNo: head.vatNo || undefined, notes: head.notes || undefined,
+        differenceReason: head.reason || undefined, supplierVatNo: head.vatNo || undefined, notes: head.notes || undefined, notSameGoods: head.notSame || undefined,
         lines: rows.map((row) => ({ ...(toLine(row) as BillLineInput), productId: row.product.id, supplierCode: row.code || undefined, billText: row.billText || undefined, tariffCode: row.tariff || undefined, packName: row.packName, pageNo: Math.max(1, Number(row.page) || 1) })),
       });
       setMsg({ kind: 'ok', text: r.pinvNo ? t('Saved. Goods receipt {0}, invoice {1}.', r.grnNo, r.pinvNo) : t('Saved. Goods receipt {0}. Nothing is owed until the invoice comes.', r.grnNo) });
@@ -225,7 +245,9 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
       setPaper(blankPaper());
       setRows([]);
       setChecked(false);
+      setNeedConfirm(false);
     } catch (e) {
+      if ((e as ApiError).code === 'POSSIBLE_DUPLICATE') setNeedConfirm(true);
       setMsg({ kind: 'error', text: t((e as Error).message) }); // the same key is kept, so saving again is safe
     } finally {
       setBusy(false);
@@ -383,7 +405,11 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
         <label>{t('Notes')}</label><input value={head.notes} onChange={(e) => set({ notes: e.target.value })} />
         {anyWarning && <label className="bill-check"><input type="checkbox" aria-label="costs checked" checked={checked} onChange={(e) => setChecked(e.target.checked)} /> {t('I checked the costs marked above')}</label>}
         {msg && <p className={`msg ${msg.kind}`} role="status">{msg.text}</p>}
-        <p><button className="primary" aria-label="save bill" disabled={busy || !ready} onClick={() => void save()}>{t('Save bill')}</button></p>
+        {needConfirm && <label className="bill-check"><input type="checkbox" aria-label="different goods" checked={head.notSame} onChange={(e) => set({ notSame: e.target.checked })} /> {t('I checked: these are different goods')}</label>}
+        <p className="row">
+          <button className="primary" aria-label="save bill" disabled={busy || !ready || (needConfirm && !head.notSame)} onClick={() => void save()}>{t('Save bill')}</button>
+          <button type="button" aria-label="start over" disabled={busy} onClick={startOver}>{t('Start over')}</button>
+        </p>
       </div>
     </div>
   );

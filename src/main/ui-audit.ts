@@ -227,6 +227,14 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await click('button[aria-label="save bill"]');
     await sleep(700);
     const saved = await js<string>(`document.querySelector('.bill .msg.ok')?.textContent ?? ''`);
+    await section('Enter supplier bill');
+    await setVal('input[aria-label="paper number"]', 'ABANDONED-1');
+    await sleep(200);
+    await js('window.confirm = () => true; 0');
+    await click('button[aria-label="start over"]');
+    await sleep(200);
+    const cleared = await js<boolean>(`localStorage.getItem('pos.billDraft') === null && document.querySelector('input[aria-label="paper number"]').value === ''`);
+    flow('bill-start-over-clears-draft', cleared, `cleared ${cleared}`);
     await section('Saved bills');
     await sleep(400);
     const row = await js<string>(`[...document.querySelectorAll('table[aria-label="saved bills"] tr')].find((r) => r.textContent.includes('AUDIT-JUICE-1'))?.textContent ?? ''`);

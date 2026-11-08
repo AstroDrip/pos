@@ -49,6 +49,8 @@ export interface SupplierBillInput {
   differenceReason?: string;
   supplierVatNo?: string;
   notes?: string;
+  /** The user checked that an open delivery note or matching proforma is for different goods. */
+  notSameGoods?: boolean;
   lines: SupplierBillLine[];
 }
 
@@ -105,6 +107,22 @@ function remember(ctx: Ctx, supplierId: number, l: SupplierBillLine) {
     .run(supplierId, l.productId, code, packName, l.unitsPerPack, packPrice, ctx.now());
 }
 
+/** The same goods entered twice would double the stock, so an earlier paper that may cover them must be confirmed. */
+function warnSameGoods(ctx: Ctx, sup: { id: number; name: string }, total: number) {
+  const open = ctx.db.prepare("SELECT doc_no FROM supplier_bills WHERE supplier_id = ? AND doc_type = 'delivery_note' AND grn_id NOT IN (SELECT grn_id FROM purchase_invoice_grns) ORDER BY id LIMIT 1").get(sup.id) as { doc_no: string } | undefined;
+  if (open) throw new DomainError('POSSIBLE_DUPLICATE', `Delivery note ${open.doc_no} from ${sup.name} has no invoice yet. If this paper is for the same goods, enter it under Supplier invoices instead.`);
+  const proforma = ctx.db.prepare("SELECT doc_no FROM supplier_bills WHERE supplier_id = ? AND doc_type = 'proforma' AND paper_total = ? ORDER BY id DESC LIMIT 1").get(sup.id, total) as { doc_no: string } | undefined;
+  if (proforma) throw new DomainError('POSSIBLE_DUPLICATE', `Proforma ${proforma.doc_no} from ${sup.name} has the same total, and its goods are already in stock.`);
+}
+
+function checkWholePieces(ctx: Ctx, input: SupplierBillInput, totals: BillTotals) {
+  input.lines.forEach((l, i) => {
+    const p = getProduct(ctx, l.productId);
+    const r = totals.lines[i]!;
+    if (p?.sellMode === 'unit' && [r.billedQty, l.freeQty, r.stockQty].some((q) => q % MILLI_PER_UNIT !== 0)) throw new DomainError('VALIDATION', `${p.nameEn} is sold by whole pieces`);
+  });
+}
+
 export function createSupplierBill(ctx: Ctx, userId: number, input: SupplierBillInput): { billId: number; grnNo: string; pinvNo: string | null; replayed: boolean } {
   const delivery = input.docType === 'delivery_note';
   requirePermission(ctx, userId, 'stock.receive');
@@ -131,8 +149,10 @@ export function createSupplierBill(ctx: Ctx, userId: number, input: SupplierBill
     const dup = ctx.db.prepare('SELECT id FROM supplier_bills WHERE supplier_id = ? AND doc_type = ? AND doc_no = ?').get(sup.id, input.docType, docNo);
     if (dup) throw new DomainError('CONFLICT', `Paper ${docNo} from ${sup.name} is already entered`);
 
+    if (!delivery && !input.notSameGoods) warnSameGoods(ctx, sup, input.paper.total);
     const totals = compute(input);
     checkPaper(input, totals);
+    checkWholePieces(ctx, input, totals);
     for (const l of input.lines) {
       if (!getProduct(ctx, l.productId)) throw new DomainError('NOT_FOUND', 'Product not found');
       remember(ctx, sup.id, l);
@@ -162,7 +182,7 @@ export function createSupplierBill(ctx: Ctx, userId: number, input: SupplierBill
         requestKey: input.requestKey, supplierId: sup.id, supplierInvoiceNo: docNo, supplierVatNo: input.supplierVatNo?.trim() || sup.vat_number || undefined, invoiceDate: input.docDate,
         dueDate: input.dueDate, grnIds: [], newLines: grnLines, invoiceNet: input.paper.net, vatAmount: input.paper.vat, vatRecoverable: claim, differenceReason: reason, notes: input.notes,
         noDueDate: input.noDueDate,
-        payNow: amount > 0 ? { requestKey: `${input.requestKey.slice(0, 50)}-pay`, amount, method: input.payMethod ?? 'till', reference: docNo } : undefined,
+        payNow: amount > 0 ? { requestKey: `${input.requestKey.slice(0, 50)}-pay`, amount, method: input.payMethod ?? 'till', reference: docNo, paidOn: (input.payMethod ?? 'till') === 'till' ? storeDay(ctx.now()) : undefined } : undefined,
       });
       pinvNo = inv.pinvNo;
       grnId = (ctx.db.prepare('SELECT grn_id FROM purchase_invoice_grns WHERE invoice_id = ?').get(inv.invoiceId) as { grn_id: number }).grn_id;

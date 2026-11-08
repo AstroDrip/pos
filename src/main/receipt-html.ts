@@ -75,7 +75,7 @@ ${money('Before VAT / قبل الضريبة', r.totalExcl)}
 ${money('Discount / الخصم', r.totalDiscount)}
 ${money('VAT 15% / الضريبة', r.totalVat)}
 ${refund
-    ? `${money('Refunded / المبلغ المسترد', r.totalIncl, 'b')}${money('Paid back in cash / نقداً', r.totalIncl)}`
+    ? `${money('Refunded / المبلغ المسترد', r.totalIncl, 'b')}${r.payments.map((p) => money(p.tender === 'cash' ? 'Paid back in cash / نقداً' : 'Taken off the account / خصم من الحساب', p.amount)).join('')}`
     : `${money('Grand Total / الإجمالي', r.totalIncl, 'b')}
 ${r.payments.map((p) => money(esc(TENDER[p.tender] ?? p.tender), p.amount)).join('')}
 ${money('Change / الباقي', r.changeGiven)}

@@ -91,7 +91,7 @@ export interface PurchaseInvoiceInput {
   /** e.g. "Supplier collects payment at the next delivery". */
   arrangementNote?: string;
   /** Paid (fully or partly) when the invoice is entered: one payment allocated to this invoice. */
-  payNow?: { requestKey: string; amount: number; method: 'bank' | 'till'; reference?: string };
+  payNow?: { requestKey: string; amount: number; method: 'bank' | 'till'; reference?: string; paidOn?: string };
 }
 
 export function createPurchaseInvoice(ctx: Ctx, userId: number, input: PurchaseInvoiceInput): { invoiceId: number; pinvNo: string; replayed: boolean } {
@@ -152,7 +152,7 @@ export function createPurchaseInvoice(ctx: Ctx, userId: number, input: PurchaseI
     if (input.payNow) {
       requirePermission(ctx, userId, 'purchase.pay');
       if (input.payNow.amount > gross) throw new DomainError('VALIDATION', 'Paid now is more than the invoice');
-      payTx(ctx, userId, { requestKey: input.payNow.requestKey, supplierId: sup.id, amount: input.payNow.amount, method: input.payNow.method, paidOn: input.invoiceDate, reference: input.payNow.reference, allocations: [{ invoiceId: id, amount: input.payNow.amount }] });
+      payTx(ctx, userId, { requestKey: input.payNow.requestKey, supplierId: sup.id, amount: input.payNow.amount, method: input.payNow.method, paidOn: input.payNow.paidOn ?? input.invoiceDate, reference: input.payNow.reference, allocations: [{ invoiceId: id, amount: input.payNow.amount }] });
     }
     return { invoiceId: id, pinvNo, replayed: false };
   })();

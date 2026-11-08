@@ -124,7 +124,7 @@ describe('saving a supplier bill', () => {
     save({ docType: 'proforma' });
     expect(acct('5010')).toBe(5_115);
     expect(acct('2210')).toBe(0);
-    save({ docType: 'proforma', docNo: 'P-2', claimVat: true });
+    save({ docType: 'proforma', docNo: 'P-2', claimVat: true, notSameGoods: true });
     expect(acct('2210')).toBe(5_115);
     books();
   });
@@ -138,7 +138,7 @@ describe('saving a supplier bill', () => {
     save();
     save({ docType: 'proforma', docNo: 'P-1' });
     save({ docType: 'delivery_note', docNo: 'D-1' });
-    save({ docType: 'other', docNo: 'O-1' });
+    save({ docType: 'other', docNo: 'O-1', notSameGoods: true });
     expect(vatSummary(ctx, u.admin, TODAY, TODAY).reconciles).toBe(true);
   });
 
@@ -216,6 +216,47 @@ describe('saving a supplier bill', () => {
 
   it('needs the right permission', () => {
     expect(code(() => createSupplierBill(ctx, u.cashier, juice()))).toBe('PERMISSION_DENIED');
+  });
+});
+
+describe('review findings', () => {
+  it('a paper dated yesterday can be paid from the till today', () => {
+    openShift(ctx, u.admin, 0);
+    expect(code(() => save({ payType: 'paid', payMethod: 'till', docDate: '2026-11-04' }))).toBe('OK');
+    expect(owed()).toBe(0);
+    books();
+  });
+
+  it('a bill while a delivery note waits for its invoice must be confirmed', () => {
+    save({ docType: 'delivery_note', docNo: 'D-1' });
+    expect(code(() => save({ docNo: 'IR-9' }))).toBe('POSSIBLE_DUPLICATE');
+    expect(() => save({ docNo: 'IR-9' })).toThrow(/D-1/);
+    expect(stock(apple).qty).toBe(48_000);
+    expect(code(() => save({ docNo: 'IR-9', notSameGoods: true }))).toBe('OK');
+    expect(stock(apple).qty).toBe(96_000);
+  });
+
+  it('another delivery note is not stopped', () => {
+    save({ docType: 'delivery_note', docNo: 'D-1' });
+    expect(code(() => save({ docType: 'delivery_note', docNo: 'D-2' }))).toBe('OK');
+  });
+
+  it('a bill with the same total as an earlier proforma must be confirmed', () => {
+    save({ docType: 'proforma', docNo: 'P-1' });
+    expect(() => save({ docNo: 'IR-9' })).toThrow(/P-1/);
+    expect(code(() => save({ docNo: 'IR-9', notSameGoods: true }))).toBe('OK');
+  });
+
+  it('a different total after a proforma is not stopped', () => {
+    save({ docType: 'proforma', docNo: 'P-1' });
+    expect(code(() => save({ docNo: 'IR-9', paper: { net: 1_000, vat: 150, total: 1_150 }, lines: [line({ unitsPerPack: 1_000, packs: 1, price: 1_000 })] }))).toBe('OK');
+  });
+
+  it('items sold by the piece take whole pieces only', () => {
+    expect(code(() => save({ paper: { net: 50, vat: 8, total: 58 }, lines: [line({ unitsPerPack: 1_000, looseQty: 500, priceBasis: 'unit', price: 100 })] }))).toBe('VALIDATION');
+    expect(code(() => save({ paper: { net: 100, vat: 15, total: 115 }, lines: [line({ unitsPerPack: 1_000, packs: 1, freeQty: 500, price: 100 })] }))).toBe('VALIDATION');
+    expect(code(() => save({ paper: { net: 300, vat: 45, total: 345 }, lines: [line({ unitsPerPack: 1_000, packs: 3, receivedQty: 2_500, price: 100 })] }))).toBe('VALIDATION');
+    expect(count('supplier_bills')).toBe(0);
   });
 });
 

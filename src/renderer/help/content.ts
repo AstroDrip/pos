@@ -548,7 +548,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { problem: 'A cost warning appears.', fix: 'The cost per piece looks wrong. The usual cause is the wrong Pieces in pack. Fix it, or tick the box if the cost is right.' },
       { problem: 'A delivery note has no Paid or Credit.', fix: 'That is correct. The goods come in now, and nothing is owed until the invoice comes. Enter the invoice later in Supplier invoices.' },
       { problem: 'The paper is a proforma.', fix: 'The VAT is not claimed unless you tick the box. Ask your accountant if you are not sure.' },
-      { problem: 'You closed the screen before saving.', fix: 'Open Enter supplier bill again. Your lines are still there.' },
+      { problem: 'It says a delivery note has no invoice yet, or a proforma has the same total.', fix: 'Those goods may already be in stock. If this paper is for the same goods, press Start over and enter it under Supplier invoices. If they are different goods, tick the box and press Save bill.' },
+      { problem: 'You closed the screen before saving.', fix: 'Open Enter supplier bill again. Your lines are still there. To throw them away, press Start over.' },
     ],
   },
   {

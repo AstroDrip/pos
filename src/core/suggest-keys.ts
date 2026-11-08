@@ -5,6 +5,11 @@ export function shouldQuery(text: string, composing: boolean): boolean {
   return !composing && text.trim().length > 0;
 }
 
+/** The one item a list holds, only if the list answers exactly this text. Otherwise the user must choose. */
+export function singleMatch<T>(items: readonly T[], itemsFor: string, text: string): T | null {
+  return items.length === 1 && itemsFor === text ? items[0]! : null;
+}
+
 /** Arrow keys in a suggestion list: move one step, stop at the first and last item; -1 when the list is empty. */
 export function moveActive(active: number, count: number, key: 'ArrowDown' | 'ArrowUp'): number {
   if (count <= 0) return -1;

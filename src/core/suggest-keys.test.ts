@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { enterAction, moveActive, shouldQuery } from './suggest-keys';
+import { enterAction, moveActive, shouldQuery, singleMatch } from './suggest-keys';
+
+describe('singleMatch', () => {
+  it('takes the only item, when the list answers exactly this text', () => {
+    expect(singleMatch(['a'], 'abc', 'abc')).toBe('a');
+  });
+  it('refuses an old list or several items', () => {
+    expect(singleMatch(['a'], 'ab', 'abc')).toBeNull();
+    expect(singleMatch(['a', 'b'], 'abc', 'abc')).toBeNull();
+    expect(singleMatch([], 'abc', 'abc')).toBeNull();
+  });
+});
 
 describe('shouldQuery', () => {
   it('asks from the first character', () => {

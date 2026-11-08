@@ -708,7 +708,8 @@ Names and numbers in the examples are made up.
 - *A cost warning appears.* The cost per piece looks wrong. The usual cause is the wrong Pieces in pack. Fix it, or tick the box if the cost is right.
 - *A delivery note has no Paid or Credit.* That is correct. The goods come in now, and nothing is owed until the invoice comes. Enter the invoice later in Supplier invoices.
 - *The paper is a proforma.* The VAT is not claimed unless you tick the box. Ask your accountant if you are not sure.
-- *You closed the screen before saving.* Open Enter supplier bill again. Your lines are still there.
+- *It says a delivery note has no invoice yet, or a proforma has the same total.* Those goods may already be in stock. If this paper is for the same goods, press Start over and enter it under Supplier invoices. If they are different goods, tick the box and press Save bill.
+- *You closed the screen before saving.* Open Enter supplier bill again. Your lines are still there. To throw them away, press Start over.
 
 <a id="suppliers-invoice"></a>
 

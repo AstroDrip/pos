@@ -105,6 +105,11 @@ const AR: Record<string, string> = {
   "Purchases by supplier": "المشتريات حسب المورد",
   "Bills": "الفواتير",
   "Price history": "تاريخ الأسعار",
+  // supplier bills and store details
+  "Choose the item from the list.": "اختر الصنف من القائمة.",
+  "Clear this bill and start over?": "مسح هذه الفاتورة والبدء من جديد؟",
+  "I checked: these are different goods": "راجعت: هذه بضاعة مختلفة",
+  "Start over": "البدء من جديد",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

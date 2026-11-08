@@ -13,6 +13,7 @@ export function makeCtx(db: Db): Ctx {
 }
 
 export type ErrorCode =
+  | 'POSSIBLE_DUPLICATE'
   | 'NOT_FOUND'
   | 'VALIDATION'
   | 'PERMISSION_DENIED'
