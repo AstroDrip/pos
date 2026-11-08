@@ -96,6 +96,15 @@ const AR: Record<string, string> = {
   "The discount is larger than the line": "الخصم أكبر من البند",
   "More received than billed. Enter the extra as free.": "المستلم أكثر من المفوتر. أدخل الزيادة كمجاني.",
   "The bill discount is larger than the goods": "خصم الفاتورة أكبر من البضاعة",
+  // supplier bills and store details
+  "Saved bills": "الفواتير المحفوظة",
+  "Purchase reports": "تقارير المشتريات",
+  "Open": "فتح",
+  "Goods receipt": "سند الاستلام",
+  "Print": "طباعة",
+  "Purchases by supplier": "المشتريات حسب المورد",
+  "Bills": "الفواتير",
+  "Price history": "تاريخ الأسعار",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

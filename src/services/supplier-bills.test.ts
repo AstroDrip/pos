@@ -4,12 +4,12 @@ import { createProduct } from './catalog';
 import { DomainError, type Ctx } from './context';
 import { datedTrialBalance } from './financials';
 import { dryRunSuppliers, importSuppliers } from './import';
-import { stockDrift } from './inventory';
+import { receiveGoods, stockDrift } from './inventory';
 import { unbalancedEntries } from './ledger';
 import { createSupplier, listSuppliers, updateSupplier } from './parties';
 import { supplierBalances, uninvoicedGrns } from './purchasing';
 import { openShift } from './shifts';
-import { billProductCost, createSupplierBill, findSupplierItem, type SupplierBillInput } from './supplier-bills';
+import { billProductCost, createSupplierBill, findSupplierItem, getBill, listBills, priceHistory, purchasesBySupplier, type SupplierBillInput } from './supplier-bills';
 import { makeTestCtx, seedUsers } from './test-helpers';
 import { vatSummary } from './vat-report';
 
@@ -225,6 +225,56 @@ describe('cost information for the bill screen', () => {
     save();
     expect(billProductCost(ctx, u.admin, apple)).toEqual({ avgCost: 464, stockQty: 48_000 });
     expect(code(() => billProductCost(ctx, u.cashier, apple))).toBe('PERMISSION_DENIED');
+  });
+});
+
+describe('after a bill is saved', () => {
+  it('a delivery note receipt offers its net and VAT', () => {
+    save({ docType: 'delivery_note' });
+    expect(uninvoicedGrns(ctx, u.admin)[0]).toMatchObject({ paperNet: 34_101, paperVat: 5_115 });
+  });
+
+  it('a receipt with no bill offers null', () => {
+    receiveGoods(ctx, u.admin, { supplierId: sup, lines: [{ productId: apple, qty: 1_000, unitCost: 100 }] });
+    expect(uninvoicedGrns(ctx, u.admin)[0]).toMatchObject({ paperNet: null, paperVat: null });
+  });
+
+  it('price history is newest first across suppliers', () => {
+    const other = createSupplier(ctx, u.admin, { name: 'Other Made Up', vatNumber: VATNO });
+    save({ docNo: 'OLD', docDate: '2026-10-01' });
+    save({ docNo: 'NEW', supplierId: other });
+    const h = priceHistory(ctx, u.admin, grape);
+    expect(h.map((x) => [x.docNo, x.supplier])).toEqual([['NEW', 'Other Made Up'], ['OLD', 'Made Up Drinks']]);
+    expect(h[0]).toMatchObject({ packName: 'CTN', unitsPerPack: 24_000, price: 11_829, costPerUnit: 493 });
+  });
+
+  it('purchases by supplier adds up for a period', () => {
+    save({ docNo: 'A' });
+    save({ docNo: 'B', docDate: '2026-11-01' });
+    save({ docNo: 'OUT', docDate: '2026-09-01' });
+    expect(purchasesBySupplier(ctx, u.admin, '2026-11-01', TODAY)).toEqual([{ supplierId: sup, supplier: 'Made Up Drinks', bills: 2, gross: 68_202, discount: 0, net: 68_202, vat: 10_230, total: 78_432 }]);
+  });
+
+  it('counts a bill discount once', () => {
+    save({ billDiscount: 101, paper: { net: 34_000, vat: 5_100, total: 39_100 } });
+    expect(purchasesBySupplier(ctx, u.admin, TODAY, TODAY)[0]).toMatchObject({ gross: 34_101, discount: 101, net: 34_000 });
+  });
+
+  it('a saved bill can be read back line by line', () => {
+    const r = save({ salesAgent: 'Made Up Agent' });
+    const b = getBill(ctx, u.admin, r.billId);
+    expect(b).toMatchObject({ supplier: 'Made Up Drinks', docNo: 'IR-1', grnNo: r.grnNo, pinvNo: r.pinvNo, salesAgent: 'Made Up Agent', net: 34_101, vat: 5_115, total: 39_216 });
+    expect(b.lines[1]).toMatchObject({ lineNo: 2, nameEn: 'Item GRAPE', supplierCode: '98002', packName: 'CTN', packs: 1, price: 11_829, total: 13_603 });
+    expect(code(() => getBill(ctx, u.admin, 999))).toBe('NOT_FOUND');
+  });
+
+  it('bills list by date, and need purchase.view', () => {
+    save({ docNo: 'A' });
+    save({ docNo: 'OLD', docDate: '2026-09-01' });
+    expect(listBills(ctx, u.admin, TODAY, TODAY).map((b) => b.docNo)).toEqual(['A']);
+    expect(code(() => listBills(ctx, u.cashier, TODAY, TODAY))).toBe('PERMISSION_DENIED');
+    expect(code(() => priceHistory(ctx, u.cashier, apple))).toBe('PERMISSION_DENIED');
+    expect(code(() => purchasesBySupplier(ctx, u.cashier, TODAY, TODAY))).toBe('PERMISSION_DENIED');
   });
 });
 

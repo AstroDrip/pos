@@ -214,3 +214,101 @@ export function billProductCost(ctx: Ctx, userId: number, productId: number): { 
   const r = ctx.db.prepare('SELECT qty, avg_cost FROM stock_balances WHERE product_id = ?').get(productId) as { qty: number; avg_cost: number } | undefined;
   return { avgCost: r?.avg_cost ?? 0, stockQty: r?.qty ?? 0 };
 }
+
+export interface BillRow {
+  id: number;
+  supplier: string;
+  docType: DocType;
+  docNo: string;
+  docDate: string;
+  payType: 'paid' | 'credit';
+  net: number;
+  vat: number;
+  total: number;
+}
+
+export interface BillDetail extends BillRow {
+  grnNo: string;
+  pinvNo: string | null;
+  salesAgent: string | null;
+  lines: {
+    lineNo: number; nameEn: string; nameAr: string; supplierCode: string | null; packName: string; unitsPerPack: number; packs: number; looseQty: number; freeQty: number; receivedQty: number;
+    price: number; discount: number; net: number; vat: number; total: number;
+  }[];
+}
+
+export interface PriceHistoryRow {
+  docDate: string;
+  docNo: string;
+  supplier: string;
+  packName: string;
+  unitsPerPack: number;
+  price: number;
+  costPerUnit: number;
+}
+
+export interface SupplierPurchases {
+  supplierId: number;
+  supplier: string;
+  bills: number;
+  gross: number;
+  discount: number;
+  net: number;
+  vat: number;
+  total: number;
+}
+
+const RANGE = /^\d{4}-\d{2}-\d{2}$/;
+function checkRange(from: string, to: string) {
+  if (!RANGE.test(from) || !RANGE.test(to) || to < from) throw new DomainError('VALIDATION', 'Check the dates');
+}
+const BILL = `b.id, s.name AS supplier, b.doc_type AS docType, b.doc_no AS docNo, b.doc_date AS docDate, b.pay_type AS payType, b.paper_net AS net, b.paper_vat AS vat, b.paper_total AS total`;
+
+export function listBills(ctx: Ctx, userId: number, from: string, to: string): BillRow[] {
+  requirePermission(ctx, userId, 'purchase.view');
+  checkRange(from, to);
+  return ctx.db.prepare(`SELECT ${BILL} FROM supplier_bills b JOIN suppliers s ON s.id = b.supplier_id WHERE b.doc_date BETWEEN ? AND ? ORDER BY b.doc_date DESC, b.id DESC`).all(from, to) as BillRow[];
+}
+
+export function getBill(ctx: Ctx, userId: number, id: number): BillDetail {
+  requirePermission(ctx, userId, 'purchase.view');
+  const b = ctx.db
+    .prepare(
+      `SELECT ${BILL}, g.grn_no AS grnNo, i.pinv_no AS pinvNo, b.sales_agent AS salesAgent FROM supplier_bills b JOIN suppliers s ON s.id = b.supplier_id JOIN goods_receipts g ON g.id = b.grn_id
+       LEFT JOIN purchase_invoice_grns x ON x.grn_id = b.grn_id LEFT JOIN purchase_invoices i ON i.id = x.invoice_id WHERE b.id = ?`,
+    )
+    .get(id) as Omit<BillDetail, 'lines'> | undefined;
+  if (!b) throw new DomainError('NOT_FOUND', 'Bill not found');
+  const lines = ctx.db
+    .prepare(
+      `SELECT l.line_no AS lineNo, p.name_en AS nameEn, p.name_ar AS nameAr, l.supplier_code AS supplierCode, l.pack_name AS packName, l.units_per_pack AS unitsPerPack, l.packs, l.loose_qty AS looseQty, l.free_qty AS freeQty,
+         l.received_qty AS receivedQty, l.price, l.discount, l.net, l.vat, l.total FROM supplier_bill_lines l JOIN products p ON p.id = l.product_id WHERE l.bill_id = ? ORDER BY l.line_no`,
+    )
+    .all(id) as BillDetail['lines'];
+  return { ...b, lines };
+}
+
+export function priceHistory(ctx: Ctx, userId: number, productId: number): PriceHistoryRow[] {
+  requirePermission(ctx, userId, 'purchase.view');
+  const rows = ctx.db
+    .prepare(
+      `SELECT b.doc_date AS docDate, b.doc_no AS docNo, s.name AS supplier, l.pack_name AS packName, l.units_per_pack AS unitsPerPack, l.price, l.net, l.packs, l.loose_qty AS loose, l.free_qty AS free
+       FROM supplier_bill_lines l JOIN supplier_bills b ON b.id = l.bill_id JOIN suppliers s ON s.id = b.supplier_id WHERE l.product_id = ? ORDER BY b.doc_date DESC, b.id DESC, l.line_no LIMIT 200`,
+    )
+    .all(productId) as (Omit<PriceHistoryRow, 'costPerUnit'> & { net: number; packs: number; loose: number; free: number })[];
+  return rows.map(({ net, packs, loose, free, ...r }) => ({ ...r, costPerUnit: roundDiv(net * MILLI_PER_UNIT, packs * r.unitsPerPack + loose + free) }));
+}
+
+export function purchasesBySupplier(ctx: Ctx, userId: number, from: string, to: string): SupplierPurchases[] {
+  requirePermission(ctx, userId, 'purchase.view');
+  checkRange(from, to);
+  return ctx.db
+    .prepare(
+      `SELECT s.id AS supplierId, s.name AS supplier, COUNT(*) AS bills,
+         SUM((SELECT SUM(l.gross) FROM supplier_bill_lines l WHERE l.bill_id = b.id)) AS gross,
+         SUM(b.bill_discount + (SELECT SUM(l.discount) FROM supplier_bill_lines l WHERE l.bill_id = b.id)) AS discount,
+         SUM(b.paper_net) AS net, SUM(b.paper_vat) AS vat, SUM(b.paper_total) AS total
+       FROM supplier_bills b JOIN suppliers s ON s.id = b.supplier_id WHERE b.doc_date BETWEEN ? AND ? GROUP BY s.id ORDER BY total DESC`,
+    )
+    .all(from, to) as SupplierPurchases[];
+}

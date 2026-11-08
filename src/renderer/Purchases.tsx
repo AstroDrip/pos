@@ -11,6 +11,7 @@ import { useSuggest } from './useSuggest';
 import { focusWhenReady, useScreenKeys } from './Keyboard';
 import { HelpLink } from './HelpLink';
 import { SupplierBill } from './SupplierBill';
+import { PurchaseReports, SavedBills } from './SupplierBillsView';
 import { ProductName, useI18n } from './i18n';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -22,7 +23,7 @@ const sar = (s: string) => {
     return NaN;
   }
 };
-type Section = 'bill' | 'invoice' | 'return' | 'pay' | 'ageing' | 'register';
+type Section = 'bill' | 'invoice' | 'return' | 'pay' | 'ageing' | 'register' | 'saved' | 'reports';
 
 /** Purchasing (plan Phase 4). Posting rules are provisional until the accountant approves. */
 export function Purchases({ can }: { can: (p: string) => boolean }) {
@@ -54,6 +55,8 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
     { id: 'pay', label: 'Balances and payments', show: true },
     { id: 'ageing', label: 'Ageing', show: true },
     { id: 'register', label: 'Purchase register', show: true },
+    { id: 'saved', label: 'Saved bills', show: true },
+    { id: 'reports', label: 'Purchase reports', show: true },
   ];
   return (
     <div className="page">
@@ -75,6 +78,8 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
       {section === 'pay' && <Balances suppliers={suppliers} can={can} request={supplierRequest} />}
       {section === 'ageing' && <Ageing />}
       {section === 'register' && <Register />}
+      {section === 'saved' && <SavedBills />}
+      {section === 'reports' && <PurchaseReports />}
     </div>
   );
 }
@@ -107,6 +112,12 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
     if (supplierId) void load(supplierId);
     else setGrns([]);
   }, [supplierId]);
+  // A delivery note was typed in full: its net and VAT fill the invoice boxes. They can still be changed.
+  useEffect(() => {
+    const chosen = grns.filter((g) => picked.includes(g.grnId));
+    if (chosen.length === 0 || chosen.some((g) => g.paperNet === null)) return;
+    setF((p) => ({ ...p, net: formatSar(chosen.reduce((s, g) => s + g.paperNet!, 0)), vat: formatSar(chosen.reduce((s, g) => s + g.paperVat!, 0)) }));
+  }, [picked]);
   const goods = grns.filter((g) => picked.includes(g.grnId)).reduce((s, g) => s + g.totalCost, 0);
   const net = sar(f.net);
   const vat = sar(f.vat);

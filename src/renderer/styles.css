@@ -354,3 +354,7 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 .bill-line-head button { margin-inline-start: auto; }
 .bill-line-fields { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
 .bill-line-sum { margin-top: var(--sp-2); font-weight: 600; }
+@media print {
+  .top, .page-header, .noprint, .msg.warn { display: none; }
+  .bill-card { border: none; max-width: none; padding: 0; }
+}

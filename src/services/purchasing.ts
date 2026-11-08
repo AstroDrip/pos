@@ -54,6 +54,9 @@ export interface UninvoicedGrn {
   reference: string | null;
   receivedAt: string;
   totalCost: number;
+  /** From a saved delivery note: what the invoice is expected to show. */
+  paperNet: number | null;
+  paperVat: number | null;
 }
 
 /** Goods receipts not yet matched to a supplier invoice (the detail behind account 2100). */
@@ -61,8 +64,8 @@ export function uninvoicedGrns(ctx: Ctx, userId: number, supplierId?: number): U
   requirePermission(ctx, userId, 'purchase.view');
   return ctx.db
     .prepare(
-      `SELECT g.id AS grnId, g.grn_no AS grnNo, g.supplier_id AS supplierId, s.name AS supplier, g.reference, g.received_at AS receivedAt, g.total_cost AS totalCost
-       FROM goods_receipts g JOIN suppliers s ON s.id = g.supplier_id
+      `SELECT g.id AS grnId, g.grn_no AS grnNo, g.supplier_id AS supplierId, s.name AS supplier, g.reference, g.received_at AS receivedAt, g.total_cost AS totalCost, b.paper_net AS paperNet, b.paper_vat AS paperVat
+       FROM goods_receipts g JOIN suppliers s ON s.id = g.supplier_id LEFT JOIN supplier_bills b ON b.grn_id = g.id
        WHERE g.id NOT IN (SELECT grn_id FROM purchase_invoice_grns) ${supplierId ? 'AND g.supplier_id = ?' : ''} ORDER BY g.id`,
     )
     .all(...(supplierId ? [supplierId] : [])) as UninvoicedGrn[];
