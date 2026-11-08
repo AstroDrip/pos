@@ -5,7 +5,7 @@
  * Always run it against a temporary data folder with fake data (scripts/ui-audit.mjs does this).
  */
 import { app, type BrowserWindow } from 'electron';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { auditGeometry, type Finding, type Snapshot } from '../core/geometry-audit';
 import { CLEAR_OUTLINE_SOURCE, COLLECT_SOURCE, outlineSource } from './ui-audit-collect';
@@ -136,6 +136,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
             await keyFlows();
             await shortcutFlows();
             await rebindFlows();
+            await billFlows();
           }
           await clearBill();
           for (const code of ['6281000000000', '6281000000077', '6281000000033']) await scan(code); // fake seed barcodes
@@ -170,6 +171,96 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   } finally {
     writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 1));
     app.quit();
+  }
+
+  /** The real bill screen and a real printed receipt, with made-up details. */
+  async function billFlows() {
+    const setVal = (sel: string, v: string) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) throw new Error('missing ' + ${JSON.stringify(sel)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, ${JSON.stringify(v)}); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    const tabTo = async (name: string) => {
+      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await sleep(400);
+    };
+    const section = async (name: string) => {
+      await js(`[...document.querySelectorAll('[aria-label="purchases section"] button')].find((b) => b.textContent.trim() === ${JSON.stringify(name)})?.click()`);
+      await sleep(350);
+    };
+    const saveOff = () => js<boolean>(`document.querySelector('button[aria-label="save bill"]').disabled`);
+    const add = async (code: string) => {
+      await setVal('input[aria-label="bill product search"]', code);
+      await sleep(350);
+      await focus('input[aria-label="bill product search"]');
+      key('Enter');
+      await sleep(500);
+    };
+
+    await tabTo('Purchases');
+    await section('Enter supplier bill');
+    await capture('63-enter-bill-empty__light-en-1366x768');
+    const sup = await js<string>(`[...document.querySelector('select[aria-label="bill supplier"]').options].find((o) => o.textContent.includes('Al Marai')).value`);
+    await setSelect('select[aria-label="bill supplier"]', sup);
+    await sleep(300);
+    await setVal('input[aria-label="paper number"]', 'AUDIT-JUICE-1');
+    await click('button[aria-label="mark credit"]');
+    await add('6281000000000');
+    await add('6281000000077');
+    const lines = await js<number>(`document.querySelectorAll('.bill-line').length`);
+    await setVal('input[aria-label="pieces in pack 1"]', '24');
+    await setVal('input[aria-label="packs 1"]', '2');
+    await setVal('input[aria-label="price 1"]', '111.36');
+    await setVal('input[aria-label="pieces in pack 2"]', '24');
+    await setVal('input[aria-label="packs 2"]', '1');
+    await setVal('input[aria-label="price 2"]', '118.29');
+    await sleep(200);
+    await setVal('input[aria-label="paper net"]', '341.04');
+    await setVal('input[aria-label="paper vat"]', '51.15');
+    await setVal('input[aria-label="paper total"]', '392.19');
+    await sleep(200);
+    const offWhenWrong = await saveOff();
+    await setVal('input[aria-label="paper net"]', '341.01');
+    await setVal('input[aria-label="paper total"]', '392.16');
+    await sleep(200);
+    await js(`document.querySelector('input[aria-label="costs checked"]')?.click()`);
+    await sleep(200);
+    const onWhenRight = !(await saveOff());
+    flow('bill-save-off-until-match', lines === 2 && offWhenWrong && onWhenRight, `lines ${lines}, off when wrong ${offWhenWrong}, on when right ${onWhenRight}`);
+    await capture('64-enter-bill-lines__light-en-1366x768');
+    await click('button[aria-label="save bill"]');
+    await sleep(700);
+    const saved = await js<string>(`document.querySelector('.bill .msg.ok')?.textContent ?? ''`);
+    await section('Saved bills');
+    await sleep(400);
+    const row = await js<string>(`[...document.querySelectorAll('table[aria-label="saved bills"] tr')].find((r) => r.textContent.includes('AUDIT-JUICE-1'))?.textContent ?? ''`);
+    flow('bill-juice-ends-exact', saved.startsWith('Saved') && row.includes('341.01') && row.includes('51.15') && row.includes('392.16'), `"${saved}", row "${row}"`);
+    await click('button[aria-label="open bill AUDIT-JUICE-1"]');
+    await sleep(400);
+    await capture('65-saved-bill__light-en-1366x768');
+    await section('Purchase reports');
+    await capture('66-purchase-reports__light-en-1366x768');
+
+    // Store details reach a printed receipt (made-up details, temporary data)
+    await tabTo('Admin');
+    await setVal('input[aria-label="store nameEn"]', 'Fictional Mart');
+    await setVal('input[aria-label="store addressLine"]', 'Made Up District');
+    await setVal('input[aria-label="store vatNumber"]', '300000000000003');
+    await setVal('input[aria-label="store mobile"]', '0500000000');
+    await click('button', 'Save store details');
+    await sleep(400);
+    await tabTo('Sell');
+    await sleep(300);
+    await clearBill();
+    await scan('6281000000000');
+    await focus('input[aria-label="product search"]');
+    await sleep(500);
+    key('Enter', ['shift']);
+    await waitFor(`document.querySelector('[aria-label="payment step"].current')`, 1500);
+    await sleep(500);
+    await focus('input[aria-label="cash received"]');
+    await sleep(500);
+    key('Enter');
+    await sleep(1200);
+    const file = process.env.POS_RECEIPT_TO_FILE ?? '';
+    const html = file && existsSync(file) ? readFileSync(file, 'utf8') : '';
+    flow('store-details-on-receipt', ['Fictional Mart', 'Made Up District', '300000000000003', '0500000000', 'Simplified Tax Invoice', 'TEST BUILD', 'VAT Included'].every((x) => html.includes(x)), `receipt length ${html.length}`);
   }
 
   /** Admin changes keys through the real screen; the till follows at once; everything is put back. */

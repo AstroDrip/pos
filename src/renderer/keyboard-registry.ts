@@ -71,7 +71,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
 
 /** The guide F1 opens on each screen. */
 export const CONTEXT_HELP: Record<ScreenContext, string> = {
-  sell: 'start-keys', refund: 'returns-refund', customers: 'customers-find-add', stock: 'stock-overview', products: 'stock-products', purchases: 'suppliers-invoice',
+  sell: 'start-keys', refund: 'returns-refund', customers: 'customers-find-add', stock: 'stock-overview', products: 'stock-products', purchases: 'suppliers-enter-bill',
   expenses: 'expenses-record', accounting: 'reports-owner', reports: 'reports-sales', shift: 'shifts-open', admin: 'backup-run', help: 'start-keys',
 };
 

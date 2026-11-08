@@ -34,6 +34,8 @@ Names and numbers in the examples are made up.
   - [Mark an invoice as disputed or write off a debt](#customers-dispute-writeoff)
 - **Suppliers and purchasing**
   - [Add a supplier](#suppliers-add)
+  - [Change a supplier](#suppliers-edit)
+  - [Set the store details on the receipt](#admin-store-details)
   - [Receive goods from a supplier](#suppliers-receive)
   - [Enter a supplier bill](#suppliers-enter-bill)
   - [Record a supplier invoice (pay now or later)](#suppliers-invoice)
@@ -606,6 +608,52 @@ Names and numbers in the examples are made up.
 **If something goes wrong**
 
 - *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
+
+<a id="suppliers-edit"></a>
+
+### Change a supplier
+
+**What this does:** Correct a supplier, or add their address, CR number, salesman and your customer number with them.
+
+**Where:** Admin tab → Suppliers.
+
+**Steps**
+
+1. Press Edit beside the supplier.
+2. Change the boxes you need.
+3. Press Save supplier. To leave without changing anything, press Cancel.
+
+**What you should see:** The list shows the change.
+
+**If something goes wrong**
+
+- *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
+
+<a id="admin-store-details"></a>
+
+### Set the store details on the receipt
+
+**What this does:** Set the name, VAT number, address, mobile and logo that print on every receipt.
+
+**Where:** Admin tab → Store details.
+
+**Steps**
+
+1. Type each box as it is on your VAT certificate and commercial register.
+2. Type the Address as printed on the receipt, and the National address parts.
+3. Choose a Logo, if you have one. It must be a PNG or JPEG file of 200 KB or less.
+4. Type the Thank-you lines.
+5. Check the Preview, then press Save store details.
+
+**What you should see:** A green message says the details are saved. The next receipt prints them.
+
+**If something goes wrong**
+
+- *It says the VAT number is wrong.* It must be 15 digits, starting and ending with 3.
+- *The logo is refused.* Use a PNG or JPEG file, and make it smaller than 200 KB.
+- *The receipt says TEST BUILD.* That is correct for now. It stays until the connection to the tax authority is finished.
+
+**Ask a supervisor:** Only a user allowed to change settings can do this.
 
 <a id="suppliers-receive"></a>
 
