@@ -267,7 +267,7 @@ export function refundReceiptData(ctx: Ctx, refundId: number): ReceiptData {
     originalInvoiceNo: r.invoice_no,
     reason: r.reason,
     lines: ctx.db
-      .prepare('SELECT name_ar AS nameAr, name_en AS nameEn, qty, unit_price_incl AS unitPriceIncl, 0 AS discount, line_incl AS lineIncl, vat_rate_bp AS vatRateBp FROM refund_lines WHERE refund_id = ? ORDER BY line_no')
+      .prepare('SELECT name_ar AS nameAr, name_en AS nameEn, qty, unit_price_incl AS unitPriceIncl, 0 AS discount, line_incl AS lineIncl, line_vat AS lineVat, line_excl AS lineExcl, vat_rate_bp AS vatRateBp FROM refund_lines WHERE refund_id = ? ORDER BY line_no')
       .all(refundId) as ReceiptData['lines'],
     totalExcl: r.total_excl,
     totalVat: r.total_vat,

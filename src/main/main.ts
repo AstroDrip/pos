@@ -9,6 +9,7 @@ import { CHANNELS } from '../shared/ipc';
 import { appendAudit } from '../services/audit';
 import { backupStatus, createBackup, encryptedSnapshot, installRestore } from '../services/backup';
 import { createHandlers, type BackupEnv, type Printer, type Session } from './handlers';
+import { getStoreDetails } from '../services/store-details';
 import { runUiAudit } from './ui-audit';
 import { demandScores } from '../services/demand';
 import { receiptHtml } from './receipt-html';
@@ -45,9 +46,7 @@ const RECEIPT_TO_FILE = process.env.POS_RECEIPT_TO_FILE;
 
 const printer: Printer = {
   async printReceipt(data, copy) {
-    const db = ctx.db;
-    const get = (k: string) => (db.prepare('SELECT value FROM settings WHERE key = ?').get(k) as { value: string } | undefined)?.value ?? '';
-    const html = receiptHtml(data, { nameAr: get('store_name_ar'), nameEn: get('store_name_en'), vatNumber: get('store_vat_number') }, copy);
+    const html = receiptHtml(data, getStoreDetails(ctx), copy);
     if (RECEIPT_TO_FILE) return writeFileSync(RECEIPT_TO_FILE, html, 'utf8');
     const win = new BrowserWindow({ show: false, webPreferences: { ...SECURE_PREFS, javascript: false } });
     try {

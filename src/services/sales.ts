@@ -202,6 +202,7 @@ export interface ReceiptData {
   /** 'refund' = credit note; 'payment' = customer payment receipt. invoiceNo then holds that document's number. */
   kind?: 'sale' | 'refund' | 'payment';
   customerName?: string;
+  customerVat?: string;
   /** Credit sale: what is left on the customer's account after this bill. Payment receipt: balance still owed. */
   remainingOnAccount?: number;
   allocations?: { invoiceNo: string; amount: number }[];
@@ -212,7 +213,7 @@ export interface ReceiptData {
   uuid: string;
   createdAt: string;
   cashier: string;
-  lines: { nameAr: string; nameEn: string; qty: number; unitPriceIncl: number; discount: number; lineIncl: number; vatRateBp: number }[];
+  lines: { nameAr: string; nameEn: string; qty: number; unitPriceIncl: number; discount: number; lineIncl: number; lineVat: number; lineExcl: number; vatRateBp: number }[];
   totalExcl: number;
   totalVat: number;
   totalIncl: number;
@@ -226,12 +227,12 @@ export function receiptData(ctx: Ctx, saleId: number): ReceiptData {
   const s = ctx.db
     .prepare(
       `SELECT s.invoice_no, s.uuid, s.created_at, u.display_name AS cashier, s.total_excl, s.total_vat, s.total_incl,
-              s.total_discount, s.change_given, c.name AS customer_name,
+              s.total_discount, s.change_given, c.name AS customer_name, c.vat_number AS customer_vat,
               (SELECT amount FROM receivables r WHERE r.sale_id = s.id) AS on_account
        FROM sales s JOIN users u ON u.id = s.user_id LEFT JOIN customers c ON c.id = s.customer_id WHERE s.id = ?`,
     )
     .get(saleId) as
-    | { invoice_no: string; uuid: string; created_at: string; cashier: string; total_excl: number; total_vat: number; total_incl: number; total_discount: number; change_given: number; customer_name: string | null; on_account: number | null }
+    | { invoice_no: string; uuid: string; created_at: string; cashier: string; total_excl: number; total_vat: number; total_incl: number; total_discount: number; change_given: number; customer_vat: string | null; customer_name: string | null; on_account: number | null }
     | undefined;
   if (!s) throw new DomainError('NOT_FOUND', 'Sale not found');
   return {
@@ -240,7 +241,7 @@ export function receiptData(ctx: Ctx, saleId: number): ReceiptData {
     createdAt: s.created_at,
     cashier: s.cashier,
     lines: ctx.db
-      .prepare('SELECT name_ar AS nameAr, name_en AS nameEn, qty, unit_price_incl AS unitPriceIncl, discount, line_incl AS lineIncl, vat_rate_bp AS vatRateBp FROM sale_lines WHERE sale_id = ? ORDER BY line_no')
+      .prepare('SELECT name_ar AS nameAr, name_en AS nameEn, qty, unit_price_incl AS unitPriceIncl, discount, line_incl AS lineIncl, line_vat AS lineVat, line_excl AS lineExcl, vat_rate_bp AS vatRateBp FROM sale_lines WHERE sale_id = ? ORDER BY line_no')
       .all(saleId) as ReceiptData['lines'],
     totalExcl: s.total_excl,
     totalVat: s.total_vat,
@@ -249,6 +250,7 @@ export function receiptData(ctx: Ctx, saleId: number): ReceiptData {
     payments: ctx.db.prepare('SELECT tender, amount FROM payments WHERE sale_id = ? ORDER BY id').all(saleId) as ReceiptData['payments'],
     changeGiven: s.change_given,
     customerName: s.customer_name ?? undefined,
+    customerVat: s.customer_vat ?? undefined,
     remainingOnAccount: s.on_account ?? undefined,
   };
 }

@@ -9,6 +9,7 @@ import { call } from './api';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { KeyboardSettings } from './KeyboardSettings';
+import { StoreDetailsCard } from './StoreDetailsCard';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
@@ -24,6 +25,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
       {(can('product.manage') || can('supplier.manage')) && <Import />}
       {can('settings.manage') && <ScaleLabels />}
       {can('settings.manage') && <DashboardHealth />}
+      {can('settings.manage') && <StoreDetailsCard />}
       {can('settings.manage') && <KeyboardSettings />}
       </div>
     </div>

@@ -36,6 +36,12 @@ export const schemas = {
   'catalog.lookup': z.object({ code: z.string().min(1).max(64) }),
   'catalog.search': z.object({ text: z.string().max(64) }),
   'catalog.suggest': z.object({ text: z.string().max(64) }),
+  'store.get': z.null(),
+  'store.save': z.object({
+    nameAr: z.string().max(120), nameEn: z.string().max(120), legalNameAr: z.string().max(200), legalNameEn: z.string().max(200), vatNumber: z.string().max(15), crNumber: z.string().max(20),
+    mobile: z.string().max(20), buildingNo: z.string().max(20), street: z.string().max(120), district: z.string().max(120), city: z.string().max(80), postalCode: z.string().max(10), additionalNo: z.string().max(20),
+    addressLine: z.string().max(200), logo: z.string().max(400_000), footerAr: z.string().max(200), footerEn: z.string().max(200),
+  }),
   'shortcuts.get': z.null(),
   'shortcuts.save': z.object({ overrides: z.record(z.string().max(30), z.string().max(30)) }),
   'catalog.itemInfo': z.object({ productId: int.positive() }),

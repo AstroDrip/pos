@@ -7,6 +7,32 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  // supplier bills and store details
+  "Store details": "بيانات المتجر",
+  "Printed on every receipt.": "تُطبع على كل فاتورة.",
+  "Store name (Arabic)": "اسم المتجر (عربي)",
+  "Store name (English)": "اسم المتجر (إنجليزي)",
+  "Legal name (Arabic)": "الاسم القانوني (عربي)",
+  "Legal name (English)": "الاسم القانوني (إنجليزي)",
+  "CR number": "السجل التجاري",
+  "Mobile": "الجوال",
+  "Address as printed on the receipt": "العنوان كما يطبع على الفاتورة",
+  "National address": "العنوان الوطني",
+  "Building number": "رقم المبنى",
+  "Street": "الشارع",
+  "District": "الحي",
+  "City": "المدينة",
+  "Postal code": "الرمز البريدي",
+  "Additional number": "الرقم الإضافي",
+  "Receipt footer": "تذييل الفاتورة",
+  "Thank-you line (Arabic)": "سطر الشكر (عربي)",
+  "Thank-you line (English)": "سطر الشكر (إنجليزي)",
+  "Logo (PNG or JPEG, up to 200 KB)": "الشعار (PNG أو JPEG حتى 200 كيلوبايت)",
+  "Remove logo": "إزالة الشعار",
+  "Preview": "معاينة",
+  "Save store details": "حفظ بيانات المتجر",
+  "Store details saved.": "تم حفظ بيانات المتجر.",
+  "The logo must be a PNG or JPEG file of 200 KB or less": "يجب أن يكون الشعار PNG أو JPEG بحجم 200 كيلوبايت أو أقل",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

@@ -340,3 +340,5 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 .palette-item dt { color: var(--muted); }
 .palette-item dd { margin: 0; font-weight: 600; }
 .step small.hint { display: block; }
+.receipt-preview { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--sp-3); background: #fff; color: #000; border: 1px dashed var(--border); text-align: center; }
+.receipt-preview img { max-width: 160px; max-height: 80px; }

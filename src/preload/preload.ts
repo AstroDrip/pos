@@ -13,6 +13,8 @@ const PRELOAD_CHANNELS = [
   'cash.move',
   'catalog.lookup',
   'catalog.search',
+  'store.get',
+  'store.save',
   'shortcuts.get',
   'shortcuts.save',
   'catalog.itemInfo',

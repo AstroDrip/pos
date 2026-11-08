@@ -7,6 +7,7 @@ import { makeTestCtx } from '../services/test-helpers';
 import { createUser } from '../services/users';
 import { CHANNELS } from '../shared/ipc';
 import { createHandlers, type BackupEnv, type Session } from './handlers';
+import { BLANK_STORE } from '../services/store-details';
 import { receiptHtml } from './receipt-html';
 
 let t: ReturnType<typeof makeTestCtx>;
@@ -75,8 +76,8 @@ describe('IPC boundary', () => {
 describe('receipt HTML', () => {
   it('escapes product names and marks copies', () => {
     const html = receiptHtml(
-      { invoiceNo: 'INV-1', uuid: 'u', createdAt: '2026-11-04T20:27:20.451Z', cashier: '<b>', lines: [{ nameAr: 'تفاح', nameEn: '<script>x</script>', qty: 1235, unitPriceIncl: 799, discount: 0, lineIncl: 987, vatRateBp: 1500 }], totalExcl: 858, totalVat: 129, totalIncl: 987, totalDiscount: 0, payments: [{ tender: 'cash', amount: 1000 }], changeGiven: 13 },
-      { nameAr: 'متجر', nameEn: 'Store', vatNumber: '' },
+      { invoiceNo: 'INV-1', uuid: 'u', createdAt: '2026-11-04T20:27:20.451Z', cashier: '<b>', lines: [{ nameAr: 'تفاح', nameEn: '<script>x</script>', qty: 1235, unitPriceIncl: 799, discount: 0, lineVat: 129, lineExcl: 858, lineIncl: 987, vatRateBp: 1500 }], totalExcl: 858, totalVat: 129, totalIncl: 987, totalDiscount: 0, payments: [{ tender: 'cash', amount: 1000 }], changeGiven: 13 },
+      { ...BLANK_STORE, nameAr: 'متجر', nameEn: 'Store' },
       true,
     );
     expect(html).not.toContain('<script>x');
