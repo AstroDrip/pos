@@ -4,14 +4,14 @@ import { isValidEan13 } from '../core/scale-barcode';
 import { appendAudit } from './audit';
 import { createProduct, type ProductInput } from './catalog';
 import { DomainError, type Ctx } from './context';
-import { createSupplier } from './parties';
+import { createSupplier, type SupplierFields } from './parties';
 import { requirePermission } from './users';
 
 // Migration plan §K: dry run → exception report → sign-off → import all-or-nothing.
 // Opening stock and opening balances are NOT imported here; they need the accountant's approval.
 
 export const PRODUCT_COLUMNS = ['sku', 'name_ar', 'name_en', 'sold_by', 'price_incl', 'vat_percent', 'barcode', 'plu'] as const;
-export const SUPPLIER_COLUMNS = ['name', 'phone', 'vat_number', 'payment_terms_days'] as const;
+export const SUPPLIER_COLUMNS = ['name', 'phone', 'vat_number', 'payment_terms_days', 'address', 'cr_number', 'our_customer_no', 'salesman'] as const;
 
 export interface ImportIssue {
   row: number; // 1-based data row (header is row 0)
@@ -120,10 +120,10 @@ export function importProducts(ctx: Ctx, userId: number, csv: string, acceptWarn
   })();
 }
 
-export function dryRunSuppliers(ctx: Ctx, csv: string): DryRun<{ name: string; phone?: string; vatNumber?: string; paymentTermsDays: number }> {
+export function dryRunSuppliers(ctx: Ctx, csv: string): DryRun<SupplierFields> {
   const recs = csvRecords(csv, ['name']);
   const issues: ImportIssue[] = [];
-  const valid: { name: string; phone?: string; vatNumber?: string; paymentTermsDays: number }[] = [];
+  const valid: SupplierFields[] = [];
   const seen = new Map<string, number>();
   recs.forEach((r, i) => {
     const row = i + 1;
@@ -137,7 +137,7 @@ export function dryRunSuppliers(ctx: Ctx, csv: string): DryRun<{ name: string; p
     if (r.phone && !/^\+?\d{7,15}$/.test(r.phone.replace(/[\s-]/g, ''))) issues.push({ row, field: 'phone', message: 'invalid' });
     const terms = r.payment_terms_days ? Number(r.payment_terms_days) : 0;
     if (!Number.isInteger(terms) || terms < 0 || terms > 365) issues.push({ row, field: 'payment_terms_days', message: 'must be 0–365' });
-    if (issues.length === before) valid.push({ name, phone: r.phone || undefined, vatNumber: r.vat_number || undefined, paymentTermsDays: terms });
+    if (issues.length === before) valid.push({ name, phone: r.phone || undefined, vatNumber: r.vat_number || undefined, paymentTermsDays: terms, address: r.address || undefined, crNumber: r.cr_number || undefined, ourCustomerNo: r.our_customer_no || undefined, salesman: r.salesman || undefined });
   });
   return { rows: recs.length, valid, issues, warnings: [] };
 }

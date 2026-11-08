@@ -8,6 +8,21 @@ export interface Supplier {
   phone: string | null;
   vatNumber: string | null;
   paymentTermsDays: number;
+  address: string | null;
+  crNumber: string | null;
+  ourCustomerNo: string | null;
+  salesman: string | null;
+}
+
+export interface SupplierFields {
+  name: string;
+  phone?: string;
+  vatNumber?: string;
+  paymentTermsDays?: number;
+  address?: string;
+  crNumber?: string;
+  ourCustomerNo?: string;
+  salesman?: string;
 }
 
 export interface Customer {
@@ -33,7 +48,9 @@ function cleanPhone(v: string | undefined): string | null {
   return t;
 }
 
-export function createSupplier(ctx: Ctx, userId: number, input: { name: string; phone?: string; vatNumber?: string; paymentTermsDays?: number }): number {
+const opt = (v: string | undefined) => v?.trim() || null;
+
+export function createSupplier(ctx: Ctx, userId: number, input: SupplierFields): number {
   requirePermission(ctx, userId, 'supplier.manage');
   if (!input.name.trim()) throw new DomainError('VALIDATION', 'Supplier name is required');
   const terms = input.paymentTermsDays ?? 0;
@@ -41,17 +58,33 @@ export function createSupplier(ctx: Ctx, userId: number, input: { name: string; 
   return ctx.db.transaction(() => {
     const id = Number(
       ctx.db
-        .prepare('INSERT INTO suppliers (name, phone, vat_number, payment_terms_days, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(input.name.trim(), cleanPhone(input.phone), cleanVat(input.vatNumber), terms, ctx.now()).lastInsertRowid,
+        .prepare('INSERT INTO suppliers (name, phone, vat_number, payment_terms_days, address, cr_number, our_customer_no, salesman, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(input.name.trim(), cleanPhone(input.phone), cleanVat(input.vatNumber), terms, opt(input.address), opt(input.crNumber), opt(input.ourCustomerNo), opt(input.salesman), ctx.now()).lastInsertRowid,
     );
     appendAudit(ctx, { userId, action: 'supplier.create', entity: 'supplier', entityId: id, details: { name: input.name } });
     return id;
   })();
 }
 
+export function updateSupplier(ctx: Ctx, userId: number, id: number, input: SupplierFields): void {
+  requirePermission(ctx, userId, 'supplier.manage');
+  if (!input.name.trim()) throw new DomainError('VALIDATION', 'Supplier name is required');
+  const terms = input.paymentTermsDays ?? 0;
+  if (!Number.isSafeInteger(terms) || terms < 0 || terms > 365) throw new DomainError('VALIDATION', 'Invalid payment terms');
+  const phone = cleanPhone(input.phone);
+  const vat = cleanVat(input.vatNumber);
+  ctx.db.transaction(() => {
+    if (!ctx.db.prepare('SELECT 1 FROM suppliers WHERE id = ?').get(id)) throw new DomainError('NOT_FOUND', 'Supplier not found');
+    ctx.db
+      .prepare('UPDATE suppliers SET name = ?, phone = ?, vat_number = ?, payment_terms_days = ?, address = ?, cr_number = ?, our_customer_no = ?, salesman = ? WHERE id = ?')
+      .run(input.name.trim(), phone, vat, terms, opt(input.address), opt(input.crNumber), opt(input.ourCustomerNo), opt(input.salesman), id);
+    appendAudit(ctx, { userId, action: 'supplier.update', entity: 'supplier', entityId: id, details: { name: input.name, vatNumber: vat, terms } });
+  })();
+}
+
 export function listSuppliers(ctx: Ctx): Supplier[] {
   return ctx.db
-    .prepare('SELECT id, name, phone, vat_number AS vatNumber, payment_terms_days AS paymentTermsDays FROM suppliers WHERE active = 1 ORDER BY name')
+    .prepare('SELECT id, name, phone, vat_number AS vatNumber, payment_terms_days AS paymentTermsDays, address, cr_number AS crNumber, our_customer_no AS ourCustomerNo, salesman FROM suppliers WHERE active = 1 ORDER BY name')
     .all() as Supplier[];
 }
 

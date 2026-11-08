@@ -24,6 +24,11 @@ const expenseFields = z.object({
   vatRecoverable: z.boolean(),
 });
 
+const supplierFields = z.object({
+  name: z.string().min(1).max(120), phone: z.string().max(20).optional(), vatNumber: z.string().max(15).optional(), paymentTermsDays: int.min(0).max(365).optional(),
+  address: z.string().max(200).optional(), crNumber: z.string().max(20).optional(), ourCustomerNo: z.string().max(40).optional(), salesman: z.string().max(80).optional(),
+});
+
 export const schemas = {
   'auth.status': z.null(),
   'auth.setupAdmin': z.object({ username: z.string().min(1).max(40), displayName: z.string().min(1).max(80), pin: z.string().regex(/^\d{4,8}$/) }),
@@ -36,6 +41,20 @@ export const schemas = {
   'catalog.lookup': z.object({ code: z.string().min(1).max(64) }),
   'catalog.search': z.object({ text: z.string().max(64) }),
   'catalog.suggest': z.object({ text: z.string().max(64) }),
+  'bill.create': z.object({
+    requestKey: key, supplierId: int.positive(), docType: z.enum(['tax_invoice', 'delivery_note', 'proforma', 'other']), docNo: z.string().min(1).max(60), docDate: z.iso.date(), deliveryDate: z.iso.date().optional(),
+    salesAgent: z.string().max(80).optional(), payType: z.enum(['paid', 'credit']), payMethod: z.enum(['till', 'bank']).optional(), paidNow: money.optional(), dueDate: z.iso.date().optional(), noDueDate: z.boolean().optional(),
+    claimVat: z.boolean().optional(), pages: int.min(1).max(99), billDiscount: money, billCharge: money,
+    paper: z.object({ gross: money.optional(), discount: money.optional(), net: money.positive(), vat: money, total: money.positive() }),
+    differenceReason: z.string().max(200).optional(), supplierVatNo: z.string().max(15).optional(), notes: z.string().max(500).optional(),
+    lines: z.array(z.object({
+      productId: int.positive(), supplierCode: z.string().max(40).optional(), billText: z.string().max(200).optional(), tariffCode: z.string().max(20).optional(), packName: z.string().min(1).max(20), pageNo: int.min(1).max(99),
+      unitsPerPack: int.positive(), packs: money, looseQty: money, freeQty: money, receivedQty: money.optional(), priceBasis: z.enum(['pack', 'unit']), price: money, discountAmount: money.optional(), discountBp: int.min(0).max(10_000).optional(),
+      vatRateBp: int.min(0).max(10_000), vatOverride: money.optional(),
+    })).min(1).max(500),
+  }),
+  'bill.item': z.object({ supplierId: int.positive(), code: z.string().min(1).max(40) }),
+  'bill.items': z.object({ supplierId: int.positive() }),
   'store.get': z.null(),
   'store.save': z.object({
     nameAr: z.string().max(120), nameEn: z.string().max(120), legalNameAr: z.string().max(200), legalNameEn: z.string().max(200), vatNumber: z.string().max(15), crNumber: z.string().max(20),
@@ -75,7 +94,8 @@ export const schemas = {
   'hold.list': z.null(),
   'hold.recall': z.object({ id: int.positive() }),
   'supplier.list': z.null(),
-  'supplier.create': z.object({ name: z.string().min(1).max(120), phone: z.string().max(20).optional(), vatNumber: z.string().max(15).optional(), paymentTermsDays: int.min(0).max(365).optional() }),
+  'supplier.create': supplierFields,
+  'supplier.update': supplierFields.extend({ id: int.positive() }),
   'customer.find': z.object({ text: z.string().max(40) }),
   'customer.create': z.object({ name: z.string().min(1).max(120), phone: z.string().max(20).optional(), vatNumber: z.string().max(15).optional() }),
   'grn.create': z.object({ requestKey: z.string().regex(/^[\w-]{8,64}$/).optional(), supplierId: int.positive(), reference: z.string().max(60).optional(), lines: z.array(z.object({ productId: int.positive(), qty: int.positive(), unitCost: money })).min(1).max(500) }),

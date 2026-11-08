@@ -166,7 +166,9 @@ function Users() {
 function Suppliers() {
   const { t } = useI18n();
   const [list, setList] = useState<Supplier[]>([]);
-  const [f, setF] = useState({ name: '', phone: '', vatNumber: '', terms: '0' });
+  const blank = { name: '', phone: '', vatNumber: '', terms: '0', address: '', crNumber: '', ourCustomerNo: '', salesman: '' };
+  const [f, setF] = useState(blank);
+  const [editing, setEditing] = useState<number | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
   const load = () => call<Supplier[]>('supplier.list').then(setList);
   useEffect(() => void load(), []);
@@ -175,8 +177,11 @@ function Suppliers() {
     e.preventDefault();
     setMsg(null);
     try {
-      await call('supplier.create', { name: f.name, phone: f.phone || undefined, vatNumber: f.vatNumber || undefined, paymentTermsDays: Number.parseInt(f.terms || '0', 10) });
-      setF({ name: '', phone: '', vatNumber: '', terms: '0' });
+      const fields = { name: f.name, phone: f.phone || undefined, vatNumber: f.vatNumber || undefined, paymentTermsDays: Number.parseInt(f.terms || '0', 10), address: f.address || undefined, crNumber: f.crNumber || undefined, ourCustomerNo: f.ourCustomerNo || undefined, salesman: f.salesman || undefined };
+      if (editing) await call('supplier.update', { id: editing, ...fields });
+      else await call('supplier.create', fields);
+      setF(blank);
+      setEditing(null);
       void load();
     } catch (err) {
       setMsg({ kind: 'error', text: t((err as Error).message) });
@@ -190,9 +195,25 @@ function Suppliers() {
       <label>{t('Phone')}</label><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
       <label>{t('VAT number')}</label><input value={f.vatNumber} onChange={(e) => setF({ ...f, vatNumber: e.target.value })} />
       <label>{t('Payment terms (days)')}</label><input value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} />
+      <label>{t('Address')}</label><input aria-label="supplier address" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} />
+      <label>{t('CR number')}</label><input aria-label="supplier cr" value={f.crNumber} onChange={(e) => setF({ ...f, crNumber: e.target.value })} />
+      <label>{t('Our customer number at this supplier')}</label><input aria-label="our customer number" value={f.ourCustomerNo} onChange={(e) => setF({ ...f, ourCustomerNo: e.target.value })} />
+      <label>{t('Salesman')}</label><input aria-label="supplier salesman" value={f.salesman} onChange={(e) => setF({ ...f, salesman: e.target.value })} />
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
-      <p><button className="primary">{t('Add supplier')}</button></p>
-      <table className="list"><tbody>{list.map((s) => <tr key={s.id}><td>{s.name}</td><td>{s.phone}</td><td>{s.paymentTermsDays}d</td></tr>)}</tbody></table>
+      <p className="row">
+        <button className="primary">{editing ? t('Save supplier') : t('Add supplier')}</button>
+        {editing && <button type="button" onClick={() => { setEditing(null); setF(blank); setMsg(null); }}>{t('Cancel')}</button>}
+      </p>
+      <table className="list"><tbody>{list.map((s) => (
+        <tr key={s.id}>
+          <td>{s.name}</td><td>{s.phone}</td><td>{s.paymentTermsDays}d</td>
+          <td className="num"><button type="button" aria-label={`edit supplier ${s.name}`} onClick={() => {
+            setEditing(s.id);
+            setMsg(null);
+            setF({ name: s.name, phone: s.phone ?? '', vatNumber: s.vatNumber ?? '', terms: String(s.paymentTermsDays), address: s.address ?? '', crNumber: s.crNumber ?? '', ourCustomerNo: s.ourCustomerNo ?? '', salesman: s.salesman ?? '' });
+          }}>{t('Edit')}</button></td>
+        </tr>
+      ))}</tbody></table>
     </form>
   );
 }

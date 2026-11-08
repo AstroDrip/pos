@@ -3,6 +3,7 @@ import { schemas, type Channel, type IpcResult } from '../shared/ipc';
 import { backupStatus, createBackup, prepareRestore } from '../services/backup';
 import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto';
 import { getShortcuts, saveShortcuts } from '../services/shortcuts';
+import { createSupplierBill, findSupplierItem, supplierItemsFor } from '../services/supplier-bills';
 import { getStoreDetails, saveStoreDetails } from '../services/store-details';
 import { createProduct, getAliases, getProduct, itemInfo, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
 import { searchProducts as indexedSearch } from '../services/search';
@@ -11,7 +12,7 @@ import { appendAudit, verifyAuditChain } from '../services/audit';
 import { holdBill, listHeldBills, recallBill, recordRemoval } from '../services/held-bills';
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from '../services/import';
 import { receiveGoods } from '../services/inventory';
-import { createCustomer, createSupplier, findCustomers, listSuppliers } from '../services/parties';
+import { createCustomer, createSupplier, findCustomers, listSuppliers, updateSupplier } from '../services/parties';
 import { adjustmentsReport, cashierActivity, refundsReport, salesSummary, stockOnHand, voidsReport } from '../services/reports';
 import { createRefund, findSaleForRefund, refundReceiptData } from '../services/refunds';
 import { postStockCount, recordWastage } from '../services/adjustments';
@@ -110,6 +111,20 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'catalog.search': (p) => searchProducts(ctx, p.text),
     'catalog.create': (p, s) => createProduct(ctx, userId(s), p),
     'catalog.suggest': (p) => indexedSearch(ctx, p.text, [...p.text.trim()].length <= 1 ? 8 : 12),
+    'supplier.update': (p, s) => {
+      const { id, ...fields } = p;
+      updateSupplier(ctx, userId(s), id, fields);
+      return null;
+    },
+    'bill.create': (p, s) => createSupplierBill(ctx, userId(s), p),
+    'bill.item': (p, s) => {
+      requirePermission(ctx, userId(s), 'stock.receive');
+      return findSupplierItem(ctx, p.supplierId, p.code);
+    },
+    'bill.items': (p, s) => {
+      requirePermission(ctx, userId(s), 'stock.receive');
+      return supplierItemsFor(ctx, p.supplierId);
+    },
     'store.get': (_p, s) => {
       requirePermission(ctx, userId(s), 'settings.manage');
       return getStoreDetails(ctx);

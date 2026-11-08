@@ -33,6 +33,11 @@ const AR: Record<string, string> = {
   "Save store details": "حفظ بيانات المتجر",
   "Store details saved.": "تم حفظ بيانات المتجر.",
   "The logo must be a PNG or JPEG file of 200 KB or less": "يجب أن يكون الشعار PNG أو JPEG بحجم 200 كيلوبايت أو أقل",
+  // supplier bills and store details
+  "Our customer number at this supplier": "رقمنا لدى هذا المورد",
+  "Salesman": "المندوب",
+  "Save supplier": "حفظ المورد",
+  "Cancel": "إلغاء",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',
