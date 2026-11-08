@@ -7,6 +7,7 @@ import { call } from './api';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { useSuggest } from './useSuggest';
+import { focusWhenReady, useScreenKeys } from './Keyboard';
 import { HelpLink } from './HelpLink';
 import { StatusBadge, StatusLegend, statusLabel } from './StatusBadge';
 
@@ -22,13 +23,23 @@ const sar = (s: string) => {
 const FILTERS: (FinStatus | 'all' | 'open')[] = ['all', 'open', 'paid', 'partial', 'unpaid', 'overdue', 'due_soon', 'no_due', 'disputed'];
 
 /** Customer accounts (accounts receivable). Balances come from the records; nothing here is typed in as a total. */
-export function Customers({ can }: { can: (p: string) => boolean }) {
+export function Customers({ can, request }: { can: (p: string) => boolean; request?: { id?: number; n: number } }) {
   const { t } = useI18n();
   const [text, setText] = useState('');
   const [openId, setOpenId] = useState<number | null>(null);
   const [view, setView] = useState<'accounts' | 'ageing'>('accounts');
   const [newCust, setNewCust] = useState({ name: '', phone: '' });
   const [msg, setMsg] = useState<Msg>(null);
+  useEffect(() => {
+    if (!request?.n) return;
+    if (request.id) setOpenId(request.id);
+    focusWhenReady(request.id ? '[aria-label="payment amount"]' : '[data-kb-search="customer"]', '[data-kb-search="customer"]');
+  }, [request]);
+  // M only opens the place to take a payment. The amount and the save button stay with the cashier.
+  useScreenKeys(() => ({
+    state: () => ({ unavailable: {} }),
+    run: () => focusWhenReady(openId !== null ? '[aria-label="payment amount"]' : '[data-kb-search="customer"]', '[data-kb-search="customer"]'),
+  }));
   const { items: found, refresh: search } = useSuggest<Found>(text, (q) => call<Found[]>('credit.find', { text: q }).catch(() => []), { debounceMs: 250 });
 
   return (
@@ -43,7 +54,7 @@ export function Customers({ can }: { can: (p: string) => boolean }) {
           </div>
         )}
       />
-      <div style={{ maxWidth: 520 }}><label>{t('Find a customer (name, phone or ID)')}</label><input aria-label="customer search" value={text} onChange={(e) => setText(e.target.value)} /></div>
+      <div style={{ maxWidth: 520 }}><label>{t('Find a customer (name, phone or ID)')}</label><input aria-label="customer search" data-kb-search="customer" data-kb-suggest value={text} onChange={(e) => setText(e.target.value)} /></div>
       <StatusLegend />
       {view === 'ageing' ? <Ageing onOpen={(id) => { setView('accounts'); setOpenId(id); }} /> : (
         <>

@@ -36,6 +36,7 @@ export const schemas = {
   'catalog.lookup': z.object({ code: z.string().min(1).max(64) }),
   'catalog.search': z.object({ text: z.string().max(64) }),
   'catalog.suggest': z.object({ text: z.string().max(64) }),
+  'catalog.itemInfo': z.object({ productId: int.positive() }),
   'catalog.setPrice': z.object({ productId: int.positive(), priceIncl: money }),
   'catalog.setActive': z.object({ productId: int.positive(), active: z.boolean(), reason: z.string().min(1).max(200) }),
   'catalog.aliases': z.object({ productId: int.positive() }),

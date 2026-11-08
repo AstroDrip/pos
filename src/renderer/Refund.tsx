@@ -97,7 +97,7 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
       <form className="row" style={{ maxWidth: 520 }} onSubmit={find}>
         <div style={{ flex: 1 }}>
           <label>{t('Invoice number from the receipt')}</label>
-          <input autoFocus aria-label="refund invoice" placeholder="INV-00000001" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
+          <input autoFocus data-kb-search="refund" aria-label="refund invoice" placeholder="INV-00000001" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
         </div>
         <button type="submit" style={{ alignSelf: 'flex-end' }} disabled={!invoiceNo.trim()}>{t('Find sale')}</button>
       </form>

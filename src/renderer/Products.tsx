@@ -65,7 +65,7 @@ export function Products() {
         <p><button className="primary">{t('Save product')}</button></p>
       </form>
       <div>
-        <input placeholder={t('Search products')} value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input data-kb-search="product" data-kb-suggest placeholder={t('Search products')} value={search} onChange={(e) => setSearch(e.target.value)} />
         <table className="list">
           <thead><tr><th>SKU</th><th>{t('Name')}</th><th>{t('Sold by')}</th><th className="num">{t('Price')}</th></tr></thead>
           <tbody>

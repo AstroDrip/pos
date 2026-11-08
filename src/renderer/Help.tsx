@@ -52,7 +52,7 @@ export function Help({ initial }: { initial?: string }) {
       {lang === 'ar' && <p className="msg warn">{t('Help is available in English for now.')}</p>}
       <div className="help-layout" lang="en" dir="ltr">
         <nav className="help-nav" aria-label="help topics">
-          <input aria-label="help search" placeholder="Search help" value={text} onChange={(e) => setText(e.target.value)} />
+          <input data-kb-search="help" aria-label="help search" placeholder="Search help" value={text} onChange={(e) => setText(e.target.value)} />
           {text.trim() ? (
             <ul>
               {found.length === 0 && <li className="none">No guide matches. Try another word.</li>}

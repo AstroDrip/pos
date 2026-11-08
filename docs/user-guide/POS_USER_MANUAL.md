@@ -11,6 +11,7 @@ Names and numbers in the examples are made up.
   - [Log in and log out](#start-login)
   - [Find your way around the screen](#start-screen)
   - [Keyboard keys at the till](#start-keys)
+  - [Quick Actions (Ctrl+K)](#start-quick-actions)
 - **Selling**
   - [Scan a product](#selling-scan)
   - [Find a product by name or code](#selling-search)
@@ -122,16 +123,22 @@ Names and numbers in the examples are made up.
 
 **What this does:** You can take a whole order with the keyboard and scanner, without the mouse.
 
-**Keys:** `↑` `↓` `Enter` `+` `−` `Shift+Enter` `Ctrl+Enter` `Esc`
+**Keys:** `F1` `F4` `Ctrl+F` `Ctrl+K` `Shift+Enter` `Enter` `Ctrl+Enter` `+` `-` `Esc` `↑` `↓`
 
 **Steps**
 
-1. Type or scan in the search box. Suggestions appear from the first letter.
-2. Use ↑ and ↓ to move in the list, and Enter to choose.
-3. In the quantity box: + adds one, − takes one off, Enter adds the item, Esc cancels.
-4. With the search box empty: + adds one more of the last item, − takes one off.
-5. With the search box empty: Enter or Shift+Enter opens the payment step.
-6. On the payment step: Enter in Cash received pays cash, Ctrl+Enter pays by card, Esc goes back to the bill.
+1. Type or scan in the search box. Suggestions appear from the first letter. Use ↑ and ↓ to move in the list.
+2. F1: opens help for the screen you are on, over the screen. Your bill stays. Esc goes back.
+3. F4: on Sell, goes to the quantity of the last item on the bill. Type a number, or press + or −, then Enter.
+4. Ctrl+F: goes to the main search box of the screen. It will not move you while you are typing in another box.
+5. Ctrl+K: opens Quick Actions. Then press one letter.
+6. Shift+Enter: with the search box empty, goes to the payment step. It never takes a payment.
+7. Enter: in Cash received on the payment step, pays cash. Elsewhere it picks the highlighted item or confirms the quantity.
+8. Ctrl+Enter: on the payment step, records a card payment. Press it only after the bank terminal shows APPROVED.
+9. +: adds one in the quantity box, or to the last item when the search box is empty.
+10. -: takes one off in the quantity box, or from the last item when the search box is empty.
+11. Esc: closes a popup or a suggestion list. On Sell it also goes back one step.
+12. For more, press Ctrl+K and then one letter. See Quick Actions.
 
 **What you should see:** Each key does one clear thing. Shift+Enter only opens the payment step; it never takes a payment.
 
@@ -139,6 +146,37 @@ Names and numbers in the examples are made up.
 
 - *Shift+Enter shows "Pick the product (↑↓ Enter) or clear the search first."* There is still text in the search box. Choose the product, or delete the text, then press Shift+Enter again.
 - *Shift+Enter shows "Press Enter to add the item, or Esc to cancel."* The quantity box is still open. Press Enter to add the item first.
+
+<a id="start-quick-actions"></a>
+
+### Quick Actions (Ctrl+K)
+
+**What this does:** A short list of what you can do on the screen you are on. Press Ctrl+K first, then one letter. Letters only work while the list is open, so normal typing and scanning are never affected.
+
+**Where:** Any screen, after you log in. You see only what you are allowed to do on that screen.
+
+**Keys:** `Ctrl+K` `P` `C` `S` `H` `R` `I` `M` `↑` `↓` `Enter` `Tab` `Esc`
+
+**Steps**
+
+1. Press Ctrl+K. The list opens and shows each action with its letter.
+2. Press the letter. Or use ↑ and ↓, then Enter. Or press Tab and type the name of what you want.
+3. P: Product search. Goes to the product search box. On Purchases it opens Return to supplier first.
+4. C: Customer search. Goes to the customer box.
+5. S: Supplier search. Find a supplier by name and open their statement. Nothing is paid.
+6. H: Hold current order. Puts the current order on hold, like the Hold bill button.
+7. R: Retrieve held order. Shows the held orders. Choose one to bring it back.
+8. I: Item information. Shows the price and stock of an item. Scan it or type its name. It does not add anything to the bill.
+9. M: Money. Opens customer collection (Customers, Sell) or supplier settlement (Purchases). You still type the amount and press the button yourself; nothing is paid by this key.
+10. Press Esc to close the list. You go back to the box you were in.
+
+**What you should see:** The action opens at once. A grey action cannot be used right now, and the reason is shown beside it.
+
+**If something goes wrong**
+
+- *Ctrl+K shows "Press Enter to add the item, or Esc to cancel."* The quantity box is open. Finish the quantity first, then press Ctrl+K.
+- *The letter you want is not in the list.* It does not belong to this screen, or your user is not allowed to use it.
+- *Collection or settlement did not take a payment.* That is correct. The letter only opens the place to pay. You type the amount and press the button yourself.
 
 ## Selling
 

@@ -156,6 +156,30 @@ export function scaleFormats(ctx: Ctx): ScaleBarcodeFormat[] {
     .all() as ScaleBarcodeFormat[];
 }
 
+export interface ItemInfo {
+  productId: number;
+  sku: string;
+  nameAr: string;
+  nameEn: string;
+  priceIncl: number;
+  vatRateBp: number;
+  sellMode: 'unit' | 'weight';
+  stockQty: number;
+}
+
+/** Price and stock for the till's item check. Never includes the cost. */
+export function itemInfo(ctx: Ctx, productId: number): ItemInfo {
+  const r = ctx.db
+    .prepare(
+      `SELECT p.id AS productId, p.sku, p.name_ar AS nameAr, p.name_en AS nameEn, p.price_incl AS priceIncl, p.vat_rate_bp AS vatRateBp,
+              p.sell_mode AS sellMode, COALESCE(b.qty, 0) AS stockQty
+       FROM products p LEFT JOIN stock_balances b ON b.product_id = p.id WHERE p.id = ?`,
+    )
+    .get(productId) as ItemInfo | undefined;
+  if (!r) throw new DomainError('NOT_FOUND', 'Product not found');
+  return r;
+}
+
 export interface LookupResult {
   product: Product;
   qty: number; // milli-units to add

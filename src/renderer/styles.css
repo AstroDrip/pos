@@ -322,3 +322,21 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
   .help-layout { display: block; }
   .help-article { border: none; max-width: none; padding: 0; }
 }
+
+/* ── Quick Actions (Ctrl+K) ───────────────────────────────── */
+.palette-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; background: rgba(0, 0, 0, 0.45); }
+.palette { width: min(520px, 92vw); max-height: 72vh; display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow); }
+.palette h3 { margin: 0; }
+.palette ul { margin: 0; padding: 0; list-style: none; }
+.palette li { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); cursor: pointer; }
+.palette li.active { background: var(--selected-bg); box-shadow: inset 4px 0 0 var(--primary); }
+.palette li.off { color: var(--muted); cursor: default; }
+.palette li .kbd { margin-inline-start: 0; }
+.palette li .grow { flex: 1; }
+.palette .none { margin: 0; color: var(--muted); }
+.palette .msg { margin: 0; }
+.palette-item { margin: 0; }
+.palette-item > div { display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-1) 0; }
+.palette-item dt { color: var(--muted); }
+.palette-item dd { margin: 0; font-weight: 600; }
+.step small.hint { display: block; }

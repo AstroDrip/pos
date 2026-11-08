@@ -8,6 +8,7 @@ import { StatusBadge, StatusLegend } from './StatusBadge';
 import { call } from './api';
 import { PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
+import { focusWhenReady, useScreenKeys } from './Keyboard';
 import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
 
@@ -28,6 +29,23 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
   const [section, setSection] = useState<Section>(can('purchase.manage') ? 'invoice' : 'pay');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), []);
+  const [supplierRequest, setSupplierRequest] = useState<{ id: number; n: number }>({ id: 0, n: 0 });
+  // These only open a section. M never records a payment: the amount and the save button stay with the user.
+  useScreenKeys(() => ({
+    state: () => ({ unavailable: {} }),
+    run: (id, arg) => {
+      if (id === 'P') {
+        setSection('return');
+        focusWhenReady('[data-kb-search="product"]');
+      } else if (id === 'S' && arg) {
+        setSection('pay');
+        setSupplierRequest((r) => ({ id: arg, n: r.n + 1 }));
+      } else if (id === 'M') {
+        setSection('pay');
+        focusWhenReady('[data-kb-settle] select');
+      }
+    },
+  }));
   const tabs: { id: Section; label: string; show: boolean }[] = [
     { id: 'invoice', label: 'Supplier invoices', show: can('purchase.manage') },
     { id: 'return', label: 'Return to supplier', show: can('purchase.manage') },
@@ -51,7 +69,7 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
       <p className="msg warn" style={{ maxWidth: 900 }}>{t('Purchase accounting is provisional until your accountant approves it.')}</p>
       {section === 'invoice' && <InvoiceForm suppliers={suppliers} />}
       {section === 'return' && <ReturnForm suppliers={suppliers} />}
-      {section === 'pay' && <Balances suppliers={suppliers} can={can} />}
+      {section === 'pay' && <Balances suppliers={suppliers} can={can} request={supplierRequest} />}
       {section === 'ageing' && <Ageing />}
       {section === 'register' && <Register />}
     </div>
@@ -229,7 +247,7 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
   );
 }
 
-function Balances({ suppliers, can }: { suppliers: Supplier[]; can: (p: string) => boolean }) {
+function Balances({ suppliers, can, request }: { suppliers: Supplier[]; can: (p: string) => boolean; request?: { id: number; n: number } }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<{ supplierId: number; supplier: string; balance: number }[]>([]);
   const [open, setOpen] = useState(0);
@@ -239,6 +257,9 @@ function Balances({ suppliers, can }: { suppliers: Supplier[]; can: (p: string) 
   const [busy, setBusy] = useState(false);
   const payKey = useRef(crypto.randomUUID());
   const load = () => call<typeof rows>('purchase.balances').then(setRows, () => setRows([]));
+  useEffect(() => {
+    if (request?.id) setOpen(request.id);
+  }, [request]);
   useEffect(() => void load(), []);
   useEffect(() => {
     if (open) void call<typeof st>('purchase.statement', { supplierId: open }).then(setSt);
@@ -460,7 +481,7 @@ function SupplierPay({ suppliers, onDone }: { suppliers: Supplier[]; onDone: (m:
     <div className="card section" role="group" aria-label="pay supplier" style={{ marginTop: 'var(--sp-4)' }}>
       <h4>{t('Pay a supplier')} <HelpLink article="suppliers-pay" /></h4>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div><label>{t('Supplier')}</label><SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} /></div>
+        <div data-kb-settle><label>{t('Supplier')}</label><SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} /></div>
         <div><label>{t('Amount (SAR)')}</label><input aria-label="supplier pay amount" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></div>
         <div><label>{t('From')}</label><select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value as 'bank' | 'till' })}><option value="bank">{t('Bank')}</option><option value="till">{t('Till cash (open shift)')}</option></select></div>
         <div><label>{t('Payment date')}</label><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>

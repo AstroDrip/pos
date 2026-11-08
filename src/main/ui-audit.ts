@@ -132,7 +132,10 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
           }
           await clearBill();
           await capture(`${slug}-empty__${v.id}`);
-          if (vi === 0) await keyFlows();
+          if (vi === 0) {
+            await keyFlows();
+            await shortcutFlows();
+          }
           await clearBill();
           for (const code of ['6281000000000', '6281000000077', '6281000000033']) await scan(code); // fake seed barcodes
           await capture(`${slug}-lines__${v.id}`);
@@ -166,6 +169,281 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   } finally {
     writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 1));
     app.quit();
+  }
+
+  /** Real key presses for F1, F4, Ctrl+F and Quick Actions (Ctrl+K). */
+  async function shortcutFlows() {
+    const box = 'input[aria-label="product search"]';
+    const isOpen = () => js<boolean>(`!!document.querySelector('.palette')`);
+    const active = () => js<string>(`document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.id ?? ''`);
+    const rows = () => js<string[]>(`[...document.querySelectorAll('.palette li .kbd')].map((e) => e.textContent)`);
+    const value = (sel: string) => js<string>(`document.querySelector(${JSON.stringify(sel)})?.value ?? ''`);
+    const clearBox = () => js(`(() => { const e = document.querySelector(${JSON.stringify(box)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, ''); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    const ctrlK = async () => { key('k', ['control']); await sleep(200); };
+    const letter = async (l: string) => { key(l); await sleep(250); };
+    const esc = async () => { key('Escape'); await sleep(200); };
+    const tabTo = async (name: string) => {
+      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await sleep(400);
+    };
+
+    await clearBill();
+    await focus(box);
+    // Letters outside the palette are plain typing
+    await type('phscrim', 40);
+    await sleep(200);
+    flow('letters-are-typing-outside-palette', !(await isOpen()) && (await value(box)) === 'phscrim', `box: "${await value(box)}"`);
+    await esc();
+    await clearBox();
+    await sleep(250);
+
+    // Open, show letters, close, focus comes back
+    await focus(box);
+    await ctrlK();
+    const shown = await rows();
+    flow('ctrl-k-opens-on-sell', (await isOpen()) && ['P', 'C', 'H', 'R', 'I', 'M'].every((x) => shown.includes(x)) && !shown.includes('S'), `letters: ${shown.join(' ')}`);
+    await capture('60-quick-actions__light-en-1366x768');
+    await esc();
+    flow('esc-closes-and-restores-focus', !(await isOpen()) && (await active()) === 'product search', `focus: ${await active()}`);
+
+    // Ctrl+K twice, and a held key, never stack two boxes
+    await ctrlK();
+    await ctrlK();
+    flow('ctrl-k-again-closes', !(await isOpen()), `open: ${await isOpen()}`);
+
+    // Arabic layout (physical K key)
+    await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ن', code: 'KeyK', ctrlKey: true, bubbles: true, cancelable: true }))`);
+    await sleep(200);
+    flow('ctrl-k-arabic-layout', await isOpen(), `open: ${await isOpen()}`);
+    await esc();
+
+    // Disabled action: refused with the reason, stays open
+    await ctrlK();
+    await letter('h');
+    const note = await js<string>(`document.querySelector('.palette .msg')?.textContent ?? ''`);
+    flow('unavailable-action-refused', (await isOpen()) && note !== '' && (await lineCount()) === 0, `note: "${note}"`);
+    await esc();
+
+    // Searching by name: letters are typing
+    await ctrlK();
+    key('Tab');
+    await sleep(100);
+    await type('hold', 60);
+    await sleep(200);
+    const filtered = await rows();
+    flow('palette-search-by-name', (await isOpen()) && filtered.length === 1 && filtered[0] === 'H', `rows: ${filtered.join(' ')}`);
+    await esc();
+
+    // Arrow keys and Enter
+    await ctrlK();
+    key('Down');
+    await sleep(100);
+    const hi = await js<string>(`document.querySelector('.palette li.active .kbd')?.textContent ?? ''`);
+    key('Enter');
+    await sleep(250);
+    flow('palette-arrows-and-enter', hi === 'C' && !(await isOpen()) && (await active()) === 'customer-phone', `highlight ${hi}, focus ${await active()}`);
+
+    // P goes to product search
+    await ctrlK();
+    await letter('p');
+    flow('quick-p-product-search', !(await isOpen()) && (await active()) === 'product search', `focus ${await active()}`);
+
+    // Scanner works while the palette is open, and its digits are not commands
+    await ctrlK();
+    await type('6281000000000');
+    key('Enter');
+    await sleep(600);
+    const afterScan = await lineCount();
+    const leftInPalette = await value('input[aria-label="quick actions search"]');
+    flow('scanner-with-palette-open', afterScan === 1 && (await isOpen()) && leftInPalette === '', `lines ${afterScan}, box "${leftInPalette}"`);
+    await esc();
+
+    // Item information: a scan checks the item and does NOT add it to the bill
+    await ctrlK();
+    await letter('i');
+    await type('6281000000077');
+    key('Enter');
+    await sleep(600);
+    const info = await js<boolean>(`!!document.querySelector('.palette-item')`);
+    await capture('61-item-information__light-en-1366x768');
+    flow('quick-i-scan-does-not-add', info && (await lineCount()) === 1, `info shown ${info}, lines ${await lineCount()}`);
+    await esc();
+
+    // M is refused with a bill on screen, so the bill cannot be lost
+    await ctrlK();
+    await letter('m');
+    flow('quick-m-refused-with-bill', (await isOpen()) && (await lineCount()) === 1, `open ${await isOpen()}`);
+    await esc();
+
+    // F4, + and − on the line, Enter back to search
+    await focus(box);
+    key('F4');
+    await sleep(200);
+    const f4 = await active();
+    key('+');
+    await sleep(300);
+    const plus = await qtyOfLastLine();
+    const kept = await active();
+    key('-');
+    await sleep(300);
+    const minus = await qtyOfLastLine();
+    key('Enter');
+    await sleep(300);
+    flow('f4-plus-minus-enter', f4 === 'line quantity' && plus === '2' && kept === 'line quantity' && minus === '1' && (await active()) === 'product search', `f4 ${f4}, + ${plus}, focus ${kept}, - ${minus}, then ${await active()}`);
+
+    // F1 over the bill; Esc returns to the same box with the bill kept
+    await focus(box);
+    key('F1');
+    await sleep(400);
+    const help = await js<boolean>(`!!document.querySelector('.help-overlay .help-article')`);
+    await ctrlK();
+    const noStack = !(await isOpen());
+    await esc();
+    await sleep(200);
+    flow('f1-keeps-bill-no-popup-on-popup', help && noStack && (await lineCount()) === 1 && (await active()) === 'product search', `help ${help}, palette blocked ${noStack}, focus ${await active()}`);
+
+    // H then R
+    await ctrlK();
+    await letter('h');
+    await sleep(300);
+    const heldEmpty = await lineCount();
+    await ctrlK();
+    await letter('r');
+    await sleep(200);
+    key('Enter');
+    await sleep(500);
+    flow('quick-h-then-r', heldEmpty === 0 && (await lineCount()) === 1 && !(await isOpen()), `after hold ${heldEmpty}, after retrieve ${await lineCount()}`);
+
+    // Quantity step: search suggestion, then Enter confirms; Ctrl+K and F1 cannot lose the chosen item
+    await focus(box);
+    await type('W', 30);
+    await sleep(600);
+    key('Enter');
+    await sleep(300);
+    const qtyOpen = await js<boolean>(`!!document.querySelector('[aria-label="quantity step"]')`);
+    await ctrlK();
+    key('F1');
+    await sleep(200);
+    const stillQty = await js<boolean>(`!!document.querySelector('[aria-label="quantity step"]') && !document.querySelector('.help-overlay') && !document.querySelector('.palette')`);
+    flow('qty-step-protected', qtyOpen && stillQty, `qty step ${qtyOpen}, kept ${stillQty}`);
+    await esc();
+    await sleep(200);
+
+    // Payment step: Ctrl+F refused; Shift+Enter never pays; Enter pays once
+    await focus(box);
+    await sleep(400);
+    key('Enter', ['shift']);
+    await waitFor(`document.querySelector('[aria-label="payment step"].current')`, 1500);
+    await sleep(500);
+    key('f', ['control']);
+    await sleep(200);
+    const stayed = await active();
+    await ctrlK();
+    await letter('h');
+    const holdRefused = (await isOpen()) && (await lineCount()) >= 1;
+    await esc();
+    flow('pay-step-protected', stayed === 'cash received' && holdRefused, `focus ${stayed}, hold refused ${holdRefused}`);
+    const before = hooks.salesCount();
+    await focus('input[aria-label="cash received"]');
+    await sleep(400);
+    key('Enter');
+    key('Enter');
+    key('Enter');
+    await sleep(1200);
+    flow('enter-pays-cash-once', hooks.salesCount() === before + 1 && (await lineCount()) === 0, `sales ${before} -> ${hooks.salesCount()}`);
+
+    // Card: Ctrl+Enter, once; empty bill can never be paid
+    await sleep(600);
+    await scan('6281000000000');
+    await focus(box);
+    await sleep(500);
+    key('Enter', ['shift']);
+    await waitFor(`document.querySelector('[aria-label="payment step"].current')`, 1500);
+    await sleep(500);
+    const b2 = hooks.salesCount();
+    key('Enter', ['control']);
+    key('Enter', ['control']);
+    await sleep(1200);
+    flow('ctrl-enter-pays-card-once', hooks.salesCount() === b2 + 1, `sales ${b2} -> ${hooks.salesCount()}`);
+    const b3 = hooks.salesCount();
+    await focus(box);
+    await sleep(500);
+    key('Enter', ['shift']);
+    key('Enter');
+    key('Enter', ['control']);
+    await sleep(600);
+    flow('empty-bill-never-paid', hooks.salesCount() === b3, `sales ${b3} -> ${hooks.salesCount()}`);
+
+    // Window loses and regains focus while the palette is open
+    await focus(box);
+    await ctrlK();
+    win.blur();
+    await sleep(200);
+    win.focus();
+    wc.focus();
+    await sleep(200);
+    const stillOpen = await isOpen();
+    await esc();
+    flow('window-focus-change', stillOpen && !(await isOpen()), `open after refocus ${stillOpen}`);
+
+    // Other screens: right letters, right target
+    const expected: Record<string, string[]> = { Customers: ['C', 'M'], Stock: ['P', 'I'], Products: ['P', 'I'], Purchases: ['P', 'S', 'I', 'M'], Accounting: [] };
+    for (const [name, letters] of Object.entries(expected)) {
+      await tabTo(name);
+      await js('document.activeElement?.blur()');
+      await ctrlK();
+      const got = await rows();
+      const empty = await js<boolean>(`!!document.querySelector('.palette .none')`);
+      flow(`ctrl-k-on-${name.toLowerCase()}`, got.slice().sort().join() === letters.slice().sort().join() && (letters.length > 0 || empty), `letters: ${got.join(' ')}`);
+      await esc();
+    }
+
+    await tabTo('Stock');
+    await js('document.activeElement?.blur()');
+    key('f', ['control']);
+    await sleep(200);
+    flow('ctrl-f-on-stock', (await js<string>(`document.activeElement?.getAttribute('data-kb-search') ?? ''`)) === 'product', `focus ${await active()}`);
+    await type('zz', 60);
+    await sleep(100);
+    key('Escape');
+    await sleep(150);
+    flow('esc-clears-suggestions', (await value('[data-kb-search="product"]')) === '', `box "${await value('[data-kb-search="product"]')}"`);
+
+    await tabTo('Customers');
+    const fields = 'input:not([data-kb-search]):not([type=checkbox]):not([disabled])';
+    await focus(fields);
+    await type('abc', 60);
+    const typed = await js<string>(`document.activeElement?.value ?? ''`);
+    key('f', ['control']);
+    await sleep(200);
+    const inField = await js<string>(`document.activeElement?.value ?? ''`);
+    flow('ctrl-f-does-not-steal-form-editing', typed === 'abc' && inField === 'abc', `typed "${typed}", focus value "${inField}"`);
+
+    await tabTo('Purchases');
+    await js('document.activeElement?.blur()');
+    const b4 = hooks.salesCount();
+    await ctrlK();
+    await letter('m');
+    await sleep(500);
+    const settle = await js<boolean>(`document.activeElement === document.querySelector('[data-kb-settle] select')`);
+    flow('quick-m-opens-settlement-only', settle && hooks.salesCount() === b4 && !(await isOpen()), `supplier box focused ${settle}`);
+    await ctrlK();
+    await letter('s');
+    const supplierList = await js<number>(`document.querySelectorAll('.palette li').length`);
+    await esc();
+    flow('quick-s-supplier-search', supplierList > 0, `suppliers listed ${supplierList}`);
+
+    // Sell with an empty bill: M goes to the collection screen, and takes no payment
+    await tabTo('Sell');
+    await sleep(300);
+    await focus(box);
+    await ctrlK();
+    await letter('m');
+    await sleep(500);
+    const onCustomers = await js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith('Customers')`);
+    flow('quick-m-from-sell-opens-collection', onCustomers && (await active()) === 'customer search', `on customers ${onCustomers}, focus ${await active()}`);
+    await tabTo('Sell');
+    await sleep(300);
   }
 
   async function keyFlows() {

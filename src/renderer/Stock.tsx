@@ -72,7 +72,7 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
           <label>{t('Supplier invoice / delivery note no.')}</label>
           <input value={reference} onChange={(e) => setReference(e.target.value)} />
           <label>{t('Add product')}</label>
-          <input placeholder={t('Search name or SKU')} value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input data-kb-search="product" data-kb-suggest placeholder={t('Search name or SKU')} value={search} onChange={(e) => setSearch(e.target.value)} />
           {found.map((p) => (
             <button key={p.id} style={{ margin: 4 }} onClick={() => { setLines([...lines, { product: p, qty: '', cost: '' }]); setSearch(''); }}>
               {p.nameEn}
@@ -193,7 +193,7 @@ function AdjustCard({ kind, onDone }: { kind: 'waste' | 'count'; onDone: () => v
         <input placeholder={t('e.g. Monthly count, aisle 3')} value={reason} onChange={(e) => setReason(e.target.value)} />
       )}
       <label>{t('Add product')}</label>
-      <input placeholder={t('Search name or SKU')} aria-label={`${kind} product search`} value={search} onChange={(e) => setSearch(e.target.value)} />
+      <input data-kb-search="product" data-kb-suggest placeholder={t('Search name or SKU')} aria-label={`${kind} product search`} value={search} onChange={(e) => setSearch(e.target.value)} />
       {found.map((p) => (
         <button key={p.id} style={{ margin: 4 }} onClick={() => { if (!lines.some((l) => l.product.id === p.id)) setLines([...lines, { product: p, qty: '' }]); setSearch(''); }}>
           {p.nameEn}

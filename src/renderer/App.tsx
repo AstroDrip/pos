@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '../services/users';
 import { Admin, Restore, type FullBackupStatus } from './Admin';
 import { call } from './api';
@@ -7,6 +7,7 @@ import { Accounting } from './Accounting';
 import { Expenses } from './Expenses';
 import { Help } from './Help';
 import { HelpContext } from './help/HelpContext';
+import { KeyboardProvider, focusEl } from './Keyboard';
 import { Customers } from './Customers';
 import { Products } from './Products';
 import { Purchases } from './Purchases';
@@ -43,7 +44,22 @@ export function App() {
   const [error, setError] = useState('');
   // A "?" link opens help OVER the current screen, so a bill or a half-filled form is never lost.
   const [helpAt, setHelpAt] = useState<string | null>(null);
-  const openHelp = (id: string) => setHelpAt(id);
+  const helpReturn = useRef<HTMLElement | null>(null);
+  const openHelp = useCallback((id: string) => {
+    helpReturn.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setHelpAt(id);
+  }, []);
+  const closeHelp = useCallback(() => {
+    setHelpAt(null);
+    const el = helpReturn.current;
+    helpReturn.current = null;
+    requestAnimationFrame(() => focusEl(el)); // back to the box the cashier was in
+  }, []);
+  const [customerRequest, setCustomerRequest] = useState<{ id?: number; n: number }>({ n: 0 });
+  const openCustomers = useCallback((id?: number) => {
+    setCustomerRequest((r) => ({ id, n: r.n + 1 }));
+    setTab('customers');
+  }, []);
 
   // Every login starts on Sell: the previous user's tab may be one the new user is not allowed to see.
   const refresh = () =>
@@ -79,6 +95,7 @@ export function App() {
   const can = (p: string) => user.permissions.includes(p);
   return (
     <HelpContext.Provider value={openHelp}>
+      <KeyboardProvider tab={tab} can={can} helpOpen={helpAt !== null} openHelp={openHelp} closeHelp={closeHelp} openCustomers={openCustomers}>
       <TopBar>
         <strong className="brand">POS</strong>
         <nav aria-label="main">
@@ -103,25 +120,26 @@ export function App() {
       {tab === 'stock' && <Stock can={can} />}
       {tab === 'products' && <Products />}
       {tab === 'reports' && <Reports />}
-      {tab === 'customers' && <Customers can={can} />}
+      {tab === 'customers' && <Customers can={can} request={customerRequest} />}
       {tab === 'purchases' && <Purchases can={can} />}
       {tab === 'expenses' && <Expenses can={can} />}
       {tab === 'accounting' && <Accounting />}
       {tab === 'shift' && <Shift can={can} />}
       {tab === 'admin' && <Admin can={can} />}
       {tab === 'help' && <Help />}
-      {helpAt && <HelpOverlay article={helpAt} onClose={() => setHelpAt(null)} />}
+      {helpAt && <HelpOverlay article={helpAt} onClose={closeHelp} />}
+      </KeyboardProvider>
     </HelpContext.Provider>
   );
 }
 
-/** Help shown over the current screen (from a "?" link). Esc or Close returns to exactly where the user was. */
+/** Help shown over the current screen (F1 or a "?" link). Esc (central key handler) or Close returns to exactly where the user was. */
 function HelpOverlay({ article, onClose }: { article: string; onClose: () => void }) {
   const { t } = useI18n();
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => closeRef.current?.focus(), []);
   return (
-    <div className="help-overlay" role="dialog" aria-modal="true" aria-label={t('Help')} onKeyDown={(e) => e.key === 'Escape' && onClose()} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="help-overlay" role="dialog" aria-modal="true" aria-label={t('Help')} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="help-overlay-panel">
         <button ref={closeRef} type="button" className="close" onClick={onClose}>{t('Close')}</button>
         <Help initial={article} />

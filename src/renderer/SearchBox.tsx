@@ -99,6 +99,7 @@ export function SearchBox({
         ref={input}
         autoFocus
         aria-label="product search"
+        data-kb-search="product"
         disabled={disabled}
         value={text}
         onChange={(e) => {

@@ -13,6 +13,8 @@ import { call, type ApiError } from './api';
 import { SearchBox } from './SearchBox';
 import { decideKey, decrementQtyText, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
 import { HelpLink } from './HelpLink';
+import { useOpenCustomers, useScanner, useScreenKeys } from './Keyboard';
+import { keyLike, lineQtyKey, type ActionId } from './keyboard-registry';
 import { ProductName, useI18n } from './i18n';
 
 /** A bill line; scanCode = the scale label scanned, kept on the sale line for audit. */
@@ -184,18 +186,15 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   }, [addLine]);
 
   // Scanner input is caught globally, whatever has focus (plan §I).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const scan = scanner.current.key(e.key, e.timeStamp);
-      if (!scan) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.target instanceof HTMLInputElement) removeScannedText(e.target, scan.code);
-      void addCode(scan.code, scan.possibleDuplicate);
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [addCode]);
+  useScanner((e, scanTarget) => {
+    const scan = scanner.current.key(e.key, e.timeStamp);
+    if (!scan) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.target instanceof HTMLInputElement) removeScannedText(e.target, scan.code);
+    if (!scanTarget.current?.(scan.code)) void addCode(scan.code, scan.possibleDuplicate);
+    return true;
+  });
 
   const resetBill = () => {
     billKey.current = crypto.randomUUID();
@@ -307,6 +306,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   };
   const lessOf = (idx: number) => changeQty(idx, decrementLine(lines, idx));
   const typedQty = (idx: number, text: string, el: HTMLInputElement) => {
+    if (el.dataset.skip) return; // + or − already applied this box's value
     const m = /^\s*(\d{1,4})\s*$/.exec(text);
     const units = lines[idx] ? lines[idx]!.qty / 1000 : 0;
     if (!m) {
@@ -315,6 +315,45 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     }
     if (Number(m[1]) !== units) changeQty(idx, setLineQty(lines, idx, Number(m[1])));
   };
+  // A changed quantity rebuilds the box, so after + or − focus is put back on the same line.
+  const refocusLine = useRef<string | null>(null);
+  useEffect(() => {
+    const uid = refocusLine.current;
+    if (!uid) return;
+    refocusLine.current = null;
+    const el = document.querySelector<HTMLInputElement>(`input[data-line="${uid}"]`);
+    el?.focus();
+    el?.select();
+  }, [lines]);
+  /** Keys in a bill line's quantity box (reached with F4 or a click). */
+  const onLineKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    const a = lineQtyKey(keyLike(e.nativeEvent));
+    if (a === 'none') return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    const line = lines[i]!;
+    if (a === 'inc' || a === 'dec') {
+      const typed = /^\s*\d{1,4}\s*$/.test(el.value) ? Number(el.value) : line.qty / 1000;
+      const next = typed + (a === 'inc' ? 1 : -1);
+      const r = setLineQty(lines, i, Math.max(next, 0));
+      if (r.lines === lines) {
+        if (r.blocked) changeQty(i, r);
+        return;
+      }
+      el.dataset.skip = '1';
+      changeQty(i, r);
+      if (r.removed) goStep(step);
+      else refocusLine.current = line.uid ?? null;
+    } else if (a === 'done') {
+      el.blur();
+      goStep(step);
+    } else if (a === 'cancel') {
+      el.value = String(line.qty / 1000);
+      el.blur();
+      goStep(step);
+    }
+  };
+
   const undoRemoval = () => {
     if (!undo || lines !== undo.after) return;
     setLines(restoreLine(lines, undo.removed));
@@ -344,6 +383,51 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
       setMsg({ kind: 'error', text: t((e as Error).message) });
     }
   };
+
+  const holding = useRef(false);
+  const openCustomers = useOpenCustomers();
+  useScreenKeys(() => ({
+    state: () => {
+      const unavailable: Partial<Record<ActionId, string>> = {};
+      if (!shift) for (const id of ['P', 'C', 'H', 'R', 'M'] as ActionId[]) unavailable[id] = t('Open the shift first.');
+      else if (step !== 'search') for (const id of ['P', 'C', 'H', 'R', 'M'] as ActionId[]) unavailable[id] = t('Press Esc to go back to the bill first.');
+      else {
+        if (lines.length === 0) unavailable.H = t('The bill is empty.');
+        if (held.length === 0) unavailable.R = t('No held orders.');
+        else if (lines.length > 0) unavailable.R = t('Finish or hold the current bill first.');
+        if (lines.length > 0) unavailable.M = t('Finish or hold the current bill first.');
+        if (customer) unavailable.C = t('A customer is already on this bill.');
+      }
+      return { unavailable, step, busy: busyRef.current, held: held.map((h) => ({ id: h.id, label: `${h.label} (${h.lineCount})` })) };
+    },
+    run: (id, arg) => {
+      if (id === 'P') goStep('search');
+      else if (id === 'C') document.getElementById('customer-phone')?.focus();
+      else if (id === 'M') openCustomers(customer?.id);
+      else if (id === 'H' && !holding.current) {
+        holding.current = true; // a second press while saving can never hold twice
+        void hold().finally(() => {
+          holding.current = false;
+          goStep('search');
+        });
+      } else if (id === 'R' && arg) {
+        void recall(arg).finally(() => goStep('search'));
+      }
+    },
+    focusQty: () => {
+      if (step === 'qty') {
+        qtyRef.current?.focus();
+        qtyRef.current?.select();
+        return;
+      }
+      const boxes = document.querySelectorAll<HTMLInputElement>('.cart input[aria-label="line quantity"]');
+      const last = boxes[boxes.length - 1];
+      if (!last) return setMsg({ kind: 'warn', text: t('No item to change.') });
+      last.focus();
+      last.select();
+    },
+    notify: (text) => setMsg({ kind: 'warn', text }),
+  }));
 
   const findCustomer = async () => {
     try {
@@ -455,11 +539,12 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
                       <input
                         key={`${l.uid}:${l.qty}`}
                         aria-label="line quantity"
+                        data-line={l.uid}
                         inputMode="numeric"
                         defaultValue={formatQty(l.qty, 0)}
                         disabled={busy}
                         onBlur={(e) => typedQty(i, e.target.value, e.target)}
-                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        onKeyDown={(e) => onLineKey(i, e)}
                       />
                       <button type="button" aria-label="one more" title={t('One more')} disabled={busy} onClick={() => setLines(incrementLine(lines, i))}>+</button>
                     </span>
@@ -506,6 +591,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             onFocusBox={() => goStep('search', false)}
           />
           <small className="hint">{t('Empty box: Enter or Shift+Enter = payment · + / − = one more / one less of the last item')}</small>
+          <small className="hint">{t('Ctrl+K = quick actions · F4 = quantity · F1 = help')}</small>
         </div>
         {step === 'qty' && pending && (
           <div className="step current" role="group" aria-label="quantity step">

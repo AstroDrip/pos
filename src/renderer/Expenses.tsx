@@ -100,7 +100,7 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
             {STATES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
           </select>
         </div>
-        <div><label>{t('Payee')}</label><input value={filter.payee} onChange={(e) => setFilter({ ...filter, payee: e.target.value })} /></div>
+        <div><label>{t('Payee')}</label><input data-kb-search="filter" value={filter.payee} onChange={(e) => setFilter({ ...filter, payee: e.target.value })} /></div>
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
 

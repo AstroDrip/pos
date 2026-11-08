@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { schemas, type Channel, type IpcResult } from '../shared/ipc';
 import { backupStatus, createBackup, prepareRestore } from '../services/backup';
 import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto';
-import { createProduct, getAliases, getProduct, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
+import { createProduct, getAliases, getProduct, itemInfo, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit, verifyAuditChain } from '../services/audit';
@@ -108,6 +108,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'catalog.search': (p) => searchProducts(ctx, p.text),
     'catalog.create': (p, s) => createProduct(ctx, userId(s), p),
     'catalog.suggest': (p) => indexedSearch(ctx, p.text, [...p.text.trim()].length <= 1 ? 8 : 12),
+    'catalog.itemInfo': (p) => itemInfo(ctx, p.productId),
     'catalog.setPrice': (p, s) => setPrice(ctx, userId(s), p.productId, p.priceIncl),
     'catalog.setActive': (p, s) => setProductActive(ctx, userId(s), p.productId, p.active, p.reason),
     'catalog.aliases': (p, s) => {
