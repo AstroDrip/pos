@@ -374,6 +374,77 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(600);
     flow('empty-bill-never-paid', hooks.salesCount() === b3, `sales ${b3} -> ${hooks.salesCount()}`);
 
+    // Review findings
+    await clearBill();
+    await focus(box);
+    await ctrlK();
+    await type('6281000000000');
+    key('Enter');
+    await sleep(600);
+    await letter('m');
+    await sleep(300);
+    const stillSell = await js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith('Sell')`);
+    flow('palette-rechecks-before-running', stillSell && (await lineCount()) === 1, `on sell ${stillSell}, lines ${await lineCount()}`);
+    await esc();
+
+    await focus(box);
+    await sleep(300);
+    key('+');
+    await sleep(200);
+    key('+');
+    await sleep(200);
+    key('+');
+    await sleep(200);
+    key('+');
+    await sleep(300);
+    const lq = 'input[aria-label="line quantity"]';
+    key('F4');
+    await sleep(200);
+    await type('4', 30);
+    await sleep(100);
+    key('+');
+    await sleep(300);
+    const boxShows = await value(lq);
+    await type('3', 30);
+    await sleep(100);
+    key('Enter');
+    await sleep(300);
+    const afterType = await qtyOfLastLine();
+    flow('line-qty-box-matches-bill', boxShows === '5' && afterType === '3', `box after + "${boxShows}", after typing 3: ${afterType}`);
+
+    await focus(box);
+    await sleep(500);
+    key('Enter', ['shift']);
+    await waitFor(`document.querySelector('[aria-label="payment step"].current')`, 1500);
+    await sleep(500);
+    await focus('input[aria-label="cash received"]');
+    await sleep(500);
+    await ctrlK();
+    await letter('i');
+    await type('6281000000077');
+    key('Enter');
+    await sleep(600);
+    const b5 = hooks.salesCount();
+    key('Enter');
+    key('Enter');
+    await sleep(900);
+    flow('double-enter-closing-palette-never-pays', hooks.salesCount() === b5 && (await lineCount()) === 1, `sales ${b5} -> ${hooks.salesCount()}`);
+    await focus('input[aria-label="cash received"]');
+    await esc();
+    await sleep(300);
+    await clearBill();
+
+    await focus(box);
+    await type('W', 30);
+    await sleep(600);
+    key('Enter');
+    await sleep(300);
+    await js('document.activeElement?.blur()');
+    await sleep(400);
+    await ctrlK();
+    flow('click-away-from-qty-step-frees-keys', await isOpen(), `palette open ${await isOpen()}`);
+    await esc();
+
     // Window loses and regains focus while the palette is open
     await focus(box);
     await ctrlK();
@@ -397,6 +468,23 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       flow(`ctrl-k-on-${name.toLowerCase()}`, got.slice().sort().join() === letters.slice().sort().join() && (letters.length > 0 || empty), `letters: ${got.join(' ')}`);
       await esc();
     }
+
+    await tabTo('Stock');
+    await ctrlK();
+    await letter('i');
+    await type('6281000000077');
+    key('Enter');
+    await sleep(700);
+    const stockInfo = await js<boolean>(`!!document.querySelector('.palette-item')`);
+    flow('quick-i-scan-off-sell', stockInfo, `info shown ${stockInfo}`);
+    await esc();
+
+    await tabTo('Purchases');
+    await js('document.activeElement?.blur()');
+    await ctrlK();
+    await letter('p');
+    await sleep(500);
+    flow('quick-p-on-purchases', (await active()) === 'return product search', `focus ${await active()}`);
 
     await tabTo('Stock');
     await js('document.activeElement?.blur()');
@@ -442,6 +530,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(500);
     const onCustomers = await js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith('Customers')`);
     flow('quick-m-from-sell-opens-collection', onCustomers && (await active()) === 'customer search', `on customers ${onCustomers}, focus ${await active()}`);
+    await tabTo('Sell');
+    await sleep(300);
     await tabTo('Sell');
     await sleep(300);
   }

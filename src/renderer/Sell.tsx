@@ -340,6 +340,11 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
         if (r.blocked) changeQty(i, r);
         return;
       }
+      if (r.lines[i]?.uid === line.uid && r.lines[i]?.qty === line.qty) {
+        el.value = String(line.qty / 1000);
+        el.select();
+        return;
+      }
       el.dataset.skip = '1';
       changeQty(i, r);
       if (r.removed) goStep(step);
@@ -606,7 +611,10 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
               onKeyDown={(e) => onStepKey('qty', e)}
               onBlur={() => setTimeout(() => {
                 // Clicking elsewhere cancels the quantity step instead of leaving it half done.
-                if (document.activeElement !== qtyRef.current) setPending((p) => (p ? null : p));
+                if (document.activeElement !== qtyRef.current) {
+                  setPending((p) => (p ? null : p));
+                  setStep((s) => (s === 'qty' ? 'search' : s));
+                }
               }, 200)}
             />
             {pending.error && <div className="msg error">{t(pending.error)}</div>}
@@ -654,7 +662,10 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             aria-label="cash received"
             value={cash}
             onChange={(e) => setCash(e.target.value)}
-            onFocus={() => lines.length > 0 && goStep('pay', false)}
+            onFocus={() => {
+              stepAt.current = performance.now(); // an Enter that was meant for what just closed must not pay
+              if (lines.length > 0) goStep('pay', false);
+            }}
             onKeyDown={(e) => onStepKey('cash', e)}
           />
           <label>{t('Card part of a split payment (optional)')}</label>

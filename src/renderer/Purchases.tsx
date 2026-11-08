@@ -61,7 +61,7 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
         actions={
           <div className="seg" role="group" aria-label="purchases section">
             {tabs.filter((x) => x.show).map((x) => (
-              <button key={x.id} className={section === x.id ? 'on' : ''} onClick={() => setSection(x.id)}>{t(x.label)}</button>
+              <button key={x.id} className={section === x.id ? 'on' : ''} onClick={() => { setSupplierRequest({ id: 0, n: 0 }); setSection(x.id); }}>{t(x.label)}</button>
             ))}
           </div>
         }
@@ -220,7 +220,7 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
       <label>{t('Supplier')}</label>
       <SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} />
       <label>{t('Add product')}</label>
-      <input placeholder={t('Search name or SKU')} aria-label="return product search" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <input data-kb-search="product" data-kb-suggest placeholder={t('Search name or SKU')} aria-label="return product search" value={search} onChange={(e) => setSearch(e.target.value)} />
       {found.map((p) => (
         <button key={p.id} style={{ margin: 4 }} onClick={() => { if (!lines.some((l) => l.product.id === p.id)) setLines([...lines, { product: p, qty: '' }]); setSearch(''); }}>{p.nameEn}</button>
       ))}

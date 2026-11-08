@@ -92,6 +92,8 @@ export function QuickActions({ context, can, screen, scanTarget, onClose }: {
   };
   const choose = (id: ActionId) => {
     setNote('');
+    const now = screen.current?.state().unavailable[id]; // a scan may have changed the bill since the box opened
+    if (now) return setNote(t(now));
     if (id === 'I' || id === 'S' || id === 'R') {
       setList(id);
       setQuery('');
@@ -101,11 +103,20 @@ export function QuickActions({ context, can, screen, scanTarget, onClose }: {
     run(id);
   };
   const enter = () => {
+    if (list === 'I' && /^\d{4,}$/.test(query.trim())) return lookupCode(query.trim());
     const r = rows[active];
     if (!r?.enabled) return;
     if (list === 'I') showItem(r.value as number);
     else if (list) run(list, r.value as number);
     else choose(r.value as ActionId);
+  };
+
+  const lookupCode = (code: string) => {
+    void call<LookupResult | null>('catalog.lookup', { code }).then((r) => {
+      setQuery('');
+      if (r) showItem(r.product.id);
+      else setNote(t('Not found: {0}', code));
+    }, (e: Error) => setNote(t(e.message)));
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

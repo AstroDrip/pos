@@ -102,7 +102,7 @@ export function App() {
           {TABS.filter((tb) => !tb.perm || can(tb.perm)).map((tb, i, shown) => (
             <span key={tb.id} style={{ display: 'contents' }}>
               {i > 0 && shown[i - 1]!.group !== tb.group && <span className="sep" aria-hidden="true" />}
-              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => setTab(tb.id)}>{tb.id === 'help' && <span className="help-mark" aria-hidden="true">?</span>}{t(tb.label)}</button>
+              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => { setCustomerRequest({ n: 0 }); setTab(tb.id); }}>{tb.id === 'help' && <span className="help-mark" aria-hidden="true">?</span>}{t(tb.label)}</button>
             </span>
           ))}
         </nav>
