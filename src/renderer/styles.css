@@ -342,3 +342,15 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 .step small.hint { display: block; }
 .receipt-preview { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--sp-3); background: #fff; color: #000; border: 1px dashed var(--border); text-align: center; }
 .receipt-preview img { max-width: 160px; max-height: 80px; }
+
+/* ── Enter supplier bill ──────────────────────────────────── */
+.bill-card { max-width: var(--section-w); margin-inline: 0; }
+.bill-fields { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: flex-end; }
+.bill-fields > div { flex: 1 1 170px; }
+.bill-check { display: flex; gap: var(--sp-2); align-items: center; margin-top: var(--sp-2); }
+.bill-check input { width: auto; }
+.bill-line { border-top: 1px solid var(--border); padding: var(--sp-3) 0; }
+.bill-line-head { display: flex; align-items: center; gap: var(--sp-2); }
+.bill-line-head button { margin-inline-start: auto; }
+.bill-line-fields { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+.bill-line-sum { margin-top: var(--sp-2); font-weight: 600; }

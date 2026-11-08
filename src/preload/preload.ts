@@ -15,6 +15,7 @@ const PRELOAD_CHANNELS = [
   'catalog.search',
   'supplier.update',
   'bill.create',
+  'bill.productCost',
   'bill.item',
   'bill.items',
   'store.get',

@@ -157,7 +157,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
           await sleep(400);
         }
         if (tab === 'Purchases') {
-          await js(`document.querySelectorAll('[aria-label="purchases section"] button')[2]?.click()`);
+          await js(`[...document.querySelectorAll('[aria-label="purchases section"] button')].find((b) => b.textContent.trim() === 'Balances and payments')?.click()`);
           await sleep(300);
           await js(`document.querySelector('table.list tbody tr button')?.click()`);
           await sleep(400);

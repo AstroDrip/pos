@@ -207,3 +207,10 @@ export function findSupplierItem(ctx: Ctx, supplierId: number, code: string): Su
 export function supplierItemsFor(ctx: Ctx, supplierId: number): SupplierItem[] {
   return (ctx.db.prepare(`${ITEM} WHERE supplier_id = ? ORDER BY updated_at DESC`).all(supplierId) as ItemRow[]).flatMap((r) => withProduct(ctx, r) ?? []);
 }
+
+/** Average cost and stock of one product, for the cost warnings on the bill screen. */
+export function billProductCost(ctx: Ctx, userId: number, productId: number): { avgCost: number; stockQty: number } {
+  requirePermission(ctx, userId, 'stock.receive');
+  const r = ctx.db.prepare('SELECT qty, avg_cost FROM stock_balances WHERE product_id = ?').get(productId) as { qty: number; avg_cost: number } | undefined;
+  return { avgCost: r?.avg_cost ?? 0, stockQty: r?.qty ?? 0 };
+}

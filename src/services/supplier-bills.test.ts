@@ -9,7 +9,7 @@ import { unbalancedEntries } from './ledger';
 import { createSupplier, listSuppliers, updateSupplier } from './parties';
 import { supplierBalances, uninvoicedGrns } from './purchasing';
 import { openShift } from './shifts';
-import { createSupplierBill, findSupplierItem, type SupplierBillInput } from './supplier-bills';
+import { billProductCost, createSupplierBill, findSupplierItem, type SupplierBillInput } from './supplier-bills';
 import { makeTestCtx, seedUsers } from './test-helpers';
 import { vatSummary } from './vat-report';
 
@@ -216,6 +216,15 @@ describe('saving a supplier bill', () => {
 
   it('needs the right permission', () => {
     expect(code(() => createSupplierBill(ctx, u.cashier, juice()))).toBe('PERMISSION_DENIED');
+  });
+});
+
+describe('cost information for the bill screen', () => {
+  it('gives average cost and stock, needs stock.receive', () => {
+    expect(billProductCost(ctx, u.admin, apple)).toEqual({ avgCost: 0, stockQty: 0 });
+    save();
+    expect(billProductCost(ctx, u.admin, apple)).toEqual({ avgCost: 464, stockQty: 48_000 });
+    expect(code(() => billProductCost(ctx, u.cashier, apple))).toBe('PERMISSION_DENIED');
   });
 });
 

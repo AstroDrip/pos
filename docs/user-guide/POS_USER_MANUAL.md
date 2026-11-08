@@ -35,6 +35,7 @@ Names and numbers in the examples are made up.
 - **Suppliers and purchasing**
   - [Add a supplier](#suppliers-add)
   - [Receive goods from a supplier](#suppliers-receive)
+  - [Enter a supplier bill](#suppliers-enter-bill)
   - [Record a supplier invoice (pay now or later)](#suppliers-invoice)
   - [Pay a supplier (full or part)](#suppliers-pay)
   - [See what the store owes suppliers](#suppliers-balances)
@@ -628,6 +629,38 @@ Names and numbers in the examples are made up.
 **If something goes wrong**
 
 - *A product is missing.* Add it first in the Products tab.
+
+<a id="suppliers-enter-bill"></a>
+
+### Enter a supplier bill
+
+**What this does:** Type a supplier paper line by line, when the goods arrive. Stock, cost, what you owe and VAT all update from this one screen.
+
+**Where:** Purchases tab → Enter supplier bill.
+
+**Steps**
+
+1. Choose the Supplier and the Paper type. Type the Number on the paper.
+2. If it is an invoice, press Paid or Credit, as the paper says.
+3. Paid: choose where the money came from. Till cash needs an open shift.
+4. Credit: leave the due date blank to use the supplier terms. Type Part paid now if some was paid at delivery.
+5. Add a line: type the supplier code, barcode or name, then press Enter.
+6. Type Pack name and Pieces in pack. You do not need to know what a code like CU or SU means. Open one box, count the pieces, and type that number. The app remembers it for this supplier code.
+7. Type Packs and Loose pieces, and any Free pieces. Type the Price, per pack or per piece, and the Discount.
+8. If the VAT on the paper is different from the VAT shown, type it in VAT printed.
+9. If fewer pieces arrived than the paper says, type the real number in Received.
+10. In Check against the paper, type the Net, VAT and Total from the paper.
+11. Press Save bill.
+
+**What you should see:** A green message shows the goods receipt number. Stock on hand goes up, and the cost per piece is worked out for you.
+
+**If something goes wrong**
+
+- *Save bill is grey.* Look at Check against the paper. The Gap must be empty or 0.00 for Net, VAT and Total. Also check that Paid or Credit is pressed, and that any cost warning is ticked.
+- *A cost warning appears.* The cost per piece looks wrong. The usual cause is the wrong Pieces in pack. Fix it, or tick the box if the cost is right.
+- *A delivery note has no Paid or Credit.* That is correct. The goods come in now, and nothing is owed until the invoice comes. Enter the invoice later in Supplier invoices.
+- *The paper is a proforma.* The VAT is not claimed unless you tick the box. Ask your accountant if you are not sure.
+- *You closed the screen before saving.* Open Enter supplier bill again. Your lines are still there.
 
 <a id="suppliers-invoice"></a>
 

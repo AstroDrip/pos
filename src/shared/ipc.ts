@@ -53,6 +53,7 @@ export const schemas = {
       vatRateBp: int.min(0).max(10_000), vatOverride: money.optional(),
     })).min(1).max(500),
   }),
+  'bill.productCost': z.object({ productId: int.positive() }),
   'bill.item': z.object({ supplierId: int.positive(), code: z.string().min(1).max(40) }),
   'bill.items': z.object({ supplierId: int.positive() }),
   'store.get': z.null(),

@@ -3,7 +3,7 @@ import { schemas, type Channel, type IpcResult } from '../shared/ipc';
 import { backupStatus, createBackup, prepareRestore } from '../services/backup';
 import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto';
 import { getShortcuts, saveShortcuts } from '../services/shortcuts';
-import { createSupplierBill, findSupplierItem, supplierItemsFor } from '../services/supplier-bills';
+import { billProductCost, createSupplierBill, findSupplierItem, supplierItemsFor } from '../services/supplier-bills';
 import { getStoreDetails, saveStoreDetails } from '../services/store-details';
 import { createProduct, getAliases, getProduct, itemInfo, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
 import { searchProducts as indexedSearch } from '../services/search';
@@ -117,6 +117,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       return null;
     },
     'bill.create': (p, s) => createSupplierBill(ctx, userId(s), p),
+    'bill.productCost': (p, s) => billProductCost(ctx, userId(s), p.productId),
     'bill.item': (p, s) => {
       requirePermission(ctx, userId(s), 'stock.receive');
       return findSupplierItem(ctx, p.supplierId, p.code);

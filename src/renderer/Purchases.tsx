@@ -10,6 +10,7 @@ import { PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { focusWhenReady, useScreenKeys } from './Keyboard';
 import { HelpLink } from './HelpLink';
+import { SupplierBill } from './SupplierBill';
 import { ProductName, useI18n } from './i18n';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
@@ -21,12 +22,12 @@ const sar = (s: string) => {
     return NaN;
   }
 };
-type Section = 'invoice' | 'return' | 'pay' | 'ageing' | 'register';
+type Section = 'bill' | 'invoice' | 'return' | 'pay' | 'ageing' | 'register';
 
 /** Purchasing (plan Phase 4). Posting rules are provisional until the accountant approves. */
 export function Purchases({ can }: { can: (p: string) => boolean }) {
   const { t } = useI18n();
-  const [section, setSection] = useState<Section>(can('purchase.manage') ? 'invoice' : 'pay');
+  const [section, setSection] = useState<Section>(can('purchase.manage') ? 'bill' : 'pay');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), []);
   const [supplierRequest, setSupplierRequest] = useState<{ id: number; n: number }>({ id: 0, n: 0 });
@@ -47,6 +48,7 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
     },
   }));
   const tabs: { id: Section; label: string; show: boolean }[] = [
+    { id: 'bill', label: 'Enter supplier bill', show: can('purchase.manage') && can('stock.receive') },
     { id: 'invoice', label: 'Supplier invoices', show: can('purchase.manage') },
     { id: 'return', label: 'Return to supplier', show: can('purchase.manage') },
     { id: 'pay', label: 'Balances and payments', show: true },
@@ -67,6 +69,7 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
         }
       />
       <p className="msg warn" style={{ maxWidth: 900 }}>{t('Purchase accounting is provisional until your accountant approves it.')}</p>
+      {section === 'bill' && <SupplierBill suppliers={suppliers} can={can} />}
       {section === 'invoice' && <InvoiceForm suppliers={suppliers} />}
       {section === 'return' && <ReturnForm suppliers={suppliers} />}
       {section === 'pay' && <Balances suppliers={suppliers} can={can} request={supplierRequest} />}
