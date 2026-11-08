@@ -14,7 +14,7 @@ import { requirePermission } from './users';
 //   salesGross    = 4000 credits from sales;  returns = 4000 debits from refunds
 //   cogs          = debits − credits on 5000 Cost of goods sold    (weighted-average cost; refunds restocked reduce it)
 //   grossProfit   = netSales − cogs
-//   operating     = 5100 wastage/shrinkage + 6000 cash over/short + every 61xx–69xx expense account
+//   operating     = 5010 purchase differences and VAT not claimed + 5100 wastage/shrinkage + 6000 cash over/short + every 61xx–69xx expense account
 //   netProfit     = grossProfit − operating                        (PROVISIONAL: draft chart, expenses may be missing)
 //   cashCollected = cash tendered − change − cash refunds          (cash basis, from payment records)
 
@@ -85,7 +85,7 @@ export function profitAndLoss(ctx: Ctx, userId: number | null, from: string, to:
   const netSales = net('4000', 'cr');
   const cogs = net('5000', 'dr');
   const operating = t
-    .filter((a) => a.type === 'expense' && a.code !== '5000' && (a.code === '5100' || a.code >= '6000'))
+    .filter((a) => a.type === 'expense' && a.code !== '5000' && (a.code === '5010' || a.code === '5100' || a.code >= '6000'))
     .map((a) => ({ code: a.code, nameEn: a.nameEn, nameAr: a.nameAr, amount: a.debit - a.credit }))
     .filter((a) => a.amount !== 0);
   const totalOperating = operating.reduce((s, a) => s + a.amount, 0);

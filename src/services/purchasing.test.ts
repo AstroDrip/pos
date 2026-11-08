@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProduct } from './catalog';
 import { DomainError, type Ctx } from './context';
 import { createExpense, listCategories, postExpense, reverseExpense } from './expenses';
-import { datedTrialBalance } from './financials';
+import { balanceSheet, datedTrialBalance, profitAndLoss } from './financials';
 import { receiveGoods, stockDrift } from './inventory';
 import { unbalancedEntries } from './ledger';
 import { createSupplier } from './parties';
@@ -102,6 +102,13 @@ describe('supplier invoices', () => {
     const a = createPurchaseInvoice(ctx, u.admin, { requestKey: rk, supplierId: sup, supplierInvoiceNo: 'ONCE', supplierVatNo: VATNO, invoiceDate: TODAY, grnIds: [g], invoiceNet: 40_000, vatAmount: 6_000, vatRecoverable: true });
     const b = createPurchaseInvoice(ctx, u.admin, { requestKey: rk, supplierId: sup, supplierInvoiceNo: 'ONCE', supplierVatNo: VATNO, invoiceDate: TODAY, grnIds: [g], invoiceNet: 40_000, vatAmount: 6_000, vatRecoverable: true });
     expect(b).toEqual({ ...a, replayed: true });
+  });
+
+  it('profit and loss includes purchase differences and unclaimed VAT (5010)', () => {
+    createPurchaseInvoice(ctx, u.admin, { requestKey: key(), supplierId: sup2, supplierInvoiceNo: 'PL-1', invoiceDate: TODAY, grnIds: [grn(sup2)], invoiceNet: 40_000, vatAmount: 6_000, vatRecoverable: false });
+    const pl = profitAndLoss(ctx, u.admin, TODAY, TODAY);
+    expect(pl.operating.find((a) => a.code === '5010')?.amount).toBe(6_000);
+    expect(pl.netProfit).toBe(balanceSheet(ctx, u.admin, TODAY).currentEarnings);
   });
 
   it('non-recoverable VAT is a cost (5010), not input VAT', () => {
