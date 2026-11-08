@@ -18,13 +18,14 @@ type ListId = 'I' | 'S' | 'R';
 type Row = { key: string; label: string; sub?: string; letter?: string; enabled: boolean; reason?: string; value: number | ActionId };
 
 /** Ctrl+K: a short list of what can be done on this screen. Letters work only while this box is open. */
-export function QuickActions({ context, can, screen, scanTarget, bindings, onClose }: {
+export function QuickActions({ context, can, screen, scanTarget, bindings, onClose, openAndRun }: {
   context: ScreenContext;
   can: (permission: string) => boolean;
   screen: RefObject<ScreenKeys | null>;
   scanTarget: RefObject<((code: string) => boolean) | null>;
   bindings: Bindings;
   onClose: (restoreFocus: boolean) => void;
+  openAndRun: (target: ScreenContext, id: ActionId, arg?: number) => void;
 }) {
   const { t, lang } = useI18n();
   const [list, setList] = useState<ListId | null>(null);
@@ -34,6 +35,7 @@ export function QuickActions({ context, can, screen, scanTarget, bindings, onClo
   const [active, setActive] = useState(0);
   const [note, setNote] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [heldHere, setHeldHere] = useState<{ id: number; label: string }[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,6 +45,7 @@ export function QuickActions({ context, can, screen, scanTarget, bindings, onClo
   const { items: hits } = useSuggest<SearchHit>(list === 'I' ? query : '', (q) => call<SearchHit[]>('catalog.suggest', { text: q }), { composing });
   useEffect(() => {
     if (list === 'S') void call<Supplier[]>('supplier.list').then(setSuppliers, () => setSuppliers([]));
+    if (list === 'R' && !snap.held) void call<{ id: number; label: string; lineCount: number }[]>('hold.list').then((h) => setHeldHere(h.map((x) => ({ id: x.id, label: `${x.label} (${x.lineCount})` }))), () => setHeldHere([]));
   }, [list]);
   useEffect(() => () => {
     if (pending.current) clearTimeout(pending.current);
@@ -76,7 +79,7 @@ export function QuickActions({ context, can, screen, scanTarget, bindings, onClo
   const rows: Row[] = item ? []
     : list === 'I' ? hits.map((h) => ({ key: `p${h.product.id}`, label: name(h.product), sub: `${formatSar(h.product.priceIncl)} ${t('SAR')}`, enabled: true, value: h.product.id }))
     : list === 'S' ? suppliers.filter((s) => !q || s.name.toLowerCase().includes(q) || (s.phone ?? '').includes(q)).slice(0, 30).map((s) => ({ key: `s${s.id}`, label: s.name, sub: s.phone ?? undefined, enabled: true, value: s.id }))
-    : list === 'R' ? (snap.held ?? []).filter((h) => !q || h.label.toLowerCase().includes(q)).map((h) => ({ key: `h${h.id}`, label: h.label, enabled: true, value: h.id }))
+    : list === 'R' ? (snap.held ?? heldHere).filter((h) => !q || h.label.toLowerCase().includes(q)).map((h) => ({ key: `h${h.id}`, label: h.label, enabled: true, value: h.id }))
     : filterActions(actions, query, t).map((a) => ({ key: a.id, label: t(a.label), letter: a.letter, enabled: a.enabled, reason: a.reason, value: a.id }));
   const rowsKey = rows.map((r) => `${r.key}:${r.enabled}`).join();
   useEffect(() => setActive(rows.findIndex((r) => r.enabled)), [rowsKey]);
@@ -88,6 +91,12 @@ export function QuickActions({ context, can, screen, scanTarget, bindings, onClo
     fn();
   };
   const run = (id: ActionId, arg?: number) => {
+    const goTo = actions.find((a) => a.id === id)?.goTo;
+    if (goTo) {
+      const now = screen.current?.state().unavailable[id]; // a scan may have put an item on the bill since the box opened
+      if (now) return setNote(t(now));
+      return finish(() => openAndRun(goTo, id, arg));
+    }
     const s = screen.current;
     if (s?.run && (context === 'sell' || context === 'purchases' || (context === 'customers' && id === 'M'))) return finish(() => s.run!(id, arg));
     finish(() => focusWhenReady(`[data-kb-search="${id === 'C' ? 'customer' : 'product'}"]`));

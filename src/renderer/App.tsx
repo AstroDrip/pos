@@ -61,6 +61,11 @@ export function App() {
     setTab('customers');
   }, []);
 
+  const openTab = useCallback((screen: Tab) => {
+    setCustomerRequest({ n: 0 });
+    setTab(screen);
+  }, []);
+
   // Every login starts on Sell: the previous user's tab may be one the new user is not allowed to see.
   const refresh = () =>
     call<Status>('auth.status').then((s) => {
@@ -95,14 +100,14 @@ export function App() {
   const can = (p: string) => user.permissions.includes(p);
   return (
     <HelpContext.Provider value={openHelp}>
-      <KeyboardProvider tab={tab} can={can} helpOpen={helpAt !== null} openHelp={openHelp} closeHelp={closeHelp} openCustomers={openCustomers}>
+      <KeyboardProvider tab={tab} openTab={openTab} can={can} helpOpen={helpAt !== null} openHelp={openHelp} closeHelp={closeHelp} openCustomers={openCustomers}>
       <TopBar>
         <strong className="brand">POS</strong>
         <nav aria-label="main">
           {TABS.filter((tb) => !tb.perm || can(tb.perm)).map((tb, i, shown) => (
             <span key={tb.id} style={{ display: 'contents' }}>
               {i > 0 && shown[i - 1]!.group !== tb.group && <span className="sep" aria-hidden="true" />}
-              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => { setCustomerRequest({ n: 0 }); setTab(tb.id); }}>{tb.id === 'help' && <span className="help-mark" aria-hidden="true">?</span>}{t(tb.label)}</button>
+              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => openTab(tb.id)}>{tb.id === 'help' && <span className="help-mark" aria-hidden="true">?</span>}{t(tb.label)}</button>
             </span>
           ))}
         </nav>

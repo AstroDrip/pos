@@ -156,9 +156,9 @@ Names and numbers in the examples are made up.
 
 ### Quick Actions (Ctrl+K)
 
-**What this does:** A short list of what you can do on the screen you are on. Press Ctrl+K first, then one letter. Letters only work while the list is open, so normal typing and scanning are never affected.
+**What this does:** A short list of what you can do. Press Ctrl+K first, then one letter. Letters only work while the list is open, so normal typing and scanning are never affected.
 
-**Where:** Any screen, after you log in. You see only what you are allowed to do on that screen.
+**Where:** Any screen, after you log in. Every letter is listed on every screen. You see only what you are allowed to do.
 
 **Keys:** `Ctrl+K` `P` `C` `S` `H` `R` `I` `M` `↑` `↓` `Enter` `Tab` `Esc`
 
@@ -173,14 +173,16 @@ Names and numbers in the examples are made up.
 7. R: Retrieve held order. Shows the held orders. Choose one to bring it back.
 8. I: Item information. Shows the price and stock of an item. Scan it or type its name. It does not add anything to the bill.
 9. M: Money. Opens customer collection (Customers, Sell) or supplier settlement (Purchases). You still type the amount and press the button yourself; nothing is paid by this key.
-10. Press Esc to close the list. You go back to the box you were in.
+10. If a letter belongs to another screen, that screen opens for you. Anything you had not saved on the old screen is lost, the same as pressing a tab.
+11. Press Esc to close the list. You go back to the box you were in.
 
 **What you should see:** The action opens at once. A grey action cannot be used right now, and the reason is shown beside it.
 
 **If something goes wrong**
 
 - *Ctrl+K shows "Press Enter to add the item, or Esc to cancel."* The quantity box is open. Finish the quantity first, then press Ctrl+K.
-- *The letter you want is not in the list.* It does not belong to this screen, or your user is not allowed to use it.
+- *The letter you want is not in the list.* Your user is not allowed to use it.
+- *Supplier search is grey on Sell.* It opens Purchases, and that would lose the bill. Finish or hold the bill first.
 - *Collection or settlement did not take a payment.* That is correct. The letter only opens the place to pay. You type the amount and press the button yourself.
 
 <a id="admin-shortcuts"></a>

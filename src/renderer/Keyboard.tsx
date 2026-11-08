@@ -11,6 +11,8 @@ export interface ScreenSnapshot extends ScreenState {
   step?: CheckoutStep;
   busy?: boolean;
   held?: { id: number; label: string }[];
+  /** True until the screen has what it needs to run an action. */
+  loading?: boolean;
 }
 
 /** What a screen tells the keyboard system. Screens without special needs register nothing. */
@@ -77,6 +79,9 @@ export function useKeyRecorder() {
   return useCallback((fn: (e: KeyboardEvent) => void) => hub.setRecorder(fn), [hub]);
 }
 
+/** How long a letter waits for its screen to load. After that it is dropped, never run late. */
+const OPEN_WAIT_MS = 3000;
+
 const VISIBLE = (el: HTMLElement) => el.offsetParent !== null && !(el as HTMLInputElement).disabled;
 
 export function focusEl(el: HTMLElement | null | undefined): boolean {
@@ -115,8 +120,9 @@ function clearInput(el: HTMLInputElement) {
 }
 
 /** The keyboard system for a logged-in user: the single global listener, and Quick Actions. */
-export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, openCustomers, children }: {
+export function KeyboardProvider({ tab, openTab, can, helpOpen, openHelp, closeHelp, openCustomers, children }: {
   tab: ScreenContext;
+  openTab: (screen: ScreenContext) => void;
   can: (permission: string) => boolean;
   helpOpen: boolean;
   openHelp: (articleId: string) => void;
@@ -196,6 +202,23 @@ export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, open
     };
   }, [hub]);
 
+  // A letter from another screen: open its screen, wait until that screen is ready, then ask it to act.
+  const openAndRun = useCallback((target: ScreenContext, id: ActionId, arg?: number) => {
+    screen.current = null; // so the old screen can never receive the action
+    openTab(target);
+    const started = performance.now();
+    const wait = () => {
+      if (performance.now() - started > OPEN_WAIT_MS) return;
+      const s = live.current.tab === target ? screen.current : null;
+      const snap = s?.state();
+      if (!s || !snap || snap.loading) return void requestAnimationFrame(wait);
+      const why = snap.unavailable[id];
+      if (why) s.notify?.(why);
+      else s.run?.(id, arg);
+    };
+    requestAnimationFrame(wait);
+  }, [openTab]);
+
   // Moving to another screen closes the palette; it belongs to the screen it was opened on.
   useEffect(() => closePalette(false), [tab, closePalette]);
 
@@ -211,6 +234,7 @@ export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, open
           scanTarget={scanTarget}
           bindings={bindings}
           onClose={closePalette}
+          openAndRun={openAndRun}
         />
       )}
     </Ctx.Provider>

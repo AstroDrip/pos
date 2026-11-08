@@ -55,18 +55,31 @@ export interface QuickAction {
   help: string;
   effect: Effect;
   keywords: string[];
-  /** Screens that offer it. Each screen can set its own permission and label. */
+  /** Screens where it runs on the spot. Each screen can set its own permission and label. */
   where: Partial<Record<ScreenContext, { permission: string | null; label?: string }>>;
+  /** From any other screen the letter opens the first of these the user may open. */
+  homes?: Home[];
+  /** Why it cannot be used from any other screen at all. */
+  notElsewhere?: string;
 }
 
+interface Home {
+  screen: ScreenContext;
+  permissions: string[];
+}
+
+const EVERYWHERE = Object.fromEntries(EVERY.map((c) => [c, { permission: null }])) as Record<ScreenContext, { permission: null }>;
+const SELL_HOME: Home = { screen: 'sell', permissions: [] };
+const CUSTOMERS_HOME: Home = { screen: 'customers', permissions: ['customer.payment.record'] };
+
 export const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'P', priority: 20, allowedStates: ['on Sell: search step only'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Goes to the product search box. On Purchases it opens Return to supplier first.", label: 'Product search', effect: 'focus', keywords: ['find', 'item', 'barcode'], where: { sell: { permission: null }, stock: { permission: null }, products: { permission: null }, purchases: { permission: 'purchase.manage' } } },
-  { id: 'C', priority: 20, allowedStates: ['on Sell: search step, no customer on the bill yet'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Goes to the customer box.", label: 'Customer search', effect: 'focus', keywords: ['find', 'phone', 'client'], where: { sell: { permission: null }, customers: { permission: null } } },
-  { id: 'S', priority: 20, allowedStates: ['Purchases only'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Find a supplier by name and open their statement. Nothing is paid.", label: 'Supplier search', effect: 'open-workflow', keywords: ['find', 'vendor', 'statement'], where: { purchases: { permission: 'purchase.view' } } },
-  { id: 'H', priority: 20, allowedStates: ['Sell, search step, items on the bill'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Puts the current order on hold, like the Hold bill button.", label: 'Hold current order', effect: 'operation', keywords: ['park', 'save', 'bill', 'suspend'], where: { sell: { permission: null } } },
-  { id: 'R', priority: 20, allowedStates: ['Sell, search step, empty bill, a held order exists'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Shows the held orders. Choose one to bring it back.", label: 'Retrieve held order', effect: 'operation', keywords: ['recall', 'bill', 'resume'], where: { sell: { permission: null } } },
-  { id: 'I', priority: 20, allowedStates: ['always where offered'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Shows the price and stock of an item. Scan it or type its name. It does not add anything to the bill.", label: 'Item information', effect: 'ui', keywords: ['price', 'stock', 'check', 'lookup'], where: { sell: { permission: null }, stock: { permission: null }, products: { permission: null }, purchases: { permission: null } } },
-  { id: 'M', priority: 20, allowedStates: ['on Sell: empty bill only'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Opens customer collection (Customers, Sell) or supplier settlement (Purchases). You still type the amount and press the button yourself; nothing is paid by this key.", label: 'Money', effect: 'open-workflow', keywords: ['pay', 'payment', 'collect', 'settle', 'account'], where: { sell: { permission: 'customer.payment.record', label: 'Customer collection' }, customers: { permission: 'customer.payment.record', label: 'Customer collection' }, purchases: { permission: 'purchase.pay', label: 'Supplier settlement' } } },
+  { id: 'P', priority: 20, allowedStates: ['on Sell: search step only'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Goes to the product search box. On Purchases it opens Return to supplier first.", label: 'Product search', effect: 'focus', keywords: ['find', 'item', 'barcode'], where: { sell: { permission: null }, stock: { permission: null }, products: { permission: null }, purchases: { permission: 'purchase.manage' } }, homes: [SELL_HOME] },
+  { id: 'C', priority: 20, allowedStates: ['on Sell: search step, no customer on the bill yet'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Goes to the customer box.", label: 'Customer search', effect: 'focus', keywords: ['find', 'phone', 'client'], where: { sell: { permission: null }, customers: { permission: null } }, homes: [CUSTOMERS_HOME, SELL_HOME] },
+  { id: 'S', priority: 20, allowedStates: ['Purchases only'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Find a supplier by name and open their statement. Nothing is paid.", label: 'Supplier search', effect: 'open-workflow', keywords: ['find', 'vendor', 'statement'], where: { purchases: { permission: 'purchase.view' } }, homes: [{ screen: 'purchases', permissions: ['purchase.view'] }] },
+  { id: 'H', priority: 20, allowedStates: ['Sell, search step, items on the bill'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Puts the current order on hold, like the Hold bill button.", label: 'Hold current order', effect: 'operation', keywords: ['park', 'save', 'bill', 'suspend'], where: { sell: { permission: null } }, homes: [SELL_HOME], notElsewhere: 'The bill is empty.' },
+  { id: 'R', priority: 20, allowedStates: ['Sell, search step, empty bill, a held order exists'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Shows the held orders. Choose one to bring it back.", label: 'Retrieve held order', effect: 'operation', keywords: ['recall', 'bill', 'resume'], where: { sell: { permission: null } }, homes: [SELL_HOME] },
+  { id: 'I', priority: 20, allowedStates: ['always where offered'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Shows the price and stock of an item. Scan it or type its name. It does not add anything to the bill.", label: 'Item information', effect: 'ui', keywords: ['price', 'stock', 'check', 'lookup'], where: EVERYWHERE },
+  { id: 'M', priority: 20, allowedStates: ['on Sell: empty bill only'], conflict: 'Only while Quick Actions is open and its box is empty.', help: "Opens customer collection (Customers, Sell) or supplier settlement (Purchases). You still type the amount and press the button yourself; nothing is paid by this key.", label: 'Money', effect: 'open-workflow', keywords: ['pay', 'payment', 'collect', 'settle', 'account'], where: { sell: { permission: 'customer.payment.record', label: 'Customer collection' }, customers: { permission: 'customer.payment.record', label: 'Customer collection' }, purchases: { permission: 'purchase.pay', label: 'Supplier settlement' } }, homes: [CUSTOMERS_HOME, { screen: 'purchases', permissions: ['purchase.view', 'purchase.pay'] }] },
 ];
 
 /** The guide F1 opens on each screen. */
@@ -205,15 +218,24 @@ export interface ShownAction {
   effect: Effect;
   enabled: boolean;
   reason?: string;
+  /** Set when the letter belongs to another screen: choosing it opens that screen. */
+  goTo?: ScreenContext;
 }
 
-/** What Quick Actions shows on this screen: not allowed = hidden; allowed but not possible now = shown disabled. */
+/** What Quick Actions shows: every letter the user may use, from any screen. Not allowed = hidden; allowed but not possible now = shown disabled. */
 export function actionsFor(context: ScreenContext, state: ScreenState, can: (permission: string) => boolean, letters: Record<LetterId, string> = DEFAULT_BINDINGS.letters): ShownAction[] {
   return QUICK_ACTIONS.flatMap((a) => {
+    const shown = { id: a.id, letter: letters[a.id], keywords: a.keywords, effect: a.effect };
     const w = a.where[context];
-    if (!w || (w.permission && !can(w.permission))) return [];
-    const reason = state.unavailable[a.id];
-    return [{ id: a.id, letter: letters[a.id], label: w.label ?? a.label, keywords: a.keywords, effect: a.effect, enabled: !reason, reason }];
+    if (w) {
+      if (w.permission && !can(w.permission)) return [];
+      const reason = state.unavailable[a.id];
+      return [{ ...shown, label: w.label ?? a.label, enabled: !reason, reason }];
+    }
+    const home = a.homes?.find((h) => h.permissions.every(can));
+    if (!home) return [];
+    const reason = a.notElsewhere ?? state.unavailable[a.id];
+    return [{ ...shown, label: a.where[home.screen]?.label ?? a.label, enabled: !reason, reason, goTo: home.screen }];
   });
 }
 

@@ -415,7 +415,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await focus(box);
     await ctrlK();
     const shown = await rows();
-    flow('ctrl-k-opens-on-sell', (await isOpen()) && ['P', 'C', 'H', 'R', 'I', 'M'].every((x) => shown.includes(x)) && !shown.includes('S'), `letters: ${shown.join(' ')}`);
+    flow('ctrl-k-opens-on-sell', (await isOpen()) && ['P', 'C', 'S', 'H', 'R', 'I', 'M'].every((x) => shown.includes(x)), `letters: ${shown.join(' ')}`);
     await capture('60-quick-actions__light-en-1366x768');
     await esc();
     flow('esc-closes-and-restores-focus', !(await isOpen()) && (await active()) === 'product search', `focus: ${await active()}`);
@@ -672,14 +672,15 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     flow('window-focus-change', stillOpen && !(await isOpen()), `open after refocus ${stillOpen}`);
 
     // Other screens: right letters, right target
-    const expected: Record<string, string[]> = { Customers: ['C', 'M'], Stock: ['P', 'I'], Products: ['P', 'I'], Purchases: ['P', 'S', 'I', 'M'], Accounting: [] };
+    const allLetters = ['P', 'C', 'S', 'H', 'R', 'I', 'M'];
+    const expected: Record<string, string[]> = { Customers: allLetters, Stock: allLetters, Products: allLetters, Purchases: allLetters, Accounting: allLetters };
     for (const [name, letters] of Object.entries(expected)) {
       await tabTo(name);
       await js('document.activeElement?.blur()');
       await ctrlK();
       const got = await rows();
       const empty = await js<boolean>(`!!document.querySelector('.palette .none')`);
-      flow(`ctrl-k-on-${name.toLowerCase()}`, got.slice().sort().join() === letters.slice().sort().join() && (letters.length > 0 || empty), `letters: ${got.join(' ')}`);
+      flow(`ctrl-k-on-${name.toLowerCase()}`, got.slice().sort().join() === letters.slice().sort().join() && !empty, `letters: ${got.join(' ')}`);
       await esc();
     }
 
@@ -734,6 +735,71 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     const supplierList = await js<number>(`document.querySelectorAll('.palette li').length`);
     await esc();
     flow('quick-s-supplier-search', supplierList > 0, `suppliers listed ${supplierList}`);
+
+    // Letters from another screen open that screen
+    const onTab = (name: string) => js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith(${JSON.stringify(name)})`);
+    await tabTo('Accounting');
+    await ctrlK();
+    await letter('p');
+    await sleep(900);
+    flow('quick-p-from-accounting-opens-sell', (await onTab('Sell')) && (await active()) === 'product search' && !(await isOpen()), `focus ${await active()}`);
+
+    await tabTo('Reports');
+    await ctrlK();
+    await letter('c');
+    await sleep(700);
+    flow('quick-c-from-reports-opens-customers', (await onTab('Customers')) && (await active()) === 'customer search', `focus ${await active()}`);
+
+    await tabTo('Stock');
+    await ctrlK();
+    const holdGrey = await js<boolean>(`[...document.querySelectorAll('.palette li')].some((l) => l.querySelector('.kbd')?.textContent === 'H' && l.getAttribute('aria-disabled') === 'true')`);
+    await letter('h');
+    await sleep(200);
+    flow('quick-h-grey-off-sell', holdGrey && (await onTab('Stock')) && (await isOpen()), `grey ${holdGrey}`);
+    await esc();
+
+    await tabTo('Accounting');
+    await ctrlK();
+    await letter('s');
+    await sleep(400);
+    const listed = await js<number>(`document.querySelectorAll('.palette li').length`);
+    const stayedPut = await onTab('Accounting');
+    key('Enter');
+    await sleep(900);
+    const chosen = await js<boolean>(`!!document.querySelector('[data-kb-settle]')`);
+    flow('quick-s-from-accounting-picks-then-opens', listed > 0 && stayedPut && (await onTab('Purchases')) && chosen, `suppliers ${listed}, stayedPut ${stayedPut}, settle ${chosen}`);
+
+    // A bill on Sell: Supplier search must not leave it
+    await tabTo('Sell');
+    await sleep(300);
+    await focus(box);
+    await type('6281000000000');
+    key('Enter');
+    await sleep(700);
+    const sLines = await lineCount();
+    await focus(box);
+    await ctrlK();
+    await letter('s');
+    await sleep(300);
+    const sNote = await js<string>(`document.querySelector('.palette .msg')?.textContent ?? ''`);
+    await esc();
+    flow('quick-s-with-a-bill-stays-on-sell', sLines >= 1 && (await lineCount()) === sLines && (await onTab('Sell')) && sNote !== '', `lines ${sLines}, note "${sNote}"`);
+
+    // A held order brought back from another screen
+    await focus(box);
+    await ctrlK();
+    await letter('h');
+    await sleep(700);
+    const clearedByHold = (await lineCount()) === 0;
+    await tabTo('Stock');
+    await ctrlK();
+    await letter('r');
+    await sleep(400);
+    const heldListed = await js<number>(`document.querySelectorAll('.palette li').length`);
+    key('Enter');
+    await sleep(1000);
+    flow('quick-r-from-stock-brings-bill-back', clearedByHold && heldListed >= 1 && (await onTab('Sell')) && (await lineCount()) === sLines, `held ${heldListed}, lines ${await lineCount()}`);
+    await clearBill();
 
     // Sell with an empty bill: M goes to the collection screen, and takes no payment
     await tabTo('Sell');

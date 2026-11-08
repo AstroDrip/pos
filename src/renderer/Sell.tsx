@@ -97,7 +97,11 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     } else cashRef.current?.focus();
   }, [step, busy, focusTick]);
 
-  const loadHeld = () => call<HeldBill[]>('hold.list').then(setHeld);
+  const heldLoaded = useRef(false);
+  const loadHeld = () => call<HeldBill[]>('hold.list').then((h) => {
+    heldLoaded.current = true;
+    setHeld(h);
+  });
   // The customer's credit position, shown before any credit sale (balance, limit, what is still available).
   useEffect(() => {
     if (!customer || !canCredit) return setCredit(null);
@@ -405,7 +409,10 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
         if (lines.length > 0) unavailable.M = t('Finish or hold the current bill first.');
         if (customer) unavailable.C = t('A customer is already on this bill.');
       }
-      return { unavailable, step, busy: busyRef.current, held: held.map((h) => ({ id: h.id, label: `${h.label} (${h.lineCount})` })) };
+      // Supplier search opens Purchases, and leaving Sell loses the bill.
+      if (step !== 'search') unavailable.S = t('Press {0} to go back to the bill first.', keys.escape);
+      else if (lines.length > 0) unavailable.S = t('Finish or hold the current bill first.');
+      return { unavailable, step, busy: busyRef.current, loading: shift === undefined || !heldLoaded.current, held: held.map((h) => ({ id: h.id, label: `${h.label} (${h.lineCount})` })) };
     },
     run: (id, arg) => {
       if (id === 'P') goStep('search');

@@ -198,13 +198,52 @@ describe('actions shown', () => {
   const state = (o: Partial<ScreenState> = {}): ScreenState => ({ unavailable: {}, ...o });
   const ids = (ctx: Parameters<typeof actionsFor>[0], can: (p: string) => boolean = all, s = state()) => actionsFor(ctx, s, can).map((a) => a.id);
 
-  it('only actions for the current screen', () => {
-    expect(ids('sell').sort()).toEqual(['C', 'H', 'I', 'M', 'P', 'R']);
-    expect(ids('customers').sort()).toEqual(['C', 'M']);
-    expect(ids('purchases').sort()).toEqual(['I', 'M', 'P', 'S']);
-    expect(ids('stock').sort()).toEqual(['I', 'P']);
-    expect(ids('products').sort()).toEqual(['I', 'P']);
-    expect(ids('accounting')).toEqual([]);
+  const on = (ctx: Parameters<typeof actionsFor>[0], id: string, can: (p: string) => boolean = all) => actionsFor(ctx, state(), can).find((a) => a.id === id);
+
+  it('every screen shows all seven letters', () => {
+    for (const ctx of ['sell', 'refund', 'customers', 'stock', 'products', 'purchases', 'expenses', 'accounting', 'reports', 'shift', 'admin', 'help'] as const) {
+      expect(ids(ctx).sort(), ctx).toEqual(['C', 'H', 'I', 'M', 'P', 'R', 'S']);
+    }
+  });
+
+  it('a letter that belongs to this screen stays on this screen', () => {
+    expect(on('sell', 'P')!.goTo).toBeUndefined();
+    expect(on('purchases', 'S')!.goTo).toBeUndefined();
+    expect(on('customers', 'M')!.goTo).toBeUndefined();
+    expect(on('stock', 'I')!.goTo).toBeUndefined();
+  });
+
+  it('item information works on the spot on every screen', () => {
+    expect(on('accounting', 'I')).toMatchObject({ enabled: true });
+    expect(on('accounting', 'I')!.goTo).toBeUndefined();
+  });
+
+  it('a letter from another screen says where it will go', () => {
+    expect(on('accounting', 'P')!.goTo).toBe('sell');
+    expect(on('accounting', 'C')!.goTo).toBe('customers');
+    expect(on('accounting', 'S')!.goTo).toBe('purchases');
+    expect(on('accounting', 'R')!.goTo).toBe('sell');
+    expect(on('accounting', 'M')).toMatchObject({ goTo: 'customers', label: 'Customer collection' });
+    expect(on('sell', 'S')!.goTo).toBe('purchases');
+  });
+
+  it('holding is grey away from Sell, because no bill is open there', () => {
+    expect(on('stock', 'H')).toMatchObject({ enabled: false, reason: 'The bill is empty.' });
+  });
+
+  it('a reason from the screen also greys a letter that would leave it', () => {
+    const s = actionsFor('sell', state({ unavailable: { S: 'Finish or hold the current bill first.' } }), all).find((a) => a.id === 'S')!;
+    expect(s).toMatchObject({ enabled: false, reason: 'Finish or hold the current bill first.', goTo: 'purchases' });
+  });
+
+  it('goes only to a screen the user may open', () => {
+    const noCustomers = (p: string) => p !== 'customer.payment.record';
+    expect(on('reports', 'C', noCustomers)!.goTo).toBe('sell');
+    expect(on('reports', 'M', noCustomers)).toMatchObject({ goTo: 'purchases', label: 'Supplier settlement' });
+    expect(on('reports', 'M', (p) => p === 'purchase.pay')).toBeUndefined();
+    expect(on('reports', 'S', (p) => p !== 'purchase.view')).toBeUndefined();
+    const cashier = () => false;
+    expect(ids('refund', cashier).sort()).toEqual(['C', 'H', 'I', 'P', 'R']);
   });
 
   it('hides what the user is not allowed to do', () => {
@@ -249,7 +288,7 @@ describe('palette key handling', () => {
 
   it('a letter with no action starts a search', () => {
     expect(paletteKey(k('z'), v())).toEqual({ type: 'none' });
-    expect(paletteKey(k('s'), v())).toEqual({ type: 'none' }); // S is not offered on Sell
+    expect(paletteKey(k('s'), v())).toEqual({ type: 'run', id: 'S' }); // every letter is offered on every screen
   });
 
   it('letters are plain typing once a search has started', () => {
