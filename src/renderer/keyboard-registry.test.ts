@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_COMBOS, resolveBindings } from '../core/shortcuts';
 import { HELP_ARTICLES } from './help/content';
 import { ARABIC_KEYS } from './i18n';
 import { decideKey, type KeyContext } from './checkout-keys';
 import {
-  CONTEXT_HELP, DIRECT_SHORTCUTS, QUICK_ACTIONS, actionsFor, commandLetter, decideGlobal, filterActions, lineQtyKey, moveHighlight, paletteKey,
+  CONTEXT_HELP, DIRECT_SHORTCUTS, QUICK_ACTIONS, actionsFor, canonicalize, checkoutActive, commandLetter, decideGlobal, filterActions, lineQtyKey, moveHighlight, paletteKey,
   type GlobalEnv, type KeyLike, type ScreenState,
 } from './keyboard-registry';
 
@@ -61,6 +62,10 @@ describe('shortcut registry', () => {
   it('every label has an Arabic translation', () => {
     const labels = QUICK_ACTIONS.flatMap((a) => [a.label, ...Object.values(a.where).map((w) => w.label).filter((l): l is string => !!l)]);
     expect(labels.filter((l) => !ARABIC_KEYS.includes(l))).toEqual([]);
+  });
+
+  it('every function name in Admin has an Arabic translation', () => {
+    expect(DIRECT_SHORTCUTS.map((s) => s.action).filter((l) => !ARABIC_KEYS.includes(l))).toEqual([]);
   });
 
   it('the Help keyboard guides show every shortcut and every letter', () => {
@@ -276,6 +281,65 @@ describe('palette key handling', () => {
   it('Ctrl+letter is not a command', () => {
     expect(paletteKey(k('a', { ctrl: true }), v())).toEqual({ type: 'none' });
     expect(paletteKey(k('p', { ctrl: true }), v())).toEqual({ type: 'none' });
+  });
+});
+
+describe('changed keys', () => {
+  const b = resolveBindings({ 'palette.open': 'F6', 'pay.cash': 'F9', 'pay.card': 'F10', 'checkout.open': 'F7', 'qty.inc': 'Alt+1', escape: 'F8', 'help.open': 'F2', 'letter.H': 'B' });
+  const pay = checkoutActive('cash');
+  const c = (key: KeyLike, active = pay) => canonicalize(key, b, active);
+
+  it('registry defaults are the shared defaults', () => {
+    for (const s of DIRECT_SHORTCUTS) expect(s.combo, s.id).toBe(DEFAULT_COMBOS[s.id as keyof typeof DEFAULT_COMBOS]);
+  });
+
+  it('the new central key works and the old one no longer does', () => {
+    expect(decideGlobal(k('F6'), env(), b).type).toBe('palette');
+    expect(decideGlobal(k('k', { ctrl: true }), env(), b).type).toBe('none');
+    expect(decideGlobal(k('F2'), env(), b).type).toBe('help');
+    expect(decideGlobal(k('F1'), env(), b).type).toBe('none');
+  });
+
+  it('a moved key still obeys every guard', () => {
+    expect(decideGlobal(k('F6', { repeat: true }), env(), b).type).toBe('swallow');
+    expect(decideGlobal(k('F6'), env({ step: 'qty', focus: 'text' }), b).type).toBe('refuse');
+    expect(decideGlobal(k('F6'), env({ focus: 'password' }), b).type).toBe('swallow');
+    expect(decideGlobal(k('F6', { composing: true }), env(), b).type).toBe('none');
+  });
+
+  it('a moved payment key pays through the same state machine', () => {
+    const cash = { step: 'pay' as const, field: 'cash' as const, searchEmpty: true, billHasItems: true, splitCardTyped: false, busy: false };
+    const run = (key: KeyLike, o: Partial<typeof cash> = {}) => {
+      const x = c(key);
+      return decideKey({ key: x.key, ctrl: x.ctrl, shift: x.shift, composing: x.composing, repeat: x.repeat, msSinceStepChange: 10_000 }, { ...cash, ...o }).type;
+    };
+    expect(run(k('F9'))).toBe('payCash');
+    expect(run(k('F10'))).toBe('payCard');
+    expect(run(k('Enter'))).toBe('none'); // Enter no longer pays
+    expect(run(k('Enter', { ctrl: true }))).toBe('none');
+    expect(run(k('F9', { repeat: true }))).toBe('swallow');
+    expect(run(k('F9'), { busy: true })).toBe('swallow');
+  });
+
+  it('a moved key only applies in its own box', () => {
+    expect(c(k('F9'), checkoutActive('qty')).key).toBe('F9');
+    expect(c(k('Enter'), checkoutActive('qty')).key).toBe('Enter'); // Enter still confirms a quantity
+    expect(c(k('Enter'), checkoutActive('cardPart')).key).toBe('Enter'); // and still moves on from the card part
+    expect(c(k('Enter'), checkoutActive('search')).key).toBe('Enter'); // and still picks a suggestion
+  });
+
+  it('nothing changed: keys pass straight through', () => {
+    const d = resolveBindings({});
+    expect(canonicalize(k('Enter'), d, pay)).toEqual(k('Enter'));
+    expect(canonicalize(k('a'), d, pay)).toEqual(k('a'));
+  });
+
+  it('a changed letter runs the action; the old letter no longer does', () => {
+    const list = actionsFor('sell', { unavailable: {} }, all, b.letters);
+    const v = { view: 'actions' as const, query: '', searching: false, actions: list };
+    expect(paletteKey(k('b'), v)).toEqual({ type: 'run', id: 'H' });
+    expect(paletteKey(k('h'), v)).toEqual({ type: 'none' });
+    expect(list.find((a) => a.id === 'H')!.letter).toBe('B');
   });
 });
 

@@ -135,6 +135,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
           if (vi === 0) {
             await keyFlows();
             await shortcutFlows();
+            await rebindFlows();
           }
           await clearBill();
           for (const code of ['6281000000000', '6281000000077', '6281000000033']) await scan(code); // fake seed barcodes
@@ -169,6 +170,88 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   } finally {
     writeFileSync(join(outDir, 'summary.json'), JSON.stringify(summary, null, 1));
     app.quit();
+  }
+
+  /** Admin changes keys through the real screen; the till follows at once; everything is put back. */
+  async function rebindFlows() {
+    const box = 'input[aria-label="product search"]';
+    const isOpen = () => js<boolean>(`!!document.querySelector('.palette')`);
+    const tabTo = async (name: string) => {
+      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await sleep(400);
+    };
+    const shownKey = (id: string) => js<string>(`document.querySelector('[aria-label="key ${id}"]')?.textContent ?? ''`);
+    const press = async (id: string, k: string, mods: ('shift' | 'control')[] = []) => {
+      await click(`button[aria-label="change ${id}"]`);
+      await sleep(150);
+      key(k, mods);
+      await sleep(200);
+    };
+    const save = async () => {
+      await click('button.primary', 'Save shortcuts');
+      await sleep(400);
+    };
+    const note = () => js<string>(`document.querySelector('[aria-label="keyboard shortcuts"] .msg')?.textContent ?? ''`);
+
+    await tabTo('Admin');
+    // F1 while recording is recorded, it does not open Help
+    await press('qty.focus', 'F1');
+    const noHelp = await js<boolean>(`!document.querySelector('.help-overlay')`);
+    flow('recording-a-key-opens-nothing', noHelp && (await note()) !== '', `no help ${noHelp}, message "${await note()}"`);
+    // Refused keys
+    await press('palette.open', 'c', ['control']);
+    flow('reserved-key-refused', (await shownKey('palette.open')) === 'Ctrl+K' && (await note()) !== '', `key ${await shownKey('palette.open')}, "${await note()}"`);
+    await capture('62-keyboard-settings__light-en-1366x768');
+    await press('palette.open', 'F6');
+    await press('pay.cash', 'F9');
+    await press('letter.H', 'b');
+    await save();
+    flow('admin-saves-new-keys', (await note()) === 'Keyboard shortcuts saved.' && (await shownKey('letter.H')) === 'B', `"${await note()}"`);
+
+    await tabTo('Sell');
+    await sleep(300);
+    await clearBill();
+    await focus(box);
+    key('k', ['control']);
+    await sleep(200);
+    const oldOff = !(await isOpen());
+    key('F6');
+    await sleep(200);
+    const newOn = await isOpen();
+    const letter = await js<string>(`[...document.querySelectorAll('.palette li .kbd')].map((e) => e.textContent).join(' ')`);
+    key('Escape');
+    await sleep(200);
+    flow('changed-palette-key', oldOff && newOn && letter.includes('B') && !letter.includes('H'), `old off ${oldOff}, new on ${newOn}, letters ${letter}`);
+
+    await scan('6281000000000');
+    await focus(box);
+    await sleep(500);
+    key('Enter', ['shift']);
+    await waitFor(`document.querySelector('[aria-label="payment step"].current')`, 1500);
+    await sleep(500);
+    await focus('input[aria-label="cash received"]');
+    await sleep(500);
+    const label = await js<string>(`document.querySelector('[aria-label="payment step"] button.primary .kbd')?.textContent ?? ''`);
+    const before = hooks.salesCount();
+    key('Enter');
+    await sleep(500);
+    const enterOff = hooks.salesCount() === before;
+    key('F9');
+    key('F9');
+    await sleep(1200);
+    flow('changed-cash-key-pays-once', label === 'F9' && enterOff && hooks.salesCount() === before + 1, `label ${label}, enter off ${enterOff}, sales ${before} -> ${hooks.salesCount()}`);
+
+    await tabTo('Admin');
+    await click('button', 'Reset all to default');
+    await sleep(400);
+    await tabTo('Sell');
+    await sleep(300);
+    await focus(box);
+    key('k', ['control']);
+    await sleep(200);
+    flow('reset-all-restores-defaults', await isOpen(), `open ${await isOpen()}`);
+    key('Escape');
+    await sleep(200);
   }
 
   /** Real key presses for F1, F4, Ctrl+F and Quick Actions (Ctrl+K). */

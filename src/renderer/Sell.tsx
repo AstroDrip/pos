@@ -13,8 +13,8 @@ import { call, type ApiError } from './api';
 import { SearchBox } from './SearchBox';
 import { decideKey, decrementQtyText, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
 import { HelpLink } from './HelpLink';
-import { useOpenCustomers, useScanner, useScreenKeys } from './Keyboard';
-import { keyLike, lineQtyKey, type ActionId } from './keyboard-registry';
+import { useBindings, useOpenCustomers, useScanner, useScreenKeys } from './Keyboard';
+import { canonicalize, checkoutActive, keyLike, lineQtyKey, type ActionId } from './keyboard-registry';
 import { ProductName, useI18n } from './i18n';
 
 /** A bill line; scanCode = the scale label scanned, kept on the sale line for audit. */
@@ -37,6 +37,8 @@ type CreditInfo = { id: number; creditEnabled: boolean; limit: number | null; ou
 
 export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean; canCredit?: boolean }) {
   const { t, lang } = useI18n();
+  const bindings = useBindings();
+  const keys = bindings.direct;
   const [shift, setShift] = useState<ShiftSummary | null | undefined>(undefined);
   const [float, setFloat] = useState('0');
   const [lines, setLines] = useState<Line[]>([]);
@@ -327,7 +329,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   }, [lines]);
   /** Keys in a bill line's quantity box (reached with F4 or a click). */
   const onLineKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    const a = lineQtyKey(keyLike(e.nativeEvent));
+    const a = lineQtyKey(canonicalize(keyLike(e.nativeEvent), bindings, ['qty.inc', 'qty.dec', 'escape']));
     if (a === 'none') return;
     e.preventDefault();
     const el = e.currentTarget;
@@ -395,7 +397,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     state: () => {
       const unavailable: Partial<Record<ActionId, string>> = {};
       if (!shift) for (const id of ['P', 'C', 'H', 'R', 'M'] as ActionId[]) unavailable[id] = t('Open the shift first.');
-      else if (step !== 'search') for (const id of ['P', 'C', 'H', 'R', 'M'] as ActionId[]) unavailable[id] = t('Press Esc to go back to the bill first.');
+      else if (step !== 'search') for (const id of ['P', 'C', 'H', 'R', 'M'] as ActionId[]) unavailable[id] = t('Press {0} to go back to the bill first.', keys.escape);
       else {
         if (lines.length === 0) unavailable.H = t('The bill is empty.');
         if (held.length === 0) unavailable.R = t('No held orders.');
@@ -476,8 +478,9 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
 
   /** Runs a key through the state machine for the focused field. Returns true when the key was used. */
   const onStepKey = (field: KeyContext['field'], e: React.KeyboardEvent<HTMLInputElement>, searchEmpty = true): boolean => {
+    const c = canonicalize(keyLike(e.nativeEvent), bindings, checkoutActive(field));
     const a = decideKey(
-      { key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, repeat: e.repeat, msSinceStepChange: performance.now() - stepAt.current },
+      { key: c.key, ctrl: c.ctrl || c.meta, shift: c.shift, composing: c.composing, repeat: c.repeat, msSinceStepChange: performance.now() - stepAt.current },
       { step, field, searchEmpty, billHasItems: lines.length > 0 && !!totals, splitCardTyped: cardPart.trim() !== '', busy: busyRef.current },
     );
     if (a.type === 'none') return false;
@@ -508,7 +511,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
           kind: 'warn',
           text:
             a.reason === 'pendingSearch' ? t('Pick the product (↑↓ Enter) or clear the search first.')
-            : a.reason === 'pendingQty' ? t('Press Enter to add the item, or Esc to cancel.')
+            : a.reason === 'pendingQty' ? t('Press Enter to add the item, or {0} to cancel.', keys.escape)
             : t('A split payment is in progress: press Enter in Cash received to finish it.'),
         });
         break;
@@ -595,8 +598,8 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             onCheckoutKey={(e, empty) => onStepKey('search', e, empty)}
             onFocusBox={() => goStep('search', false)}
           />
-          <small className="hint">{t('Empty box: Enter or Shift+Enter = payment · + / − = one more / one less of the last item')}</small>
-          <small className="hint">{t('Ctrl+K = quick actions · F4 = quantity · F1 = help')}</small>
+          <small className="hint">{t('Empty box: Enter or {0} = payment · {1} / {2} = one more / one less of the last item', keys['checkout.open'], keys['qty.inc'], keys['qty.dec'])}</small>
+          <small className="hint">{t('{0} = quick actions · {1} = quantity · {2} = help', keys['palette.open'], keys['qty.focus'], keys['help.open'])}</small>
         </div>
         {step === 'qty' && pending && (
           <div className="step current" role="group" aria-label="quantity step">
@@ -618,7 +621,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
               }, 200)}
             />
             {pending.error && <div className="msg error">{t(pending.error)}</div>}
-            <small className="hint">{t('Enter = add · + = one more · Esc = cancel')}</small>
+            <small className="hint">{t('Enter = add · {0} = one more · {1} = cancel', keys['qty.inc'], keys.escape)}</small>
           </div>
         )}
         <div className="row">
@@ -677,10 +680,10 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             onKeyDown={(e) => onStepKey('cardPart', e)}
           />
           <div className="row" style={{ marginTop: 8 }}>
-            <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>{t('Cash')} <span className="kbd">Enter</span></button>
-            <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>{t('Card')} <span className="kbd">Ctrl+Enter</span></button>
+            <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('cash')}>{t('Cash')} <span className="kbd">{keys['pay.cash']}</span></button>
+            <button className="primary" disabled={busy || !totals || lines.length === 0} onClick={() => pay('card')}>{t('Card')} <span className="kbd">{keys['pay.card']}</span></button>
           </div>
-          {step === 'pay' && <small className="hint">{t('Card: record only after the bank terminal shows APPROVED.')} {t('Esc = back to the bill')}</small>}
+          {step === 'pay' && <small className="hint">{t('Card: record only after the bank terminal shows APPROVED.')} {t('{0} = back to the bill', keys.escape)}</small>}
           {canCredit && customer && credit && (
             <div className="msg" role="group" aria-label="credit sale" style={{ border: '1px solid var(--border)', marginTop: 8 }}>
               {!credit.creditEnabled ? (

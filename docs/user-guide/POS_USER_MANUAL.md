@@ -12,6 +12,7 @@ Names and numbers in the examples are made up.
   - [Find your way around the screen](#start-screen)
   - [Keyboard keys at the till](#start-keys)
   - [Quick Actions (Ctrl+K)](#start-quick-actions)
+  - [Change the keyboard keys](#admin-shortcuts)
 - **Selling**
   - [Scan a product](#selling-scan)
   - [Find a product by name or code](#selling-search)
@@ -177,6 +178,32 @@ Names and numbers in the examples are made up.
 - *Ctrl+K shows "Press Enter to add the item, or Esc to cancel."* The quantity box is open. Finish the quantity first, then press Ctrl+K.
 - *The letter you want is not in the list.* It does not belong to this screen, or your user is not allowed to use it.
 - *Collection or settlement did not take a payment.* That is correct. The letter only opens the place to pay. You type the amount and press the button yourself.
+
+<a id="admin-shortcuts"></a>
+
+### Change the keyboard keys
+
+**What this does:** Choose your own key for each function. The change applies to every user on this till as soon as you save it.
+
+**Where:** Admin tab → Keyboard shortcuts.
+
+**Steps**
+
+1. Open the Admin tab and find Keyboard shortcuts.
+2. Press Change beside the function.
+3. Press the new key. For Quick Actions, press one letter.
+4. Press Save shortcuts.
+5. To undo one change, press Default on that row. To undo them all, press Reset all to default.
+
+**What you should see:** A green message says the shortcuts are saved. The keys shown on the Sell screen change too.
+
+**If something goes wrong**
+
+- *It says the key is needed for typing or the window.* Choose a function key such as F6, or Ctrl or Alt with a letter. Keys used for typing, copy and paste, or closing the window cannot be used.
+- *It says the key is already used.* Two functions cannot share a key. Change the other function first, or choose another key.
+- *You changed Enter for cash and now Enter does not pay.* That is correct: the new key pays instead. Enter still picks items and confirms quantities. The Cash button shows the key in use.
+
+**Ask a supervisor:** Only a user allowed to change settings can do this. Every change is written to the audit log.
 
 ## Selling
 

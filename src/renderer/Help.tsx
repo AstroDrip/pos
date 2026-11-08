@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { searchHelp } from '../core/help-search';
 import { HELP_ARTICLES, HELP_SECTIONS, type HelpArticle } from './help/content';
+import { DIRECT_SHORTCUTS, QUICK_ACTIONS } from './keyboard-registry';
+import { useBindings, useShortcuts } from './Keyboard';
 import { useI18n } from './i18n';
 import { PageHeader } from './PageHeader';
 
@@ -77,6 +79,7 @@ export function Help({ initial }: { initial?: string }) {
           {article.keys && (
             <p className="help-keys"><strong>Keys.</strong> {article.keys.map((k) => <kbd key={k}>{k}</kbd>)}</p>
           )}
+          {(article.id === 'start-keys' || article.id === 'start-quick-actions') && <LiveKeys />}
           <h4>Steps</h4>
           <ol className="help-steps">
             {article.steps.map((s, i) => <li key={i}>{s}</li>)}
@@ -96,6 +99,23 @@ export function Help({ initial }: { initial?: string }) {
           {article.supervisor && <p className="help-supervisor"><strong>Ask a supervisor.</strong> {article.supervisor}</p>}
         </article>
       </div>
+    </div>
+  );
+}
+
+/** The guides list the standard keys. If the admin changed any, this says which keys this till really uses. */
+function LiveKeys() {
+  const b = useBindings();
+  const { overrides } = useShortcuts();
+  if (Object.keys(overrides).length === 0) return null;
+  const rows = [
+    ...DIRECT_SHORTCUTS.filter((s) => s.id in overrides).map((s) => [s.action, b.direct[s.id as keyof typeof b.direct]] as const),
+    ...QUICK_ACTIONS.filter((a) => `letter.${a.id}` in overrides).map((a) => [a.label, b.letters[a.id]] as const),
+  ];
+  return (
+    <div className="msg warn" aria-label="changed keys">
+      <strong>Keys changed on this till.</strong> Use these instead of the standard keys below:
+      <ul>{rows.map(([label, key]) => <li key={label}>{label}: <kbd>{key}</kbd></li>)}</ul>
     </div>
   );
 }

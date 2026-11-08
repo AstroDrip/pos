@@ -6,6 +6,7 @@
 //                 never touches those keys, so a payment key cannot be handled twice.
 //  - 'palette'  = the Quick Actions box. Its letters exist only while the box is open.
 
+import { DEFAULT_BINDINGS, DEFAULT_COMBOS, comboOf, type Bindings, type LetterId, type ShortcutId } from '../core/shortcuts';
 import type { CheckoutStep } from './checkout-keys';
 
 export type ScreenContext = 'sell' | 'refund' | 'customers' | 'stock' | 'products' | 'purchases' | 'expenses' | 'accounting' | 'reports' | 'shift' | 'admin' | 'help';
@@ -104,23 +105,57 @@ export type GlobalAction =
 const NONE: GlobalAction = { type: 'none' };
 const SWALLOW: GlobalAction = { type: 'swallow' };
 
-/** Ctrl+letter by the physical key as well, so it works on an Arabic layout. AltGr (Ctrl+Alt) never matches. */
-const ctrlLetter = (k: KeyLike, letter: string) => (k.ctrl || k.meta) && !k.shift && !k.alt && (k.key.toLowerCase() === letter || k.code === `Key${letter.toUpperCase()}`);
-const plain = (k: KeyLike) => !k.ctrl && !k.meta && !k.shift && !k.alt;
-
-function which(k: KeyLike): 'help' | 'qty' | 'search' | 'palette' | 'escape' | null {
-  if (k.key === 'F1' && plain(k)) return 'help';
-  if (k.key === 'F4' && plain(k)) return 'qty';
-  if (k.key === 'Escape' && plain(k)) return 'escape';
-  if (ctrlLetter(k, 'f')) return 'search';
-  if (ctrlLetter(k, 'k')) return 'palette';
+/** Which central function this key press is, with the keys the admin chose. */
+function which(k: KeyLike, b: Bindings): 'help' | 'qty' | 'search' | 'palette' | 'escape' | null {
+  const combo = comboOf(k);
+  if (!combo) return null;
+  if (combo === b.direct['help.open']) return 'help';
+  if (combo === b.direct['qty.focus']) return 'qty';
+  if (combo === b.direct.escape) return 'escape';
+  if (combo === b.direct['search.focus']) return 'search';
+  if (combo === b.direct['palette.open']) return 'palette';
   return null;
 }
 
+const CANONICAL: Partial<Record<ShortcutId, { key: string; ctrl?: boolean; shift?: boolean }>> = {
+  'pay.cash': { key: 'Enter' },
+  'pay.card': { key: 'Enter', ctrl: true },
+  'checkout.open': { key: 'Enter', shift: true },
+  'qty.inc': { key: '+' },
+  'qty.dec': { key: '-' },
+  escape: { key: 'Escape' },
+};
+
+/**
+ * Turns a key press into the key the checkout rules know, using the admin's choices. All guards (held keys, the
+ * Enter timer, the busy lock) then work unchanged. A default key whose function moved away stops doing that function.
+ */
+export function canonicalize(k: KeyLike, b: Bindings, active: readonly ShortcutId[]): KeyLike {
+  const combo = comboOf(k);
+  for (const id of active) {
+    if (combo === b.direct[id]) return { ...k, key: CANONICAL[id]!.key, ctrl: !!CANONICAL[id]!.ctrl, shift: !!CANONICAL[id]!.shift, alt: false, meta: false };
+  }
+  for (const id of active) {
+    if (combo === DEFAULT_COMBOS[id] && b.direct[id] !== DEFAULT_COMBOS[id]) return { ...k, key: 'Unidentified', code: '' };
+  }
+  return k;
+}
+
+/** The changeable checkout functions that apply in each box. */
+export function checkoutActive(field: 'search' | 'qty' | 'cash' | 'cardPart' | 'other'): readonly ShortcutId[] {
+  switch (field) {
+    case 'search': return ['checkout.open', 'qty.inc', 'qty.dec'];
+    case 'qty': return ['qty.inc', 'qty.dec', 'escape'];
+    case 'cash': return ['pay.cash', 'pay.card', 'escape'];
+    case 'cardPart': return ['pay.card', 'escape'];
+    case 'other': return [];
+  }
+}
+
 /** What the central listener does with a key. Every key it does not know is left completely alone. */
-export function decideGlobal(k: KeyLike, e: GlobalEnv): GlobalAction {
+export function decideGlobal(k: KeyLike, e: GlobalEnv, b: Bindings = DEFAULT_BINDINGS): GlobalAction {
   if (k.composing) return NONE;
-  const w = which(k);
+  const w = which(k, b);
   if (!w) return NONE;
   if (w === 'qty' && e.context !== 'sell' && !e.paletteOpen && !e.modalOpen) return NONE;
 
@@ -162,6 +197,8 @@ export interface ScreenState {
 
 export interface ShownAction {
   id: ActionId;
+  /** The key that runs it: the admin may have changed it. */
+  letter: string;
   label: string;
   keywords: string[];
   effect: Effect;
@@ -170,12 +207,12 @@ export interface ShownAction {
 }
 
 /** What Quick Actions shows on this screen: not allowed = hidden; allowed but not possible now = shown disabled. */
-export function actionsFor(context: ScreenContext, state: ScreenState, can: (permission: string) => boolean): ShownAction[] {
+export function actionsFor(context: ScreenContext, state: ScreenState, can: (permission: string) => boolean, letters: Record<LetterId, string> = DEFAULT_BINDINGS.letters): ShownAction[] {
   return QUICK_ACTIONS.flatMap((a) => {
     const w = a.where[context];
     if (!w || (w.permission && !can(w.permission))) return [];
     const reason = state.unavailable[a.id];
-    return [{ id: a.id, label: w.label ?? a.label, keywords: a.keywords, effect: a.effect, enabled: !reason, reason }];
+    return [{ id: a.id, letter: letters[a.id], label: w.label ?? a.label, keywords: a.keywords, effect: a.effect, enabled: !reason, reason }];
   });
 }
 
@@ -216,7 +253,7 @@ export function paletteKey(k: KeyLike, v: PaletteView): PaletteAction {
   if (k.key === 'Tab') return { type: 'swallow' }; // focus stays inside the palette
   if (!commands) return { type: 'none' };
   const letter = commandLetter(k);
-  const a = letter ? v.actions.find((x) => x.id === letter) : undefined;
+  const a = letter ? v.actions.find((x) => x.letter === letter) : undefined;
   if (!a) return { type: 'none' };
   if (k.repeat) return { type: 'swallow' };
   return { type: a.enabled ? 'run' : 'refuse', id: a.id };

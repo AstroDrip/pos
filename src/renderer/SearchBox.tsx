@@ -5,6 +5,9 @@ import type { Product } from '../services/catalog';
 import type { SearchHit } from '../services/search';
 import { call } from './api';
 import { useI18n } from './i18n';
+import { canonicalize, keyLike } from './keyboard-registry';
+import { comboOf } from '../core/shortcuts';
+import { useBindings } from './Keyboard';
 import { useSuggest } from './useSuggest';
 
 const DEBOUNCE_MS = 150;
@@ -35,6 +38,7 @@ export function SearchBox({
   onFocusBox?: () => void;
 }) {
   const { t, lang } = useI18n();
+  const bindings = useBindings();
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -68,14 +72,15 @@ export function SearchBox({
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
     const empty = !text.trim();
-    if ((empty || (e.key === 'Enter' && e.shiftKey)) && onCheckoutKey?.(e, empty)) return;
+    const finishKey = comboOf(keyLike(e.nativeEvent)) === bindings.direct['checkout.open'];
+    if ((empty || finishKey) && onCheckoutKey?.(e, empty)) return;
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && hits.length) {
       e.preventDefault();
       if (e.key === 'ArrowDown') setOpen(true);
       navigated.current = true;
       const key = e.key;
       setActive((a) => moveActive(a, hits.length, key));
-    } else if (e.key === 'Escape') {
+    } else if (canonicalize(keyLike(e.nativeEvent), bindings, ['escape']).key === 'Escape') {
       setOpen(false);
     } else if (e.key === 'Enter') {
       e.preventDefault();

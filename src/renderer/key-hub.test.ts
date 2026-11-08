@@ -36,6 +36,19 @@ describe('KeyHub', () => {
     expect(calls).toEqual(['scan', 'handler']);
   });
 
+  it('while recording a new key, nothing else sees the key', () => {
+    const hub = new KeyHub();
+    const calls: string[] = [];
+    hub.setHandler(() => void calls.push('handler'));
+    hub.setScanner(() => (calls.push('scan'), false));
+    const off = hub.setRecorder(() => calls.push('record'));
+    hub.handle({ key: 'F1' } as KeyboardEvent);
+    expect(calls).toEqual(['record']);
+    off();
+    hub.handle({ key: 'F1' } as KeyboardEvent);
+    expect(calls).toEqual(['record', 'scan', 'handler']);
+  });
+
   it('a stale scanner cleanup does not remove the current one', () => {
     const hub = new KeyHub();
     const a = vi.fn(() => false);

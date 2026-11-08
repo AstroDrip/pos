@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { resolveBindings, type Bindings, type ShortcutOverrides } from '../core/shortcuts';
+import { call } from './api';
 import { KeyHub } from './key-hub';
 import { CONTEXT_HELP, decideGlobal, keyLike, type ActionId, type FocusKind, type ScreenContext, type ScreenState } from './keyboard-registry';
 import type { CheckoutStep } from './checkout-keys';
@@ -25,6 +27,9 @@ interface KeyboardApi {
   /** Set while Item information is open: a scan then looks the item up instead of adding it to the bill. */
   scanTarget: RefObject<((code: string) => boolean) | null>;
   openCustomers: (customerId?: number) => void;
+  bindings: Bindings;
+  overrides: ShortcutOverrides;
+  setOverrides: (o: ShortcutOverrides) => void;
 }
 
 const Ctx = createContext<KeyboardApi | null>(null);
@@ -61,6 +66,16 @@ export function useScanner(fn: (e: KeyboardEvent, scanTarget: KeyboardApi['scanT
 }
 
 export const useOpenCustomers = () => useKeyboard().openCustomers;
+/** The keys in force on this till. */
+export const useBindings = () => useKeyboard().bindings;
+export function useShortcuts() {
+  const { overrides, setOverrides } = useKeyboard();
+  return { overrides, setOverrides };
+}
+export function useKeyRecorder() {
+  const { hub } = useKeyboard();
+  return useCallback((fn: (e: KeyboardEvent) => void) => hub.setRecorder(fn), [hub]);
+}
 
 const VISIBLE = (el: HTMLElement) => el.offsetParent !== null && !(el as HTMLInputElement).disabled;
 
@@ -115,6 +130,9 @@ export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, open
   const scanTarget = useRef<((code: string) => boolean) | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const [palette, setPalette] = useState(false);
+  const [overrides, setOverrides] = useState<ShortcutOverrides>({});
+  const bindings = useMemo(() => resolveBindings(overrides), [overrides]);
+  useEffect(() => void call<ShortcutOverrides>('shortcuts.get').then(setOverrides, () => setOverrides({})), []);
 
   const register = useCallback((s: ScreenKeys) => {
     screen.current = s;
@@ -137,8 +155,8 @@ export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, open
   }, []);
 
   // Everything the listener needs, read fresh on each key.
-  const live = useRef({ tab, helpOpen, palette, openHelp, closeHelp, closePalette, t });
-  live.current = { tab, helpOpen, palette, openHelp, closeHelp, closePalette, t };
+  const live = useRef({ tab, helpOpen, palette, openHelp, closeHelp, closePalette, t, bindings });
+  live.current = { tab, helpOpen, palette, openHelp, closeHelp, closePalette, t, bindings };
 
   useEffect(() => {
     hub.setHandler((e) => {
@@ -151,7 +169,7 @@ export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, open
         focus: focusKind(document.activeElement),
         step: l.tab === 'sell' ? snap?.step : undefined,
         busy: snap?.busy ?? false,
-      });
+      }, l.bindings);
       if (action.type === 'none') return;
       e.preventDefault();
       e.stopPropagation();
@@ -167,7 +185,7 @@ export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, open
         case 'focusQty': screen.current?.focusQty?.(); break;
         case 'clearSuggest': clearInput(document.activeElement as HTMLInputElement); break;
         case 'refuse':
-          screen.current?.notify?.(action.reason === 'qty' ? l.t('Press Enter to add the item, or Esc to cancel.') : l.t('Press Esc to go back to the bill first.'));
+          screen.current?.notify?.(action.reason === 'qty' ? l.t('Press Enter to add the item, or {0} to cancel.', l.bindings.direct.escape) : l.t('Press {0} to go back to the bill first.', l.bindings.direct.escape));
           break;
       }
     });
@@ -181,7 +199,7 @@ export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, open
   // Moving to another screen closes the palette; it belongs to the screen it was opened on.
   useEffect(() => closePalette(false), [tab, closePalette]);
 
-  const api = useMemo(() => ({ hub, register, scanTarget, openCustomers }), [hub, register, openCustomers]);
+  const api = useMemo(() => ({ hub, register, scanTarget, openCustomers, bindings, overrides, setOverrides }), [hub, register, openCustomers, bindings, overrides]);
   return (
     <Ctx.Provider value={api}>
       {children}
@@ -191,6 +209,7 @@ export function KeyboardProvider({ tab, can, helpOpen, openHelp, closeHelp, open
           can={can}
           screen={screen}
           scanTarget={scanTarget}
+          bindings={bindings}
           onClose={closePalette}
         />
       )}

@@ -127,6 +127,29 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
 
+  {
+    id: 'admin-shortcuts',
+    section: 'start',
+    title: 'Change the keyboard keys',
+    keywords: ['shortcut', 'keyboard', 'change key', 'rebind', 'custom', 'admin', 'letter', 'settings'],
+    what: 'Choose your own key for each function. The change applies to every user on this till as soon as you save it.',
+    where: 'Admin tab → Keyboard shortcuts.',
+    steps: [
+      'Open the Admin tab and find Keyboard shortcuts.',
+      'Press Change beside the function.',
+      'Press the new key. For Quick Actions, press one letter.',
+      'Press Save shortcuts.',
+      'To undo one change, press Default on that row. To undo them all, press Reset all to default.',
+    ],
+    expect: 'A green message says the shortcuts are saved. The keys shown on the Sell screen change too.',
+    problems: [
+      { problem: 'It says the key is needed for typing or the window.', fix: 'Choose a function key such as F6, or Ctrl or Alt with a letter. Keys used for typing, copy and paste, or closing the window cannot be used.' },
+      { problem: 'It says the key is already used.', fix: 'Two functions cannot share a key. Change the other function first, or choose another key.' },
+      { problem: 'You changed Enter for cash and now Enter does not pay.', fix: 'That is correct: the new key pays instead. Enter still picks items and confirms quantities. The Cash button shows the key in use.' },
+    ],
+    supervisor: 'Only a user allowed to change settings can do this. Every change is written to the audit log.',
+  },
+
   // ───────────────────────── Selling
   {
     id: 'selling-scan',

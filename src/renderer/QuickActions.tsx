@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { formatQty, formatSar } from '../core/money';
+import type { Bindings } from '../core/shortcuts';
 import type { ItemInfo, LookupResult } from '../services/catalog';
 import type { Supplier } from '../services/parties';
 import type { SearchHit } from '../services/search';
 import { call } from './api';
 import { useI18n } from './i18n';
-import { actionsFor, filterActions, keyLike, moveHighlight, paletteKey, type ActionId, type ScreenContext } from './keyboard-registry';
+import { actionsFor, canonicalize, filterActions, keyLike, moveHighlight, paletteKey, type ActionId, type ScreenContext } from './keyboard-registry';
 import type { ScreenKeys } from './Keyboard';
 import { focusWhenReady } from './Keyboard';
 import { useSuggest } from './useSuggest';
@@ -17,11 +18,12 @@ type ListId = 'I' | 'S' | 'R';
 type Row = { key: string; label: string; sub?: string; letter?: string; enabled: boolean; reason?: string; value: number | ActionId };
 
 /** Ctrl+K: a short list of what can be done on this screen. Letters work only while this box is open. */
-export function QuickActions({ context, can, screen, scanTarget, onClose }: {
+export function QuickActions({ context, can, screen, scanTarget, bindings, onClose }: {
   context: ScreenContext;
   can: (permission: string) => boolean;
   screen: RefObject<ScreenKeys | null>;
   scanTarget: RefObject<((code: string) => boolean) | null>;
+  bindings: Bindings;
   onClose: (restoreFocus: boolean) => void;
 }) {
   const { t, lang } = useI18n();
@@ -68,14 +70,14 @@ export function QuickActions({ context, can, screen, scanTarget, onClose }: {
     };
   }, [list]);
 
-  const actions = useMemo(() => actionsFor(context, snap, can), [context, can, JSON.stringify(snap.unavailable)]);
+  const actions = useMemo(() => actionsFor(context, snap, can, bindings.letters), [context, can, bindings, JSON.stringify(snap.unavailable)]);
   const name = (p: { nameEn: string; nameAr: string }) => (lang === 'ar' ? p.nameAr : p.nameEn);
   const q = query.trim().toLowerCase();
   const rows: Row[] = item ? []
     : list === 'I' ? hits.map((h) => ({ key: `p${h.product.id}`, label: name(h.product), sub: `${formatSar(h.product.priceIncl)} ${t('SAR')}`, enabled: true, value: h.product.id }))
     : list === 'S' ? suppliers.filter((s) => !q || s.name.toLowerCase().includes(q) || (s.phone ?? '').includes(q)).slice(0, 30).map((s) => ({ key: `s${s.id}`, label: s.name, sub: s.phone ?? undefined, enabled: true, value: s.id }))
     : list === 'R' ? (snap.held ?? []).filter((h) => !q || h.label.toLowerCase().includes(q)).map((h) => ({ key: `h${h.id}`, label: h.label, enabled: true, value: h.id }))
-    : filterActions(actions, query, t).map((a) => ({ key: a.id, label: t(a.label), letter: a.id, enabled: a.enabled, reason: a.reason, value: a.id }));
+    : filterActions(actions, query, t).map((a) => ({ key: a.id, label: t(a.label), letter: a.letter, enabled: a.enabled, reason: a.reason, value: a.id }));
   const rowsKey = rows.map((r) => `${r.key}:${r.enabled}`).join();
   useEffect(() => setActive(rows.findIndex((r) => r.enabled)), [rowsKey]);
 
@@ -124,7 +126,7 @@ export function QuickActions({ context, can, screen, scanTarget, onClose }: {
       clearTimeout(pending.current);
       pending.current = null;
     }
-    const a = paletteKey(keyLike(e.nativeEvent), { view: item ? 'item' : list ? 'list' : 'actions', query, searching, actions });
+    const a = paletteKey(canonicalize(keyLike(e.nativeEvent), bindings, ['escape']), { view: item ? 'item' : list ? 'list' : 'actions', query, searching, actions });
     if (a.type === 'none') return;
     e.preventDefault();
     switch (a.type) {
@@ -202,7 +204,7 @@ export function QuickActions({ context, can, screen, scanTarget, onClose }: {
           </ul>
         )}
         {note && <p className="msg warn" role="status">{note}</p>}
-        <small className="hint">{list || item ? t('↑ ↓ and Enter to choose · Esc to close') : t('Press a letter · ↑ ↓ and Enter · Tab to search by name · Esc to close')}</small>
+        <small className="hint">{list || item ? t('↑ ↓ and Enter to choose · {0} to close', bindings.direct.escape) : t('Press a letter · ↑ ↓ and Enter · Tab to search by name · {0} to close', bindings.direct.escape)}</small>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { formatQty } from '../core/money';
 import { call } from './api';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
+import { KeyboardSettings } from './KeyboardSettings';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
@@ -23,6 +24,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
       {(can('product.manage') || can('supplier.manage')) && <Import />}
       {can('settings.manage') && <ScaleLabels />}
       {can('settings.manage') && <DashboardHealth />}
+      {can('settings.manage') && <KeyboardSettings />}
       </div>
     </div>
   );

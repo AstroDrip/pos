@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { schemas, type Channel, type IpcResult } from '../shared/ipc';
 import { backupStatus, createBackup, prepareRestore } from '../services/backup';
 import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto';
+import { getShortcuts, saveShortcuts } from '../services/shortcuts';
 import { createProduct, getAliases, getProduct, itemInfo, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
@@ -108,6 +109,8 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'catalog.search': (p) => searchProducts(ctx, p.text),
     'catalog.create': (p, s) => createProduct(ctx, userId(s), p),
     'catalog.suggest': (p) => indexedSearch(ctx, p.text, [...p.text.trim()].length <= 1 ? 8 : 12),
+    'shortcuts.get': () => getShortcuts(ctx),
+    'shortcuts.save': (p, s) => saveShortcuts(ctx, userId(s), p.overrides),
     'catalog.itemInfo': (p) => itemInfo(ctx, p.productId),
     'catalog.setPrice': (p, s) => setPrice(ctx, userId(s), p.productId, p.priceIncl),
     'catalog.setActive': (p, s) => setProductActive(ctx, userId(s), p.productId, p.active, p.reason),
