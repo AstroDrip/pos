@@ -7,6 +7,7 @@
 - The customer receipt must look like the store's current receipt, with the store's real details.
 - Every supplier paper the store gets must be enterable: delivery note, tax invoice, proforma.
 - All bill data must feed stock cost, what we owe, VAT, profit and expense numbers correctly.
+- Owner (2026-11-08): suppliers print the invoice on the spot when the store buys, and the invoice says whether the amount is paid or on credit.
 - Owner answers (2026-11-08): store name is Joori; building number comes from the latest supplier bill; the owner does not know what the pack codes (CU, SU) mean.
 
 **Assumption from that last answer:** the app must never depend on knowing a pack code. A pack is just a name plus "how many pieces inside". Staff count it once and the app remembers it.
@@ -52,7 +53,7 @@ Carried from the owner's standing rules. They bind every task.
 
 **`supplier_items`** (the app's memory): `id`, `supplier_id`, `product_id`, `supplier_code` (nullable), `pack_name` (free text, default `PCS`), `units_per_pack` (milli, > 0), `last_price` (halalas per pack), `updated_at`. Unique on (`supplier_id`, `supplier_code`) when the code exists; unique on (`supplier_id`, `product_id`, `pack_name`). Normal table, can be edited.
 
-**`supplier_bills`** (immutable): `id`, `request_key` (unique), `supplier_id`, `doc_type` (`tax_invoice`, `delivery_note`, `proforma`, `other`), `doc_no`, `doc_date`, `delivery_date`, `sales_agent`, `pay_type` (`credit`, `cash`), `grn_id`, `bill_discount`, `bill_charge`, `paper_gross` (nullable), `paper_discount` (nullable), `paper_net`, `paper_vat`, `paper_total`, `pages`, `notes`, `user_id`, `created_at`. Unique on (`supplier_id`, `doc_type`, `doc_no`).
+**`supplier_bills`** (immutable): `id`, `request_key` (unique), `supplier_id`, `doc_type` (`tax_invoice`, `delivery_note`, `proforma`, `other`), `doc_no`, `doc_date`, `delivery_date`, `sales_agent`, `pay_type` (`paid`, `credit`), `grn_id`, `bill_discount`, `bill_charge`, `paper_gross` (nullable), `paper_discount` (nullable), `paper_net`, `paper_vat`, `paper_total`, `pages`, `notes`, `user_id`, `created_at`. Unique on (`supplier_id`, `doc_type`, `doc_no`).
 
 **`supplier_bill_lines`** (immutable): `bill_id`, `line_no`, `page_no`, `product_id`, `supplier_code`, `bill_text` (name as printed), `tariff_code`, `pack_name`, `units_per_pack`, `packs`, `loose_qty`, `free_qty`, `received_qty`, `price_basis` (`pack` or `unit`), `price`, `gross`, `discount`, `discount_bp`, `net`, `vat_rate_bp`, `vat`, `total`, `grn_line_from`, `grn_line_count`.
 
@@ -105,15 +106,18 @@ All through existing `receiveGoods` and `createPurchaseInvoice`.
 | Other paper | In | Yes | Not claimed by default |
 
 - VAT claim is forced off when VAT is 0.
-- Cash bill: `payNow` for the full total, from till or bank. Credit bill: due date from supplier terms, or typed, or no due date.
+- The bill form has one required choice copied from the paper: **Paid** or **Credit**. Staff enter the bill when the goods arrive, so paper date and delivery date default to today.
+- **Paid:** `payNow` for the full total, from till (default) or bank.
+- **Credit:** due date from supplier terms, or typed, or no due date. An optional amount covers a part paid at delivery.
+- A delivery note has no Paid or Credit choice, because no invoice exists yet.
 - A delivery note's later invoice uses the existing Purchases form. The form pre-fills net and VAT from the saved bill.
-- Permissions are the existing ones: `stock.receive`, plus `purchase.manage` for anything that creates a payable, plus `purchase.pay` for cash bills.
+- Permissions are the existing ones: `stock.receive`, plus `purchase.manage` for anything that creates a payable, plus `purchase.pay` for paid bills.
 
 ## 8. Screens
 
 **Enter supplier bill** (new, Purchases tab, full-width):
 
-- Header: supplier (shows VAT number), paper type, number, paper date, delivery date, sales agent, cash or credit, pages.
+- Header: supplier (shows VAT number), paper type, number, paper date, delivery date, sales agent, **Paid or Credit**, pages.
 - Add line by supplier code, barcode or name. A known code fills product, pack name, pack size and last price.
 - Line row: code, product, pack name, pieces in pack, packs, loose, free, received, price (pack or piece), discount (amount or %), VAT %, VAT, net, total, cost per piece, page.
 - Unknown product: small New product form on the same screen, needs `product.manage`.
@@ -158,7 +162,7 @@ Logo · Arabic name · English name · legal name · address line · VAT No. · 
 
 - **Bill A (snacks), page 1:** 9 lines end 532.86 / 32.48 / 500.38 / 75.07 / 575.45. Delivery note: stock up, 2100 up, nothing owed.
 - **Bill B (juice):** 2 lines, packs of 24, end 341.01 / 51.15 / 392.16. Stock value exactly 341.01, 5010 stays 0, supplier owed 392.16.
-- **Bill C (dairy):** loose pieces from cases, cash, proforma. VAT lands in 5010 and is not input VAT.
+- **Bill C (dairy):** loose pieces from cases, paid, proforma. VAT lands in 5010 and is not input VAT.
 - Free goods lower the average cost. Short delivery creates the difference.
 - P&L net profit equals balance-sheet current earnings when 5010 is not zero.
 - VAT summary still reconciles after each bill type.
