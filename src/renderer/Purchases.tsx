@@ -3,10 +3,10 @@ import { formatSar, parseQty, parseSar, roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import type { Product } from '../services/catalog';
 import type { Supplier } from '../services/parties';
-import type { AgeingRow, StatementLine, SupplierAccount, UninvoicedGrn } from '../services/purchasing';
+import type { AgeingRow, PastReturn, StatementLine, SupplierAccount, UninvoicedGrn } from '../services/purchasing';
 import { StatusBadge, StatusLegend } from './StatusBadge';
 import { call } from './api';
-import { PageHeader } from './PageHeader';
+import { EmptyRow, PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { focusWhenReady, useScreenKeys } from './Keyboard';
 import { HelpLink } from './HelpLink';
@@ -109,8 +109,7 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
     setPicked([]);
     const s = suppliers.find((x) => x.id === supplierId);
     setF((p) => ({ ...p, vatNo: s?.vatNumber ?? '' }));
-    if (supplierId) void load(supplierId);
-    else setGrns([]);
+    void load(supplierId); // no supplier chosen: everything still waiting for an invoice
   }, [supplierId]);
   // A delivery note was typed in full: its net and VAT fill the invoice boxes. They can still be changed.
   useEffect(() => {
@@ -153,6 +152,22 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
       <p className="hint">{t('Receive the goods first (Stock tab), then match the receipts to the supplier invoice here.')}</p>
       <label>{t('Supplier')}</label>
       <SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} />
+      {supplierId === 0 && (
+        <>
+          <h4>{t('Goods receipts not yet invoiced')}</h4>
+          <table className="list" aria-label="waiting for invoice">
+            <thead><tr><th>{t('Goods receipt')}</th><th>{t('Supplier')}</th><th>{t('Reference')}</th><th>{t('Date')}</th><th className="num">{t('Cost')}</th></tr></thead>
+            <tbody>
+              {grns.length === 0 && <EmptyRow cols={5} text={t('Nothing is waiting for an invoice.')} />}
+              {grns.map((g) => (
+                <tr key={g.grnId} style={{ cursor: 'pointer' }} tabIndex={0} onClick={() => setSupplierId(g.supplierId)} onKeyDown={(e) => e.key === 'Enter' && setSupplierId(g.supplierId)}>
+                  <td>{g.grnNo}</td><td>{g.supplier}</td><td>{g.reference}</td><td>{storeDay(g.receivedAt)}</td><td className="num">{formatSar(g.totalCost)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
       {supplierId > 0 && (
         <>
           <h4>{t('Goods receipts not yet invoiced')}</h4>
@@ -209,6 +224,8 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
   const [busy, setBusy] = useState(false);
   const requestKey = useRef(crypto.randomUUID());
   const { items: found } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
+  const [past, setPast] = useState<PastReturn[]>([]);
+  useEffect(() => void call<PastReturn[]>('purchase.returns', { limit: 50 }).then(setPast, () => setPast([])), [msg]);
   const save = async () => {
     if (busy) return;
     setBusy(true);
@@ -257,6 +274,14 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
       <label><input type="checkbox" checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('The VAT was claimed as input VAT (reverse it)')}</label>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       <p><button className="primary" disabled={busy || !supplierId || lines.length === 0 || lines.some((l) => !l.qty.trim()) || !f.reason.trim()} onClick={save}>{t('Save return')}</button></p>
+      <h4>{t('Past returns')}</h4>
+      <table className="list" aria-label="past returns">
+        <thead><tr><th>{t('Return')}</th><th>{t('Supplier')}</th><th>{t("Supplier's credit note no.")}</th><th>{t('Date')}</th><th>{t('Reason')}</th><th className="num">{t('Total')}</th></tr></thead>
+        <tbody>
+          {past.length === 0 && <EmptyRow cols={6} text={t('No returns yet.')} />}
+          {past.map((r) => <tr key={r.pretNo}><td>{r.pretNo}</td><td>{r.supplier}</td><td>{r.supplierCreditRef}</td><td>{r.returnDate}</td><td>{r.reason}</td><td className="num">{formatSar(r.gross)}</td></tr>)}
+        </tbody>
+      </table>
     </div>
   );
 }

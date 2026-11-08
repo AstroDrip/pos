@@ -35,6 +35,7 @@ export const schemas = {
   'auth.login': z.object({ username: z.string().min(1).max(40), pin: z.string().max(8) }),
   'auth.logout': z.null(),
   'shift.current': z.null(),
+  'shift.history': z.object({ limit: int.min(1).max(200) }),
   'shift.open': z.object({ openingFloat: money }),
   'shift.close': z.object({ countedCash: money }),
   'cash.move': z.object({ kind: z.enum(['in', 'out']), amount: money.positive(), reason: z.string().min(1).max(200) }),
@@ -151,6 +152,7 @@ export const schemas = {
     noDueDate: z.boolean().optional(), arrangementNote: z.string().max(200).optional(),
     payNow: z.object({ requestKey: key, amount: money.positive(), method: z.enum(['bank', 'till']), reference: z.string().max(60).optional() }).optional(),
   }),
+  'purchase.returns': z.object({ limit: int.min(1).max(200) }),
   'purchase.return': z.object({
     requestKey: key, supplierId: int.positive(), supplierCreditRef: z.string().max(60).optional(), returnDate: z.iso.date(), reason: z.string().min(1).max(200),
     lines: z.array(z.object({ productId: int.positive(), qty: int.positive() })).min(1).max(500), creditNet: money, vatAmount: money, vatRecoverable: z.boolean(),
@@ -166,6 +168,7 @@ export const schemas = {
   'purchase.register': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
   'purchase.balances': z.null(),
   'finance.vat': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
+  'credit.list': z.object({ offset: int.nonnegative(), limit: int.min(1).max(200) }),
   'credit.find': z.object({ text: z.string().min(1).max(40) }),
   'credit.account': z.object({ customerId: int.positive() }),
   'credit.settings': z.object({ customerId: int.positive(), creditEnabled: z.boolean(), creditLimit: money.nullable(), paymentTermsDays: int.min(0).max(365).nullable(), address: z.string().max(200).optional(), notes: z.string().max(500).optional() }),
@@ -182,6 +185,7 @@ export const schemas = {
   'purchase.account': z.object({ supplierId: int.positive() }),
   'purchase.applyAdvance': z.object({ supplierId: int.positive(), allocations: z.array(z.object({ invoiceId: int.positive().optional(), openingId: int.positive().optional(), amount: money.positive() })).min(1).max(200) }),
   'purchase.notes': z.object({ supplierId: int.positive(), notes: z.string().max(500) }),
+  'refund.recent': z.object({ offset: int.nonnegative(), limit: int.min(1).max(200) }),
   'refund.find': z.object({ invoiceNo: z.string().min(1).max(40) }),
   'refund.create': z.object({
     requestKey: z.string().regex(/^[\w-]{8,64}$/),

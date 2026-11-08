@@ -101,6 +101,10 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     if (!(await waitFor(`document.querySelector('.top nav')`, 8000))) throw new Error('login failed');
 
     const tabs = await js<string[]>(`[...document.querySelectorAll('.top nav button')].map((b) => b.textContent.trim())`);
+    if (process.env.POS_UI_AUDIT_DEMO === '1') {
+      await demoTour(tabs);
+      return;
+    }
     const variants = [
       { id: 'light-en-1366x768', theme: 'light', ar: false, w: 1366, h: 768 },
       { id: 'dark-en-1366x768', theme: 'dark', ar: false, w: 1366, h: 768 },
@@ -138,6 +142,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
             await rebindFlows();
             await billFlows();
             await productListFlows();
+            await emptySearchFlows();
           }
           await clearBill();
           for (const code of ['6281000000000', '6281000000077', '6281000000033']) await scan(code); // fake seed barcodes
@@ -174,6 +179,71 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     app.quit();
   }
 
+  /** Opens every tab of the demo shop and reports what each one shows. */
+  async function demoTour(tabs: string[]) {
+    const rows = () => js<number>(`document.querySelectorAll('table tbody tr:not(.empty), .kpi').length`);
+    const empties = () => js<string[]>(`[...document.querySelectorAll('tr.empty')].map((e) => e.textContent.trim())`);
+    const look = async (name: string) => {
+      await sleep(1200);
+      const n = await rows();
+      await capture(`demo-${name}`);
+      flow(`demo-${name}`, n > 0, `rows ${n}${(await empties()).map((e) => ` | empty: ${e}`).join('')}`);
+    };
+    for (const tab of tabs) {
+      const name = tab.replace(/[^A-Za-z]/g, '').toLowerCase();
+      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim() === ${JSON.stringify(tab)})?.click()`);
+      await sleep(600);
+      if (name === 'sell') {
+        await sleep(600);
+        const held = await js<boolean>(`document.body.textContent.includes('Lady in blue')`);
+        const open = await js<boolean>(`!!document.querySelector('input[aria-label="product search"]')`);
+        await capture('demo-sell');
+        flow('demo-sell', held && open, `held bills shown ${held}, shift open ${open}`);
+        continue;
+      }
+      if (name === 'help') continue;
+      await look(name);
+      const seg = name === 'purchases' ? '[aria-label="purchases section"] button' : '.page-header .seg button, .seg button';
+      const count = await js<number>(`document.querySelectorAll(${JSON.stringify(seg)}).length`);
+      for (let i = 0; i < count; i++) {
+        const label = await js<string>(`document.querySelectorAll(${JSON.stringify(seg)})[${i}].textContent.trim()`);
+        await js(`document.querySelectorAll(${JSON.stringify(seg)})[${i}].click()`);
+        await sleep(300);
+        await look(`${name}-${label.replace(/[^A-Za-z]/g, '').toLowerCase()}`);
+      }
+    }
+  }
+
+  /** Customers, Refund, Stock and Shift show their lists with nothing typed. */
+  async function emptySearchFlows() {
+    const tabTo = async (name: string) => {
+      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await sleep(700);
+    };
+    const rows = (label: string) => js<number>(`document.querySelectorAll('table[aria-label="${label}"] tbody tr:not(.empty)').length`);
+    await tabTo('Customers');
+    const people = await rows('customers list');
+    await js(`document.querySelector('table[aria-label="customers list"] tbody tr')?.click()`);
+    await sleep(500);
+    const hidden = (await rows('customers list')) === 0;
+    flow('customers-listed-without-search', people >= 2 && hidden, `rows ${people}, list hidden while an account is open ${hidden}`);
+    await tabTo('Refund');
+    const sold = await rows('recent sales');
+    const first = await js<string>(`document.querySelector('table[aria-label="recent sales"] tbody td')?.textContent ?? ''`);
+    await js(`document.querySelector('table[aria-label="recent sales"] tbody tr')?.click()`);
+    await sleep(600);
+    const opened = await js<string>(`document.querySelector('.card.section h3')?.textContent ?? ''`);
+    flow('refund-recent-sales-listed-and-open', sold > 0 && first !== '' && opened === first, `rows ${sold}, first ${first}, opened ${opened}`);
+    await tabTo('Stock');
+    const stock = await js<number>(`[...document.querySelectorAll('h3')].find((h) => h.textContent.trim() === 'Stock on hand')?.parentElement.querySelectorAll('tbody tr:not(.empty)').length ?? 0`);
+    flow('stock-listed-without-tick', stock >= 8, `rows ${stock}`);
+    await tabTo('Shift');
+    const shifts = await rows('past shifts');
+    flow('past-shifts-listed', shifts >= 1, `rows ${shifts}`);
+    await js(`document.querySelectorAll('.top nav button')[0].click()`);
+    await sleep(400);
+  }
+
   /** Products lists everything with no search, and a turned-off item can be found and turned back on. */
   async function productListFlows() {
     const setVal = (sel: string, v: string) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) throw new Error('missing ' + ${JSON.stringify(sel)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, ${JSON.stringify(v)}); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
@@ -183,7 +253,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     const all = await rows();
     flow('products-listed-without-search', all > 0, `rows ${all}`);
     await js(`document.querySelector('table[aria-label="products list"] tbody tr')?.click()`);
-    await sleep(300);
+    await waitFor(`document.querySelector('input[aria-label="status reason"]')`);
     await setVal('input[aria-label="status reason"]', 'Audit test');
     await click('button', 'Deactivate product');
     await sleep(500);
@@ -192,7 +262,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(500);
     const off = await rows();
     await js(`document.querySelector('table[aria-label="products list"] tbody tr')?.click()`);
-    await sleep(300);
+    await waitFor(`document.querySelector('input[aria-label="status reason"]')`);
     await setVal('input[aria-label="status reason"]', 'Audit test');
     await click('button', 'Turn product back on');
     await sleep(500);

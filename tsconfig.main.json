@@ -10,6 +10,6 @@
     "noEmit": false,
     "sourceMap": true
   },
-  "include": ["src/main", "src/preload", "src/core", "src/db", "src/services", "src/shared"],
+  "include": ["src/main", "src/preload", "src/core", "src/db", "src/services", "src/shared", "src/demo"],
   "exclude": ["**/*.test.ts"]
 }

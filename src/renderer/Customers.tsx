@@ -12,6 +12,7 @@ import { HelpLink } from './HelpLink';
 import { StatusBadge, StatusLegend, statusLabel } from './StatusBadge';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
+const PAGE = 100;
 type Found = { id: number; name: string; phone: string | null; creditEnabled: boolean; limit: number | null; outstanding: number; advance: number; available: number | null };
 const sar = (s: string) => {
   try {
@@ -40,7 +41,17 @@ export function Customers({ can, request }: { can: (p: string) => boolean; reque
     state: () => ({ unavailable: {} }),
     run: () => focusWhenReady(openId !== null ? '[aria-label="payment amount"]' : '[data-kb-search="customer"]', '[data-kb-search="customer"]'),
   }));
-  const { items: found, refresh: search } = useSuggest<Found>(text, (q) => call<Found[]>('credit.find', { text: q }).catch(() => []), { debounceMs: 250 });
+  const { items: found, refresh } = useSuggest<Found>(text, (q) => call<Found[]>('credit.find', { text: q }).catch(() => []), { debounceMs: 250 });
+  // With nothing typed, everyone is listed A to Z, one page at a time.
+  const browsing = !text.trim();
+  const [all, setAll] = useState<{ items: Found[]; total: number }>({ items: [], total: 0 });
+  const loadAll = (offset: number) => call<{ items: Found[]; total: number }>('credit.list', { offset, limit: PAGE }).then((r) => setAll((a) => ({ items: offset === 0 ? r.items : [...a.items, ...r.items], total: r.total })), (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
+  useEffect(() => void loadAll(0), []);
+  const search = () => {
+    refresh();
+    void loadAll(0);
+  };
+  const shown = browsing ? all.items : found;
 
   return (
     <div className="page">
@@ -58,10 +69,11 @@ export function Customers({ can, request }: { can: (p: string) => boolean; reque
       <StatusLegend />
       {view === 'ageing' ? <Ageing onOpen={(id) => { setView('accounts'); setOpenId(id); }} /> : (
         <>
-          {found.length > 0 && (
-            <table className="list" style={{ maxWidth: 'var(--section-w)' }}>
+          {browsing && !openId && <p className="hint">{t('Showing {0} of {1}', all.items.length, all.total)}</p>}
+          {shown.length > 0 && !(browsing && openId) && (
+            <table className="list" aria-label="customers list" style={{ maxWidth: 'var(--section-w)' }}>
               <thead><tr><th>ID</th><th>{t('Name')}</th><th>{t('Phone')}</th><th>{t('Credit')}</th><th className="num">{t('Owed')}</th><th className="num">{t('Advance')}</th><th className="num">{t('Available')}</th></tr></thead>
-              <tbody>{found.map((c) => (
+              <tbody>{shown.map((c) => (
                 <tr key={c.id} style={{ cursor: 'pointer' }} tabIndex={0} onClick={() => setOpenId(c.id)} onKeyDown={(e) => e.key === 'Enter' && setOpenId(c.id)}>
                   <td>{c.id}</td><td>{c.name}</td><td>{c.phone}</td><td>{c.creditEnabled ? t('Yes') : t('No')}</td>
                   <td className="num">{formatSar(c.outstanding)}</td><td className="num">{formatSar(c.advance)}</td>
@@ -70,6 +82,7 @@ export function Customers({ can, request }: { can: (p: string) => boolean; reque
               ))}</tbody>
             </table>
           )}
+          {browsing && !openId && all.items.length < all.total && <p><button type="button" aria-label="show more customers" onClick={() => void loadAll(all.items.length)}>{t('Show more')}</button></p>}
           {can('customer.manage') && !openId && (
             <div className="row" style={{ maxWidth: 600, alignItems: 'flex-end', marginTop: 8 }}>
               <div><label>{t('New customer name')}</label><input value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} /></div>

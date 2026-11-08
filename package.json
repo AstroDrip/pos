@@ -54,6 +54,7 @@
     },
     "files": [
       "dist/**",
+      "!dist/main/demo/**",
       "package.json"
     ],
     "asar": true,

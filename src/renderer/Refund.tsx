@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatQty, formatSar, parseQty, roundDiv } from '../core/money';
 import { storeDateTime } from '../core/store-time';
-import type { RefundableSale, RefundResult } from '../services/refunds';
+import type { RecentSale, RefundableSale, RefundResult } from '../services/refunds';
 import { call } from './api';
-import { PageHeader } from './PageHeader';
+import { EmptyRow, PageHeader } from './PageHeader';
 import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
 
 // Owner policy (D1): receipt required, within the refund window, cash only, supervisor approval for every refund.
+const PAGE = 50;
 const REASONS = ['Customer changed mind', 'Damaged or faulty', 'Expired', 'Wrong item', 'Other'] as const;
 
 interface Pick {
@@ -29,14 +30,18 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
   // One key per refund: a retry after an error can never pay out twice.
   const requestKey = useRef(crypto.randomUUID());
 
-  const find = async (e?: React.FormEvent) => {
+  const [recent, setRecent] = useState<{ items: RecentSale[]; total: number }>({ items: [], total: 0 });
+  const loadRecent = (offset: number) => call<{ items: RecentSale[]; total: number }>('refund.recent', { offset, limit: PAGE }).then((r) => setRecent((a) => ({ items: offset === 0 ? r.items : [...a.items, ...r.items], total: r.total })), (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
+  useEffect(() => void loadRecent(0), [lastRefundId]);
+
+  const find = async (e?: React.FormEvent, no = invoiceNo) => {
     e?.preventDefault();
     setMsg(null);
     setSale(null);
     setPicks({});
     requestKey.current = crypto.randomUUID();
     try {
-      const s = await call<RefundableSale>('refund.find', { invoiceNo });
+      const s = await call<RefundableSale>('refund.find', { invoiceNo: no });
       setSale(s);
       setPicks(Object.fromEntries(s.lines.map((l) => [l.saleLineNo, { qty: '', restock: true }])));
     } catch (err) {
@@ -106,6 +111,26 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       {lastRefundId !== null && !sale && (
         <p><button onClick={() => call('refund.print', { refundId: lastRefundId, copy: true }).catch((e: Error) => setMsg({ kind: 'error', text: t(e.message) }))}>{t('Reprint last credit note')}</button></p>
+      )}
+
+      {!sale && (
+        <div>
+          <h3>{t('Recent sales')}</h3>
+          <p className="hint">{t('Showing {0} of {1}', recent.items.length, recent.total)}</p>
+          <table className="list" aria-label="recent sales" style={{ maxWidth: 'var(--section-w)' }}>
+            <thead><tr><th>{t('Invoice')}</th><th>{t('Date')}</th><th>{t('Cashier')}</th><th>{t('Customer')}</th><th className="num">{t('Total')}</th><th>{t('Status')}</th></tr></thead>
+            <tbody>
+              {recent.items.length === 0 && <EmptyRow cols={6} text={t('No sales yet.')} />}
+              {recent.items.map((r) => (
+                <tr key={r.invoiceNo} style={{ cursor: 'pointer' }} tabIndex={0} onClick={() => { setInvoiceNo(r.invoiceNo); void find(undefined, r.invoiceNo); }} onKeyDown={(e) => { if (e.key === 'Enter') { setInvoiceNo(r.invoiceNo); void find(undefined, r.invoiceNo); } }}>
+                  <td dir="ltr">{r.invoiceNo}</td><td>{storeDateTime(r.createdAt)}</td><td>{r.cashier}</td><td>{r.customer ?? ''}</td><td className="num">{formatSar(r.totalIncl)}</td>
+                  <td>{r.refunded ? t('Refunded') : r.withinWindow ? '' : t('Past the refund time')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {recent.items.length < recent.total && <p><button type="button" aria-label="show more sales" onClick={() => void loadRecent(recent.items.length)}>{t('Show more')}</button></p>}
+        </div>
       )}
 
       {sale && (

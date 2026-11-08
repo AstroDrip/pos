@@ -44,6 +44,7 @@ Names and numbers in the examples are made up.
   - [Return goods to a supplier](#suppliers-return)
 - **Stock and products**
   - [See all products](#stock-find-products)
+  - [See lists without searching](#stock-see-lists)
   - [View stock on hand](#stock-overview)
   - [Record damaged or expired goods (wastage)](#stock-wastage)
   - [Count the shelves (stock count)](#stock-count)
@@ -818,6 +819,29 @@ Names and numbers in the examples are made up.
 5. Click a product to change it. To bring one back, type a Reason and press Turn product back on.
 
 **What you should see:** The line above the list says how many products are shown. A product turned back on can be scanned and sold again.
+
+**If something goes wrong**
+
+- *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
+
+<a id="stock-see-lists"></a>
+
+### See lists without searching
+
+**What this does:** Several tabs show their list as soon as you open them. You only need the search box to narrow it.
+
+**Where:** Customers, Refund, Stock, Shift and Purchases tabs.
+
+**Steps**
+
+1. Customers lists everyone from A to Z. Click a name to open the account.
+2. Refund lists recent sales, newest first. Click one to open it. A sale past the refund time can be seen but not refunded.
+3. Stock lists every item. Tick the box to see only items that are running low.
+4. Shift lists past shifts and any cash difference, if your user can see reports.
+5. In Purchases, Supplier invoices lists goods still waiting for an invoice. Click one to choose its supplier. Return to supplier lists past returns.
+6. If there are many, press Show more at the bottom.
+
+**What you should see:** The list appears with nothing typed.
 
 **If something goes wrong**
 

@@ -53,6 +53,39 @@ function storeDaysBetween(fromIso: string, toIso: string): number {
   return Math.trunc((Date.parse(`${storeDay(toIso)}T00:00:00Z`) - Date.parse(`${storeDay(fromIso)}T00:00:00Z`)) / 86_400_000);
 }
 
+export interface RecentSale {
+  invoiceNo: string;
+  createdAt: string;
+  cashier: string;
+  customer: string | null;
+  totalIncl: number;
+  refunded: boolean;
+  daysSinceSale: number;
+  withinWindow: boolean;
+}
+
+/** The latest sales, newest first, so a sale can be picked without typing its number. */
+export function recentSales(ctx: Ctx, userId: number, q: { offset: number; limit: number }): { items: RecentSale[]; total: number } {
+  requirePermission(ctx, userId, 'sale.create');
+  const total = (ctx.db.prepare('SELECT count(*) AS n FROM sales').get() as { n: number }).n;
+  const rows = ctx.db
+    .prepare(
+      `SELECT s.invoice_no AS invoiceNo, s.created_at AS createdAt, u.display_name AS cashier, c.name AS customer, s.total_incl AS totalIncl,
+              EXISTS (SELECT 1 FROM refunds r WHERE r.original_sale_id = s.id) AS refunded
+       FROM sales s JOIN users u ON u.id = s.user_id LEFT JOIN customers c ON c.id = s.customer_id
+       ORDER BY s.id DESC LIMIT ? OFFSET ?`,
+    )
+    .all(q.limit, q.offset) as (Omit<RecentSale, 'refunded' | 'daysSinceSale' | 'withinWindow'> & { refunded: number })[];
+  const maxDays = refundMaxDays(ctx);
+  return {
+    total,
+    items: rows.map((r) => {
+      const daysSinceSale = storeDaysBetween(r.createdAt, ctx.now());
+      return { ...r, refunded: r.refunded === 1, daysSinceSale, withinWindow: daysSinceSale >= 0 && daysSinceSale <= maxDays };
+    }),
+  };
+}
+
 /** Finds a sale by invoice number and shows what can still be refunded. */
 export function findSaleForRefund(ctx: Ctx, userId: number, invoiceNo: string): RefundableSale {
   requirePermission(ctx, userId, 'sale.create');

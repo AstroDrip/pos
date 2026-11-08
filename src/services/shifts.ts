@@ -107,6 +107,33 @@ export function shiftSummary(ctx: Ctx, shiftId: number): ShiftSummary {
   };
 }
 
+export interface PastShift {
+  shiftId: number;
+  status: 'open' | 'closed';
+  openedAt: string;
+  closedAt: string | null;
+  openedBy: string;
+  saleCount: number;
+  salesTotal: number;
+  expectedCash: number | null;
+  countedCash: number | null;
+  difference: number | null;
+}
+
+/** The latest shifts, newest first. Shows other people's cash differences, so it needs reports.view. */
+export function listShifts(ctx: Ctx, userId: number, limit: number): PastShift[] {
+  requirePermission(ctx, userId, 'reports.view');
+  const rows = ctx.db
+    .prepare(
+      `SELECT r.id AS shiftId, r.status, r.opened_at AS openedAt, r.closed_at AS closedAt, u.display_name AS openedBy, r.expected_cash AS expectedCash, r.counted_cash AS countedCash,
+              (SELECT count(*) FROM sales s WHERE s.shift_id = r.id) AS saleCount,
+              (SELECT COALESCE(SUM(s.total_incl), 0) FROM sales s WHERE s.shift_id = r.id) AS salesTotal
+       FROM register_shifts r JOIN users u ON u.id = r.user_id ORDER BY r.id DESC LIMIT ?`,
+    )
+    .all(limit) as Omit<PastShift, 'difference'>[];
+  return rows.map((r) => ({ ...r, difference: r.countedCash === null || r.expectedCash === null ? null : r.countedCash - r.expectedCash }));
+}
+
 /** Closes the open shift. Any cash difference is posted to Cash over/short. */
 export function closeShift(ctx: Ctx, userId: number, countedCash: number): ShiftSummary {
   requirePermission(ctx, userId, 'shift.close');

@@ -115,6 +115,23 @@ const AR: Record<string, string> = {
   "Showing {0} of {1}": "عرض {0} من {1}",
   "Show more": "عرض المزيد",
   "Turn product back on": "إعادة تفعيل الصنف",
+  // supplier bills and store details
+  "Recent sales": "آخر المبيعات",
+  "No sales yet.": "لا توجد مبيعات بعد.",
+  "Refunded": "مسترد",
+  "Past the refund time": "انتهت مدة الاسترداد",
+  "Past shifts": "الورديات السابقة",
+  "No shifts yet.": "لا توجد ورديات بعد.",
+  "Opened": "فتحت",
+  "Closed": "أغلقت",
+  "Opened by": "فتحها",
+  "Difference": "الفرق",
+  // supplier bills and store details
+  "Cost": "التكلفة",
+  "Nothing is waiting for an invoice.": "لا يوجد ما ينتظر فاتورة.",
+  "Past returns": "المرتجعات السابقة",
+  "No returns yet.": "لا توجد مرتجعات بعد.",
+  "Return": "مرتجع",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

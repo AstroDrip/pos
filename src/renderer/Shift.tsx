@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { formatSar, parseSar } from '../core/money';
-import type { ShiftSummary } from '../services/shifts';
+import { storeDateTime } from '../core/store-time';
+import type { PastShift, ShiftSummary } from '../services/shifts';
 import { call } from './api';
 import { useI18n } from './i18n';
+import { EmptyRow } from './PageHeader';
 
 export function Shift({ can }: { can: (p: string) => boolean }) {
   const { t } = useI18n();
@@ -25,9 +27,11 @@ export function Shift({ can }: { can: (p: string) => boolean }) {
     }
   };
 
-  if (!s) return <div className="card">{t('No open shift. Open one from the Sell tab.')}{msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}</div>;
+  const past = can('reports.view') && <PastShifts refresh={msg} />;
+  if (!s) return <><div className="card">{t('No open shift. Open one from the Sell tab.')}{msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}</div>{past}</>;
 
   return (
+    <>
     <div className="card">
       <h3>{t('Shift #{0}', s.shiftId)}</h3>
       <table className="list">
@@ -80,6 +84,34 @@ export function Shift({ can }: { can: (p: string) => boolean }) {
         </button>
       </p>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+    </div>
+    {past}
+    </>
+  );
+}
+
+/** Earlier shifts with their cash differences. Only for people who can see reports. */
+function PastShifts({ refresh }: { refresh: unknown }) {
+  const { t } = useI18n();
+  const [rows, setRows] = useState<PastShift[]>([]);
+  useEffect(() => void call<PastShift[]>('shift.history', { limit: 60 }).then(setRows, () => setRows([])), [refresh]);
+  return (
+    <div className="card">
+      <h3>{t('Past shifts')}</h3>
+      <table className="list" aria-label="past shifts">
+        <thead><tr><th>#</th><th>{t('Opened')}</th><th>{t('Closed')}</th><th>{t('Opened by')}</th><th className="num">{t('Sales')}</th><th className="num">{t('Total')}</th><th className="num">{t('Expected')}</th><th className="num">{t('Counted')}</th><th className="num">{t('Difference')}</th></tr></thead>
+        <tbody>
+          {rows.length === 0 && <EmptyRow cols={9} text={t('No shifts yet.')} />}
+          {rows.map((r) => (
+            <tr key={r.shiftId}>
+              <td>{r.shiftId}</td><td>{storeDateTime(r.openedAt)}</td><td>{r.closedAt ? storeDateTime(r.closedAt) : t('Open')}</td><td>{r.openedBy}</td>
+              <td className="num">{r.saleCount}</td><td className="num">{formatSar(r.salesTotal)}</td>
+              <td className="num">{r.expectedCash === null ? '' : formatSar(r.expectedCash)}</td><td className="num">{r.countedCash === null ? '' : formatSar(r.countedCash)}</td>
+              <td className="num">{r.difference === null ? '' : formatSar(r.difference)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

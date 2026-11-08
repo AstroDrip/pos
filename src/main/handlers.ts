@@ -14,7 +14,7 @@ import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from
 import { receiveGoods } from '../services/inventory';
 import { createCustomer, createSupplier, findCustomers, listSuppliers, updateSupplier } from '../services/parties';
 import { adjustmentsReport, cashierActivity, refundsReport, salesSummary, stockOnHand, voidsReport } from '../services/reports';
-import { createRefund, findSaleForRefund, refundReceiptData } from '../services/refunds';
+import { createRefund, findSaleForRefund, recentSales, refundReceiptData } from '../services/refunds';
 import { postStockCount, recordWastage } from '../services/adjustments';
 import {
   cancelDraft, categoryAccounts, createExpense, expensePayments, expenseSummary, generateRecurring, getExpense, listCategories, listExpenses,
@@ -23,17 +23,17 @@ import {
 import { balanceSheet, datedTrialBalance, generalLedger, ownerKpis, profitAndLoss } from '../services/financials';
 import { syncHealth } from '../services/dashboard-sync';
 import {
-  createPurchaseInvoice, createPurchaseReturn, paySupplier, purchaseRegister, reverseSupplierPayment, setSupplierOpeningBalance,
+  createPurchaseInvoice, createPurchaseReturn, listPurchaseReturns, paySupplier, purchaseRegister, reverseSupplierPayment, setSupplierOpeningBalance,
   supplierAgeing, supplierBalances, supplierStatement, uninvoicedGrns,
 } from '../services/purchasing';
 import { vatSummary } from '../services/vat-report';
 import {
-  applyCustomerAdvance, creditControls, creditReceiptData, customerAccount, customerStatement, findCreditCustomers, receivablesAgeing,
+  applyCustomerAdvance, creditControls, creditReceiptData, customerAccount, customerStatement, findCreditCustomers, listCustomerAccounts, receivablesAgeing,
   recordCustomerReceipt, reverseCustomerReceipt, setInvoiceDispute, suggestCustomerAllocation, updateCustomerCredit, writeOffInvoice,
 } from '../services/credit';
 import { applySupplierAdvance, setSupplierNotes, supplierAccount, supplierControls } from '../services/purchasing';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
-import { closeShift, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
+import { closeShift, listShifts, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
 
 export interface Printer {
@@ -88,6 +88,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       s.user = null;
       return null;
     },
+    'shift.history': (p, s) => listShifts(ctx, userId(s), p.limit),
     'shift.current': () => {
       const id = openShiftId(ctx);
       return id === null ? null : shiftSummary(ctx, id);
@@ -234,6 +235,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'finance.kpis': (p, s) => ownerKpis(ctx, userId(s), p.fromDay, p.toDay),
     'purchase.uninvoiced': (p, s) => uninvoicedGrns(ctx, userId(s), p.supplierId),
     'purchase.invoice': (p, s) => createPurchaseInvoice(ctx, userId(s), p),
+    'purchase.returns': (p, s) => listPurchaseReturns(ctx, userId(s), p.limit),
     'purchase.return': (p, s) => createPurchaseReturn(ctx, userId(s), p),
     'purchase.opening': (p, s) => setSupplierOpeningBalance(ctx, userId(s), p),
     'purchase.pay': (p, s) => paySupplier(ctx, userId(s), p),
@@ -243,6 +245,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'purchase.register': (p, s) => purchaseRegister(ctx, userId(s), p.fromDay, p.toDay),
     'purchase.balances': (_p, s) => supplierBalances(ctx, userId(s)),
     'finance.vat': (p, s) => vatSummary(ctx, userId(s), p.fromDay, p.toDay),
+    'credit.list': (p, s) => listCustomerAccounts(ctx, userId(s), p),
     'credit.find': (p, s) => findCreditCustomers(ctx, userId(s), p.text),
     'credit.account': (p, s) => customerAccount(ctx, userId(s), p.customerId),
     'credit.settings': (p, s) => updateCustomerCredit(ctx, userId(s), p),
@@ -272,6 +275,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       requirePermission(ctx, userId(s), 'settings.manage');
       return syncHealth(ctx);
     },
+    'refund.recent': (p, s) => recentSales(ctx, userId(s), p),
     'refund.find': (p, s) => findSaleForRefund(ctx, userId(s), p.invoiceNo),
     'refund.create': (p, s) => {
       let approverId: number | undefined;

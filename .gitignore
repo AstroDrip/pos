@@ -9,6 +9,6 @@ coverage/
 *.log
 .env
 .env.*
-demo-data/
+demo-data*/
 ui-shots/
 ui-audit/

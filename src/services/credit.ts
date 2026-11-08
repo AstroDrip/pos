@@ -502,11 +502,21 @@ export function findCreditCustomers(ctx: Ctx, userId: number, text: string) {
   const rows = ctx.db
     .prepare('SELECT id, name, phone FROM customers WHERE phone LIKE ? OR name LIKE ? OR CAST(id AS TEXT) = ? LIMIT 2000')
     .all(`%${t}%`, `%${t}%`, t) as { id: number; name: string; phone: string | null }[];
-  return rankCustomers(ctx, rows, t).map((r) => {
-    const c = customerRow(ctx, r.id);
-    const chk = creditCheck(ctx, r.id, 0);
-    return { id: c.id, name: c.name, phone: c.phone, creditEnabled: c.credit_enabled === 1, limit: c.credit_limit, outstanding: chk.outstanding, advance: chk.advance, available: chk.available };
-  });
+  return rankCustomers(ctx, rows, t).map((r) => creditCustomerRow(ctx, r.id));
+}
+
+function creditCustomerRow(ctx: Ctx, id: number) {
+  const c = customerRow(ctx, id);
+  const chk = creditCheck(ctx, id, 0);
+  return { id: c.id, name: c.name, phone: c.phone, creditEnabled: c.credit_enabled === 1, limit: c.credit_limit, outstanding: chk.outstanding, advance: chk.advance, available: chk.available };
+}
+
+/** Every customer A to Z, one page at a time, with the same figures a search shows. */
+export function listCustomerAccounts(ctx: Ctx, userId: number, q: { offset: number; limit: number }) {
+  requirePermission(ctx, userId, 'customer.credit.sell');
+  const total = (ctx.db.prepare('SELECT count(*) AS n FROM customers').get() as { n: number }).n;
+  const rows = ctx.db.prepare('SELECT id FROM customers ORDER BY name COLLATE NOCASE, id LIMIT ? OFFSET ?').all(q.limit, q.offset) as { id: number }[];
+  return { total, items: rows.map((r) => creditCustomerRow(ctx, r.id)) };
 }
 
 /** Control check: subledgers must equal their control accounts. Returns the differences (all 0 when correct). */

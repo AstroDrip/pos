@@ -174,6 +174,26 @@ export interface PurchaseReturnInput {
   invoiceId?: number;
 }
 
+export interface PastReturn {
+  pretNo: string;
+  supplier: string;
+  supplierCreditRef: string | null;
+  returnDate: string;
+  reason: string;
+  gross: number;
+}
+
+/** The latest returns to suppliers, newest first. */
+export function listPurchaseReturns(ctx: Ctx, userId: number, limit: number): PastReturn[] {
+  requirePermission(ctx, userId, 'purchase.view');
+  return ctx.db
+    .prepare(
+      `SELECT r.pret_no AS pretNo, s.name AS supplier, r.supplier_credit_ref AS supplierCreditRef, r.return_date AS returnDate, r.reason, r.gross
+       FROM purchase_returns r JOIN suppliers s ON s.id = r.supplier_id ORDER BY r.id DESC LIMIT ?`,
+    )
+    .all(limit) as PastReturn[];
+}
+
 export function createPurchaseReturn(ctx: Ctx, userId: number, input: PurchaseReturnInput): { returnId: number; pretNo: string; stockValue: number; replayed: boolean } {
   requirePermission(ctx, userId, 'purchase.manage');
   if (!KEY.test(input.requestKey)) throw new DomainError('VALIDATION', 'Invalid request key');
