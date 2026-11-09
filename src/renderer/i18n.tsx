@@ -7,6 +7,9 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'No records for this period. The zeros below mean nothing was recorded.': 'لا توجد سجلات لهذه الفترة.',
+  'Prepaid expenses of {0} are due but not recognised yet. Confirm them under Expenses.': 'مصروفات مقدمة بقيمة {0} مستحقة ولم تُثبت بعد.',
+  'Some prepaid expenses that are due have not been recognised yet': 'بعض المصروفات المقدمة المستحقة لم تُثبت بعد',
   'Recognise prepaid expenses': 'إثبات المصروفات المدفوعة مقدمًا',
   'Reports never post this for you. Read the list, then confirm.': 'التقارير لا ترحل هذا. راجع القائمة ثم أكد.',
   'Prepaid expenses recognised.': 'تم إثبات المصروفات المدفوعة مقدمًا.',

@@ -95,6 +95,8 @@ export function Accounting() {
       {pl && (
         <>
           <h3>{t('Profit and loss')} <span className="tag">{t('accrual basis')}</span></h3>
+          {pl.entryCount === 0 && <p className="msg warn">{t('No records for this period. The zeros below mean nothing was recorded.')}</p>}
+          {pl.prepaidWaiting > 0 && <p className="msg warn">{t('Prepaid expenses of {0} are due but not recognised yet. Confirm them under Expenses.', formatSar(pl.prepaidWaiting))}</p>}
           <div className="msg warn">
             <strong>{t('Provisional figures')}</strong>
             <ul style={{ margin: 'var(--sp-1) 0 0' }}>{pl.provisionalReasons.map((r) => { const m = /^(\d+) draft/.exec(r); return <li key={r}>{m ? t('{0} draft expense(s) in this period are not posted yet', m[1]!) : t(r)}</li>; })}</ul>

@@ -69,6 +69,7 @@ export interface ProfitAndLoss {
   outputVat: number;
   inputVat: number;
   prepaidWaiting: number; // due and not yet recognised, so not in the expenses above
+  entryCount: number; // 0 means no records for the period, which is different from a real zero result
   provisional: boolean;
   provisionalReasons: string[];
 }
@@ -114,6 +115,7 @@ export function profitAndLoss(ctx: Ctx, userId: number | null, from: string, to:
     netProfit: grossProfit - totalOperating,
     outputVat: net('2200', 'cr'),
     inputVat: net('2210', 'dr'),
+    entryCount: (ctx.db.prepare('SELECT count(*) AS v FROM journal_entries WHERE entry_date BETWEEN ? AND ?').get(from, to) as { v: number }).v,
     prepaidWaiting: waiting,
     provisional: true,
     provisionalReasons: reasons,
@@ -130,6 +132,7 @@ export interface BalanceSheet {
   totalLiabilitiesAndEquity: number;
   balanced: boolean;
   prepaidWaiting: number;
+  entryCount: number;
 }
 
 export function balanceSheet(ctx: Ctx, userId: number, asOf: string): BalanceSheet {
@@ -145,7 +148,7 @@ export function balanceSheet(ctx: Ctx, userId: number, asOf: string): BalanceShe
   const expense = t.filter((a) => a.type === 'expense').reduce((s, a) => s + a.debit - a.credit, 0);
   const totalAssets = assets.reduce((s, a) => s + a.amount, 0);
   const tle = liabilities.reduce((s, a) => s + a.amount, 0) + equity.reduce((s, a) => s + a.amount, 0) + (income - expense);
-  return { asOf, assets, liabilities, equity, currentEarnings: income - expense, totalAssets, totalLiabilitiesAndEquity: tle, balanced: totalAssets === tle, prepaidWaiting: prepaidWaiting(ctx, asOf) };
+  return { asOf, assets, liabilities, equity, currentEarnings: income - expense, totalAssets, totalLiabilitiesAndEquity: tle, balanced: totalAssets === tle, prepaidWaiting: prepaidWaiting(ctx, asOf), entryCount: (ctx.db.prepare('SELECT count(*) AS v FROM journal_entries WHERE entry_date <= ?').get(asOf) as { v: number }).v };
 }
 
 export function datedTrialBalance(ctx: Ctx, userId: number, from: string, to: string) {

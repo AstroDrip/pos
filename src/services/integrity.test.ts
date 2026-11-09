@@ -51,7 +51,7 @@ const shift = (entry: number, fromCode: string, toCode: string, amount: number, 
 describe('books check', () => {
   it('the clean demo shop has no findings', () => expect(runChecks(ctx)).toEqual([]));
 
-  it('has every check in the spec', () => expect(CHECKS.map((c) => c.id)).toEqual(['je_balanced', 'tb_balanced', 'bs_balanced', 'sale_lines', 'sale_payments', 'ledger_sales_vat', 'cogs', 'refund_limits', 'stock_movements', 'inventory_value', 'receivables', 'payables', 'shift_cash', 'cash_sources', 'cash_flow', 'orphans', 'duplicates', 'audit_chain', 'backup_records']));
+  it('has every check in the spec', () => expect(CHECKS.map((c) => c.id)).toEqual(['je_balanced', 'tb_balanced', 'bs_balanced', 'sale_lines', 'sale_payments', 'ledger_sales_vat', 'cogs', 'refund_limits', 'stock_movements', 'inventory_value', 'receivables', 'payables', 'shift_cash', 'cash_sources', 'cash_flow', 'orphans', 'duplicates', 'audit_chain', 'backup_records', 'vat_claims', 'prepaid_balance', 'expense_accounts']));
 
   it('finds a one-sided journal line', () => {
     unlock('journal_lines');

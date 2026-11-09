@@ -283,6 +283,39 @@ const backupRecords: Check = (ctx) =>
     suggestion: 'Run a new backup from the Admin tab and check that it succeeds.',
   }));
 
+/** Every VAT claim in the ledger has a claim record, for the same amount, and claimed reviews net to their approved VAT. */
+const vatClaims: Check = (ctx) => {
+  const out: Finding[] = [];
+  for (const r of all<{ id: number; d: number; c: number; amount: number | null; kind: string | null }>(ctx, `SELECT j.id, SUM(CASE WHEN a.code = '2210' THEN l.debit ELSE 0 END) AS d, SUM(CASE WHEN a.code = '2210' THEN l.credit ELSE 0 END) AS c, x.amount, x.kind
+    FROM journal_entries j JOIN journal_lines l ON l.entry_id = j.id JOIN accounts a ON a.id = l.account_id LEFT JOIN supplier_vat_claims x ON x.id = j.source_id WHERE j.source_type = 'vat_claim' GROUP BY j.id`)) {
+    const moved = r.kind === 'reverse' ? r.c : r.d;
+    if (r.amount === null || moved !== r.amount) out.push({ checkId: 'vat_claims', severity: 'critical', entityType: 'journal_entry', entityId: String(r.id), problem: `VAT entry ${r.id} does not match a claim.`, explanation: 'Input VAT moved in the ledger with no matching claim record, or for a different amount.', suggestion: ASK });
+  }
+  for (const r of all<{ id: number; net: number; want: number }>(ctx, `SELECT v.id, COALESCE((SELECT SUM(CASE c.kind WHEN 'claim' THEN c.amount ELSE -c.amount END) FROM supplier_vat_claims c WHERE c.review_id = v.id), 0) AS net,
+    CASE WHEN v.vat_status = 'claimed' THEN v.approved_vat ELSE 0 END AS want FROM supplier_vat_reviews v`)) {
+    if (r.net !== r.want) out.push({ checkId: 'vat_claims', severity: 'critical', entityType: 'supplier_vat_review', entityId: String(r.id), problem: `VAT review ${r.id} does not match its claims.`, explanation: `Its status needs SAR ${fmt(r.want)} claimed. The claims come to SAR ${fmt(r.net)}. VAT may be claimed twice or not at all.`, suggestion: ASK });
+  }
+  return out;
+};
+
+/** Account 1300 holds exactly what posted prepaid expenses have not yet released. */
+const prepaidBalance: Check = (ctx) => {
+  const want = one(ctx, `SELECT COALESCE(SUM(e.gross - CASE WHEN e.vat_recoverable = 1 THEN e.vat_amount ELSE 0 END), 0) -
+    COALESCE((SELECT SUM(a.amount) FROM expense_amortization a JOIN expenses x ON x.id = a.expense_id WHERE x.status = 'posted'), 0) AS v
+    FROM expenses e WHERE e.status = 'posted' AND e.period_start IS NOT NULL AND e.period_start <> e.period_end`);
+  const have = balance(ctx, '1300');
+  return want === have ? [] : [{ checkId: 'prepaid_balance', severity: 'warning', entityType: 'account', entityId: '1300', problem: 'Prepaid expenses do not match their account.', explanation: `Account 1300 holds SAR ${fmt(have)}. Posted prepaid expenses still to be released come to SAR ${fmt(want)}.`, suggestion: ASK }];
+};
+
+/** An expense category must point at an expense or asset account. */
+const expenseAccounts: Check = (ctx) =>
+  all<{ name: string; code: string }>(ctx, "SELECT c.name_en AS name, c.account_code AS code FROM expense_categories c LEFT JOIN accounts a ON a.code = c.account_code WHERE a.id IS NULL OR a.type NOT IN ('expense','asset')").map((r) => ({
+    checkId: 'expense_accounts', severity: 'warning', entityType: 'expense_category', entityId: r.name,
+    problem: `Expense category ${r.name} points to account ${r.code}, which is not an expense or asset account.`,
+    explanation: 'Expenses in this category would land in the wrong place in the reports.',
+    suggestion: ASK,
+  }));
+
 export const CHECKS: { id: string; run: Check }[] = [
   { id: 'je_balanced', run: jeBalanced },
   { id: 'tb_balanced', run: tbBalanced },
@@ -303,6 +336,9 @@ export const CHECKS: { id: string; run: Check }[] = [
   { id: 'duplicates', run: duplicates },
   { id: 'audit_chain', run: auditChain },
   { id: 'backup_records', run: backupRecords },
+  { id: 'vat_claims', run: vatClaims },
+  { id: 'prepaid_balance', run: prepaidBalance },
+  { id: 'expense_accounts', run: expenseAccounts },
 ];
 
 export const runChecks = (ctx: Ctx): Finding[] => CHECKS.flatMap((c) => c.run(ctx));
