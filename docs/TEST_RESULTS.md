@@ -42,7 +42,13 @@ text, dark cards, visible focus outline).
 - `npm run ui-audit -- <dir> --demo`: 25 screens, 0 findings, 24 of 24 flows.
 - Not run: `npm run e2e`, Playwright. Not tried: real scanner, real Arabic keyboard, true process restart (a full screen reload was used).
 
-<!-- cloud-results -->
+## Cloud phase (2026-11-09)
+- POS `npm test`: 749 passed. Dashboard `npm test`: 67 passed. Typecheck and lint clean. Dashboard production build passed.
+- `npm run ui-audit`: 54 screens, 0 findings, 101 of 101 flows. Short run with the new screens: 15 of 15.
+- `scripts/cloud-e2e-local.cjs` against a local database: passed.
+- Installer on this PC, temporary folders: install, update and uninstall passed, data kept.
+- Not tried: real Neon or Vercel, real hardware, clean Windows, Arabic. Not run: `npm run e2e`, Playwright.
+
 ## Manual and hardware tests
 None on store hardware so far. The receipt printer, scanner, scale labels and cash drawer have not been tested; their models are unknown.
 

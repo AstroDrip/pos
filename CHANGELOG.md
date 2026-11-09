@@ -2,6 +2,20 @@
 
 Not for live trading: there is no ZATCA Phase 2 integration yet, and receipts are marked "NOT A ZATCA TAX INVOICE".
 
+## Unreleased — Accounting fixes, cloud backup, owner dashboard (2026-11-09)
+
+Details: `docs/IMPLEMENTATION_REPORT_CLOUD_PHASE.md`. Accounting PROVISIONAL.
+
+### Added
+- Proforma VAT review: final tax invoice, comparison, accountant decision, explicit claim.
+- Cloud Backup & Recovery, with encrypted uploads and restore on another computer.
+- Owner phone dashboard in `dashboard/`, read only, with a demo mode.
+- Hardware test screen. Seven new Help guides.
+
+### Changed
+- Reports no longer post prepaid expenses. Recognising a month is now a confirmed step.
+- New backups are compressed before encryption. Older files still restore.
+
 ## Unreleased — Sell keys, tab memory, audit log, books check, Help registry (2026-11-09)
 
 Details: `docs/IMPLEMENTATION_REPORT_MASTER_PROMPT_A.md`. Accounting PROVISIONAL.

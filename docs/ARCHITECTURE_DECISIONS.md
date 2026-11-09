@@ -94,6 +94,12 @@ The checkout is always in exactly one state. The key map is in `renderer/checkou
 - Cash collected comes from payment records (cash basis) and is labelled as such.
 - **One KPI service** (`services/financials.ts`) feeds both the desktop Accounting tab and the dashboard snapshots, so the two can't disagree.
 
+## ADR-8 Cloud: copies only, figures from the till
+- SQLite on the till stays the only source of truth. Neon receives an encrypted backup and read-only figures.
+- **The till computes every figure** and sends daily totals. The dashboard only adds days, so there is no second accounting engine. This replaces the earlier plan to copy full records and re-state the sums in SQL.
+- **Separate roles and schemas** make demo and real data, and backups, unreachable from each other even if the app has a bug.
+- **Device credential outside the database**, so a backup never contains it.
+
 ## ADR-7 Tabs stay open; screen memory; audit detail; books check
 - **Tabs stay mounted**, hidden, keyed by user. Hidden tabs take no keys or scans (`useTabActive`).
 - **What survives a restart:** filters and places in `localStorage` per user; unfinished bills in SQLite (`bill_drafts`). PINs and approvers are never kept.
