@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatSar } from '../core/money';
 import { storeDay } from '../core/store-time';
-import type { BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
+import type { CashFlow, BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
 import type { VatSummary } from '../services/vat-report';
 import { call } from './api';
 import { useRemembered, useReturnTick } from './TabHost';
@@ -14,6 +14,11 @@ type Tb = { rows: { code: string; nameEn: string; nameAr: string; type: string; 
 type Gl = { account: { code: string; nameEn: string }; opening: number; closing: number; lines: { date: string; source: string; sourceId: number; memo: string; debit: number; credit: number; balance: number }[] };
 
 /** Owner overview and financial statements (ADR-5). Same service as the owner dashboard snapshots. */
+const FLOW_LABEL: Record<CashFlow['groups'][number]['id'], string> = {
+  sales: 'Sales', refunds: 'Refunds', customers: 'Customer payments', suppliers: 'Supplier payments', expenses: 'Expenses',
+  cash_moves: 'Cash in and out', differences: 'Cash differences', other: 'Other',
+};
+
 export function Accounting() {
   const back = useReturnTick();
   const { t, lang } = useI18n();
@@ -26,6 +31,7 @@ export function Accounting() {
   const [glCode, setGlCode] = useRemembered('accounting', 'account', '1010', validText);
   const [gl, setGl] = useState<Gl | null>(null);
   const [vat, setVat] = useState<VatSummary | null>(null);
+  const [cf, setCf] = useState<CashFlow | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -36,6 +42,7 @@ export function Accounting() {
     call<BalanceSheet>('finance.bs', { asOf: to }).then(setBs, fail);
     call<Tb>('finance.tb', { fromDay: from, toDay: to }).then(setTb, fail);
     call<VatSummary>('finance.vat', { fromDay: from, toDay: to }).then(setVat, fail);
+    call<CashFlow>('finance.cashflow', { fromDay: from, toDay: to }).then(setCf, fail);
   }, [from, to, back]);
   useEffect(() => void call<Gl>('finance.gl', { code: glCode, fromDay: from, toDay: to }).then(setGl, () => setGl(null)), [back, glCode, from, to]);
 
@@ -131,6 +138,18 @@ export function Accounting() {
         </>
       )}
 
+      {cf && (
+        <div className="card section" aria-label="cash flow">
+          <h3>{t('Cash flow')}</h3>
+          <p className="hint">{t('Money that actually moved in and out of cash and bank. This is not the same as profit: a sale on credit is profit before any money arrives.')}</p>
+          <table className="list"><tbody>
+            <Line l={t('Cash and bank at the start')} v={cf.opening} strong />
+            {cf.groups.filter((g) => g.amount !== 0).map((g) => <Line key={g.id} l={t(FLOW_LABEL[g.id])} v={g.amount} />)}
+            <Line l={t('Net change')} v={cf.net} strong />
+            <Line l={t('Cash and bank at the end')} v={cf.closing} strong />
+          </tbody></table>
+        </div>
+      )}
       {bs && (
         <>
           <h3>{t('Balance sheet as of {0}', bs.asOf)} {!bs.balanced && <span className="tag overdue">{t('NOT BALANCED')}</span>}</h3>

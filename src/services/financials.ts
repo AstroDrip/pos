@@ -274,3 +274,40 @@ function creditPosition(ctx: Ctx, from: string, to: string, fUtc: string, tUtc: 
     cashAndBank: acct('1010') + acct('1020') + acct('1030'),
   };
 }
+
+export interface CashFlow {
+  fromDay: string;
+  toDay: string;
+  opening: number;
+  groups: { id: 'sales' | 'refunds' | 'customers' | 'suppliers' | 'expenses' | 'cash_moves' | 'differences' | 'other'; amount: number }[];
+  net: number;
+  closing: number;
+}
+
+const CASH_ACCOUNTS = "('1010', '1020', '1030')"; // the same three accounts as cashAndBank
+const FLOW_GROUP: Record<string, CashFlow['groups'][number]['id']> = {
+  sale: 'sales', refund: 'refunds', customer_receipt: 'customers', supplier_payment: 'suppliers',
+  expense: 'expenses', expense_payment: 'expenses', expense_reversal: 'expenses', cash_movement: 'cash_moves', shift_close: 'differences',
+};
+
+/** Money that actually moved through cash and bank, by what caused it. Anything else lands in "other", so nothing is dropped. */
+export function cashFlowData(ctx: Ctx, from: string, to: string): CashFlow {
+  checkRange(from, to);
+  const opening = (ctx.db
+    .prepare(`SELECT COALESCE(SUM(l.debit - l.credit), 0) AS v FROM journal_lines l JOIN accounts a ON a.id = l.account_id JOIN journal_entries j ON j.id = l.entry_id WHERE a.code IN ${CASH_ACCOUNTS} AND j.entry_date < ?`)
+    .get(from) as { v: number }).v;
+  const rows = ctx.db
+    .prepare(`SELECT j.source_type AS source, SUM(l.debit - l.credit) AS amount FROM journal_lines l JOIN accounts a ON a.id = l.account_id JOIN journal_entries j ON j.id = l.entry_id
+              WHERE a.code IN ${CASH_ACCOUNTS} AND j.entry_date BETWEEN ? AND ? GROUP BY j.source_type`)
+    .all(from, to) as { source: string; amount: number }[];
+  const totals: Record<CashFlow['groups'][number]['id'], number> = { sales: 0, refunds: 0, customers: 0, suppliers: 0, expenses: 0, cash_moves: 0, differences: 0, other: 0 };
+  for (const r of rows) totals[FLOW_GROUP[r.source] ?? 'other'] += r.amount;
+  const groups = (Object.keys(totals) as (keyof typeof totals)[]).map((id) => ({ id, amount: totals[id] }));
+  const net = groups.reduce((s, g) => s + g.amount, 0);
+  return { fromDay: from, toDay: to, opening, groups, net, closing: opening + net };
+}
+
+export function cashFlow(ctx: Ctx, userId: number, from: string, to: string): CashFlow {
+  requirePermission(ctx, userId, 'finance.view');
+  return cashFlowData(ctx, from, to);
+}

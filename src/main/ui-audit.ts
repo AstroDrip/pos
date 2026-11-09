@@ -148,6 +148,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       for (const [i, tab] of tabs.entries()) {
         await js(`document.querySelectorAll('.top nav button')[${i}].click()`);
         await sleep(350);
+        await js('window.scrollTo(0, 0)'); // tabs keep their scroll position, and the screens are measured from the top
         const slug = `${String(i + 1).padStart(2, '0')}-${tab.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '')}`;
         if (tab === 'Sell') {
           if (await js<boolean>(`!document.querySelector('input[aria-label="product search"]')`)) {
@@ -933,6 +934,18 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(300);
     const shown = await js<string>(`document.querySelector('[aria-label="audit details"]')?.textContent ?? ''`);
     flow('audit-tab-lists-price-change', shown.includes('4321'), shown.slice(0, 120));
+
+    await click('[aria-label="audit section"] button', 'Books check');
+    await sleep(300);
+    await click('[aria-label="books check"] button', 'Run check');
+    await waitFor(`document.querySelector('[aria-label="books check"] .msg, [aria-label="books check"] .subpanel')`, 8000);
+    const verdict = await js<string>(`document.querySelector('[aria-label="books check"] .msg')?.textContent ?? ''`);
+    flow('books-check-runs', verdict !== '', verdict.slice(0, 120));
+    await click('[aria-label="audit section"] button', 'Activity log');
+
+    await openNamed('Accounting');
+    const flowShown = await js<boolean>(`!!document.querySelector('[aria-label="cash flow"]')`);
+    flow('cash-flow-shown', flowShown, `shown ${flowShown}`);
 
     await openNamed('Shift');
     await js('void (window.alert = () => undefined)');

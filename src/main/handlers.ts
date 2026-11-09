@@ -10,6 +10,7 @@ import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit, appendFailure, verifyAuditChain } from '../services/audit';
 import { auditFilters, exportAudit, listAudit } from '../services/audit-view';
+import { latestIntegrity, reviewFinding, runIntegrity } from '../services/integrity-runs';
 import { clearDraft, discardDraft, loadDraft, markDraftRestored, saveDraft } from '../services/drafts';
 import { cancelHeldBill, holdBill, hydrateBill, listHeldBills, payloadSchema, recallBill, recordRemoval } from '../services/held-bills';
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from '../services/import';
@@ -22,7 +23,7 @@ import {
   cancelDraft, categoryAccounts, createExpense, expensePayments, expenseSummary, generateRecurring, getExpense, listCategories, listExpenses,
   listRecurring, payExpense, postExpense, reverseExpense, reversePayment, saveCategory, saveRecurring, updateDraft,
 } from '../services/expenses';
-import { balanceSheet, datedTrialBalance, generalLedger, ownerKpis, profitAndLoss } from '../services/financials';
+import { cashFlow, balanceSheet, datedTrialBalance, generalLedger, ownerKpis, profitAndLoss } from '../services/financials';
 import { syncHealth } from '../services/dashboard-sync';
 import {
   createPurchaseInvoice, createPurchaseReturn, listPurchaseReturns, paySupplier, purchaseRegister, reverseSupplierPayment, setSupplierOpeningBalance,
@@ -118,6 +119,10 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       dayEndBackup(incoming.id);
       return r;
     },
+    'finance.cashflow': (p, s) => cashFlow(ctx, userId(s), p.fromDay, p.toDay),
+    'integrity.run': (_p, s) => runIntegrity(ctx, userId(s)),
+    'integrity.latest': (_p, s) => latestIntegrity(ctx, userId(s)),
+    'integrity.review': (p, s) => reviewFinding(ctx, userId(s), p.fingerprint, p.note),
     'audit.list': (p, s) => listAudit(ctx, userId(s), p),
     'audit.filters': (_p, s) => auditFilters(ctx, userId(s)),
     'audit.export': (p, s) => exportAudit(ctx, userId(s), p),

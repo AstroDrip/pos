@@ -58,6 +58,7 @@ Names and numbers in the examples are made up.
   - [Set up recurring expenses (monthly rent, bills)](#expenses-recurring)
 - **Reports and the owner overview**
   - [Read the audit log](#audit-log)
+  - [Run the books check](#books-check)
   - [View sales for a day or a month](#reports-sales)
   - [Read the owner overview, profit and balances](#reports-owner)
 - **Shifts and daily work**
@@ -1068,6 +1069,28 @@ Names and numbers in the examples are made up.
 5. To keep a copy, press Export to CSV.
 
 **What you should see:** The newest records are at the top. Older records from before this screen existed show less detail. PINs and passwords are never written here.
+
+**If something goes wrong**
+
+- *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
+
+<a id="books-check"></a>
+
+### Run the books check
+
+**What this does:** The books check works out the important totals again from the original records and compares them with what the system shows. It only reports. It changes nothing.
+
+**Where:** Audit tab, Books check.
+
+**Steps**
+
+1. Open the Audit tab and choose Books check.
+2. Press Run check.
+3. If it says "No problems found", you are done.
+4. If it lists a problem, read what it says and show it to your accountant.
+5. Type a note and press Save note to record what is being done. The problem stays on the list until the records are right.
+
+**What you should see:** A green message, or a list with the most serious problems first. Do not try to fix a problem by changing old records. Corrections are always new entries.
 
 **If something goes wrong**
 

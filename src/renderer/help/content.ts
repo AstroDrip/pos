@@ -246,6 +246,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    id: 'books-check',
+    section: 'reports',
+    title: 'Run the books check',
+    keywords: ['books check', 'integrity', 'reconcile', 'discrepancy', 'wrong totals', 'verify'],
+    what: 'The books check works out the important totals again from the original records and compares them with what the system shows. It only reports. It changes nothing.',
+    where: 'Audit tab, Books check.',
+    steps: [
+      'Open the Audit tab and choose Books check.',
+      'Press Run check.',
+      'If it says "No problems found", you are done.',
+      'If it lists a problem, read what it says and show it to your accountant.',
+      'Type a note and press Save note to record what is being done. The problem stays on the list until the records are right.',
+    ],
+    expect: 'A green message, or a list with the most serious problems first. Do not try to fix a problem by changing old records. Corrections are always new entries.',
+    problems: [NO_TAB],
+  },
+  {
     id: 'selling-quantity',
     section: 'selling',
     title: 'Change a quantity (+, − or type a number)',

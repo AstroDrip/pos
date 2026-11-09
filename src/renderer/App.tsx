@@ -5,6 +5,7 @@ import { call } from './api';
 import { LangToggle, useI18n } from './i18n';
 import { Accounting } from './Accounting';
 import { Audit } from './Audit';
+import { BooksCheck } from './BooksCheck';
 import { Expenses } from './Expenses';
 import { Help } from './Help';
 import { HelpContext } from './help/HelpContext';
@@ -152,7 +153,7 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
       {pane('accounting', <Accounting />)}
       {pane('shift', <Shift can={can} onUserChange={onAuthChange} />)}
       {pane('admin', <Admin can={can} />)}
-      {pane('audit', <Audit can={can} openCustomer={(id) => openCustomers(id)} openSale={(invoice) => { setRefundRequest((r) => ({ invoice, n: r.n + 1 })); show('refund'); }} />)}
+      {pane('audit', <Audit books={can('integrity.view') ? <BooksCheck /> : undefined} can={can} openCustomer={(id) => openCustomers(id)} openSale={(invoice) => { setRefundRequest((r) => ({ invoice, n: r.n + 1 })); show('refund'); }} />)}
       {pane('help', <Help />)}
       {helpAt && <HelpOverlay article={helpAt} onClose={closeHelp} />}
       </KeyboardProvider>

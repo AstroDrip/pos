@@ -185,6 +185,28 @@ const AR: Record<string, string> = {
   "Shift handed over. Expected {0}, counted {1}, difference {2}.": "تم تسليم الوردية. المتوقع {0}، المعدود {1}، الفرق {2}.",
   // master prompt A
   "Search": "بحث",
+  // master prompt A
+  "Works out the important totals again from the original records and compares them. It changes nothing.": "يعيد حساب الإجماليات المهمة من السجلات الأصلية ويقارنها. لا يغير شيئاً.",
+  "Checking…": "جارٍ الفحص…",
+  "Run check": "تشغيل الفحص",
+  "Last run: {0}": "آخر تشغيل: {0}",
+  "No problems found.": "لم يتم العثور على مشاكل.",
+  "Serious": "خطير",
+  "Check this": "يحتاج مراجعة",
+  "What to do": "ما يجب فعله",
+  "Needs a person.": "يحتاج إلى شخص.",
+  "Add a note": "أضف ملاحظة",
+  "Save note": "حفظ الملاحظة",
+  // master prompt A
+  "Cash flow": "التدفق النقدي",
+  "Money that actually moved in and out of cash and bank. This is not the same as profit: a sale on credit is profit before any money arrives.": "الأموال التي دخلت وخرجت فعلياً من النقد والبنك. هذا ليس هو الربح: البيع الآجل ربح قبل وصول أي مال.",
+  "Cash and bank at the start": "النقد والبنك في البداية",
+  "Net change": "صافي التغير",
+  "Cash and bank at the end": "النقد والبنك في النهاية",
+  "Customer payments": "مدفوعات العملاء",
+  "Supplier payments": "مدفوعات الموردين",
+  "Cash in and out": "نقد داخل وخارج",
+  "Cash differences": "فروقات النقد",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',
