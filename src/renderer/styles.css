@@ -367,3 +367,30 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 .info-pop p { margin: var(--sp-1) 0; }
 .info-pop:focus { outline: none; }
 .info-pop .link { padding: 0; min-height: 0; border: 0; background: none; color: var(--primary); text-decoration: underline; cursor: pointer; }
+
+/* ── Date navigator ───────────────────────────────────────── */
+.date-nav { margin-bottom: var(--sp-4); display: grid; gap: var(--sp-2); min-width: 0; }
+.date-nav-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.date-nav-fields { display: flex; align-items: center; gap: var(--sp-1); }
+.date-nav-fields input { width: 140px; }
+.date-nav-now { font-size: var(--fs-base); margin-inline-start: auto; }
+.date-nav-strip { display: flex; align-items: stretch; gap: var(--sp-1); min-width: 0; }
+.date-nav-strip > button { flex: 0 0 auto; font-size: var(--fs-lg); }
+.date-strip { display: flex; gap: 2px; overflow-x: auto; flex: 1 1 0; min-width: 0; scrollbar-width: thin; padding-bottom: 2px; overscroll-behavior: contain; }
+.date-strip button { flex: 0 0 44px; min-height: 52px; padding: 2px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; border-color: transparent; background: transparent; }
+.date-strip button small { font-size: 10px; color: var(--muted); }
+.date-strip button b { font-size: var(--fs-md); font-weight: 600; font-variant-numeric: tabular-nums; }
+.date-strip button.on { background: var(--selected-bg); border-color: var(--primary); }
+.date-strip button.today b { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Figures ──────────────────────────────────────────────── */
+.kpi.lead { border-color: var(--primary); }
+.kpi.lead .v { font-size: 26px; }
+.views { margin-bottom: var(--sp-3); }
+.more { margin: var(--sp-3) 0; }
+.more > summary { cursor: pointer; color: var(--text-2); font-size: var(--fs-sm); min-height: 28px; display: flex; align-items: center; }
+.row-more td { background: var(--surface-2); }
+.pairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--sp-1) var(--sp-4); font-size: var(--fs-sm); }
+.pairs > div { display: flex; justify-content: space-between; gap: var(--sp-2); }
+.pairs dt, .pairs .k { color: var(--muted); }
+.pairs dd { margin: 0; font-variant-numeric: tabular-nums; }

@@ -50,6 +50,14 @@ export function parseSar(text: string): Halalas {
   return m[1] ? -value : value;
 }
 
+/** For headline figures: SAR 1,234.50 */
+export function formatMoney(amount: Halalas): string {
+  const s = formatSar(amount);
+  const negative = s.startsWith('-');
+  const [whole, frac] = (negative ? s.slice(1) : s).split('.') as [string, string];
+  return `${negative ? '-' : ''}SAR ${whole.replace(/\B(?=(\d{3})+$)/g, ',')}.${frac}`;
+}
+
 export function formatSar(amount: Halalas): string {
   assertSafeInt(amount, 'amount');
   const sign = amount < 0 ? '-' : '';

@@ -10,6 +10,7 @@ import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { HelpLink } from './HelpLink';
 import { StatusBadge } from './StatusBadge';
+import { Kpi } from './Figures';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 const todayDay = () => storeDay(new Date().toISOString());
@@ -169,10 +170,6 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
       {can('expense.approve') && <Categories cats={cats} onChange={reload} />}
     </div>
   );
-}
-
-function Kpi({ l, v, bad, info }: { l: string; v: string; bad?: boolean; info?: string }) {
-  return <div className="kpi"><div className="l">{l}{info && <InfoIcon id={info} />}</div><div className={`v${bad ? ' neg' : ''}`}>{v}</div></div>;
 }
 
 /** Simple labelled bars: every bar also shows its number, so nothing depends on reading the bar length. */

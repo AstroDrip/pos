@@ -4,6 +4,7 @@ import { storeDay } from '../core/store-time';
 import type { CashFlow, BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
 import type { VatSummary } from '../services/vat-report';
 import { call } from './api';
+import { Kpi } from './Figures';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validDay, validText } from './remember';
@@ -65,29 +66,29 @@ export function Accounting() {
         <>
           <h3>{t('Owner overview')}</h3>
           <div className="kpis">
-            <Tile info="metric.salesIncl" l={t('Sales incl. VAT')} v={formatSar(k.salesInclVat)} />
-            <Tile info="metric.refundsIncl" l={t('Refunds incl. VAT')} v={formatSar(k.refundsInclVat)} />
-            <Tile info="metric.transactions" l={t('Transactions')} v={String(k.saleCount)} sub={k.averageBasket !== null ? t('Average basket {0}', formatSar(k.averageBasket)) : undefined} />
-            <Tile info="metric.netSales" l={t('Net sales excl. VAT')} v={formatSar(k.netSales)} />
-            <Tile info="metric.grossProfit" l={t('Gross profit')} v={formatSar(k.grossProfit)} />
-            <Tile info="metric.operating" l={t('Operating expenses')} v={formatSar(k.operatingExpenses)} />
-            <Tile info="metric.netProfit" l={t('Net profit (provisional)')} v={formatSar(k.netProfit)} bad={k.netProfit < 0} />
-            <Tile info="metric.cashCollected" l={t('Cash collected (net)')} v={formatSar(k.cashCollected)} />
-            <Tile info="metric.cardRecorded" l={t('Card recorded by cashiers')} v={formatSar(k.cardRecorded)} />
-            <Tile info="metric.inventoryValue" l={t('Inventory value (at cost)')} v={formatSar(k.inventoryValue)} />
-            <Tile info="metric.expensesOwed" l={t('Expenses still owed')} v={formatSar(k.expensesOutstanding)} />
-            <Tile info="metric.lowStock" l={t('Products at/below reorder level')} v={String(k.lowStockCount)} />
+            <Kpi info="metric.salesIncl" l={t('Sales incl. VAT')} v={formatSar(k.salesInclVat)} />
+            <Kpi info="metric.refundsIncl" l={t('Refunds incl. VAT')} v={formatSar(k.refundsInclVat)} />
+            <Kpi info="metric.transactions" l={t('Transactions')} v={String(k.saleCount)} sub={k.averageBasket !== null ? t('Average basket {0}', formatSar(k.averageBasket)) : undefined} />
+            <Kpi info="metric.netSales" l={t('Net sales excl. VAT')} v={formatSar(k.netSales)} />
+            <Kpi info="metric.grossProfit" l={t('Gross profit')} v={formatSar(k.grossProfit)} />
+            <Kpi info="metric.operating" l={t('Operating expenses')} v={formatSar(k.operatingExpenses)} />
+            <Kpi info="metric.netProfit" l={t('Net profit (provisional)')} v={formatSar(k.netProfit)} bad={k.netProfit < 0} />
+            <Kpi info="metric.cashCollected" l={t('Cash collected (net)')} v={formatSar(k.cashCollected)} />
+            <Kpi info="metric.cardRecorded" l={t('Card recorded by cashiers')} v={formatSar(k.cardRecorded)} />
+            <Kpi info="metric.inventoryValue" l={t('Inventory value (at cost)')} v={formatSar(k.inventoryValue)} />
+            <Kpi info="metric.expensesOwed" l={t('Expenses still owed')} v={formatSar(k.expensesOutstanding)} />
+            <Kpi info="metric.lowStock" l={t('Products at/below reorder level')} v={String(k.lowStockCount)} />
           </div>
           <h4>{t('Money position (right now)')}</h4>
           <p className="hint">{t('Cash and bank is money the store has. Money customers owe is not cash until they pay; money owed to suppliers is not yet paid out.')}</p>
           <div className="kpis">
-            <Tile info="metric.cashBank" l={t('Cash and bank (books)')} v={formatSar(k.cashAndBank)} />
-            <Tile info="metric.receivables" l={t('Customers owe the store')} v={formatSar(k.receivablesOutstanding)} sub={t('{0} customers · overdue {1} · due soon {2}', k.customersWithBalance, formatSar(k.receivablesOverdue), formatSar(k.receivablesDueSoon))} />
-            <Tile info="metric.customerAdvances" l={t('Advances held for customers')} v={formatSar(k.customerAdvances)} />
-            <Tile info="metric.payables" l={t('Store owes suppliers')} v={formatSar(k.payablesOutstanding)} sub={t('{0} suppliers · overdue {1} · due soon {2}', k.suppliersWithBalance, formatSar(k.payablesOverdue), formatSar(k.payablesDueSoon))} />
-            <Tile info="metric.supplierAdvances" l={t('Paid to suppliers in advance')} v={formatSar(k.supplierAdvances)} />
-            <Tile info="metric.collections" l={t('Customer payments received (period)')} v={formatSar(k.collectionsInPeriod)} />
-            <Tile info="metric.supplierPayments" l={t('Supplier payments made (period)')} v={formatSar(k.supplierPaymentsInPeriod)} />
+            <Kpi info="metric.cashBank" l={t('Cash and bank (books)')} v={formatSar(k.cashAndBank)} />
+            <Kpi info="metric.receivables" l={t('Customers owe the store')} v={formatSar(k.receivablesOutstanding)} sub={t('{0} customers · overdue {1} · due soon {2}', k.customersWithBalance, formatSar(k.receivablesOverdue), formatSar(k.receivablesDueSoon))} />
+            <Kpi info="metric.customerAdvances" l={t('Advances held for customers')} v={formatSar(k.customerAdvances)} />
+            <Kpi info="metric.payables" l={t('Store owes suppliers')} v={formatSar(k.payablesOutstanding)} sub={t('{0} suppliers · overdue {1} · due soon {2}', k.suppliersWithBalance, formatSar(k.payablesOverdue), formatSar(k.payablesDueSoon))} />
+            <Kpi info="metric.supplierAdvances" l={t('Paid to suppliers in advance')} v={formatSar(k.supplierAdvances)} />
+            <Kpi info="metric.collections" l={t('Customer payments received (period)')} v={formatSar(k.collectionsInPeriod)} />
+            <Kpi info="metric.supplierPayments" l={t('Supplier payments made (period)')} v={formatSar(k.supplierPaymentsInPeriod)} />
           </div>
         </>
       )}
@@ -205,6 +206,3 @@ export function Accounting() {
   );
 }
 
-function Tile({ l, v, sub, bad, info }: { l: string; v: string; sub?: string; bad?: boolean; info?: string }) {
-  return <div className="kpi"><div className="l">{l}{info && <InfoIcon id={info} />}</div><div className={`v${bad ? ' neg' : ''}`}>{v}</div>{sub && <div className="l">{sub}</div>}</div>;
-}
