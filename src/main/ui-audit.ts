@@ -84,10 +84,10 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     writeFileSync(join(outDir, `${name}.json`), JSON.stringify({ ...snap, scrollHeight: raw.scrollHeight, findings }, null, 1));
     const suspects = [...new Set(findings.filter((f) => f.severity !== 'low').flatMap((f) => f.ids))];
     if (suspects.length) {
-      await js(outlineSource(suspects));
+      await wc.executeJavaScript(outlineSource(suspects), true);
       await painted();
       writeFileSync(join(outDir, `${name}__overlay.png`), (await wc.capturePage()).toPNG());
-      await js(CLEAR_OUTLINE_SOURCE);
+      await wc.executeJavaScript(CLEAR_OUTLINE_SOURCE, true);
     }
     summary.screens.push({ name, findings: findings.length, high: findings.filter((f) => f.severity === 'high').length });
   };
