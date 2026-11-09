@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { NavIcon } from './NavIcons';
 import type { User } from '../services/users';
 import { Admin, Restore, type FullBackupStatus } from './Admin';
 import { CloudRestoreNewComputer } from './CloudBackup';
@@ -11,7 +12,7 @@ import { Expenses } from './Expenses';
 import { Help } from './Help';
 import { HelpContext } from './help/HelpContext';
 import { KeyboardProvider, focusEl } from './Keyboard';
-import { validOneOf } from './remember';
+import { validBool, validOneOf } from './remember';
 import { TabPane, UserProvider, useRemembered } from './TabHost';
 import { Customers } from './Customers';
 import { Products } from './Products';
@@ -26,21 +27,21 @@ import { ThemeSelect } from './theme';
 type Status = { needsSetup: boolean; user: User | null };
 type Tab = 'sell' | 'refund' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin' | 'audit' | 'help';
 
-// Grouped by workflow: till · goods · money · day and settings. A thin separator is drawn between groups.
-const TABS: { id: Tab; label: string; perm?: string; group: number }[] = [
-  { id: 'sell', label: 'Sell', group: 1 },
-  { id: 'refund', label: 'Refund', group: 1 },
-  { id: 'customers', label: 'Customers', perm: 'customer.payment.record', group: 1 },
-  { id: 'stock', label: 'Stock', perm: 'stock.receive', group: 2 },
-  { id: 'products', label: 'Products', perm: 'product.manage', group: 2 },
-  { id: 'purchases', label: 'Purchases', perm: 'purchase.view', group: 2 },
-  { id: 'expenses', label: 'Expenses', perm: 'expense.view', group: 3 },
-  { id: 'accounting', label: 'Accounting', perm: 'finance.view', group: 3 },
-  { id: 'reports', label: 'Reports', perm: 'reports.view', group: 3 },
-  { id: 'shift', label: 'Shift', group: 4 },
-  { id: 'admin', label: 'Admin', perm: 'backup.run', group: 4 },
-  { id: 'audit', label: 'Audit', perm: 'audit.view', group: 4 },
-  { id: 'help', label: 'Help', group: 4 }, // every role
+// The one list of screens, in sidebar order. Each screen belongs to a group; a role sees only what it may open.
+const TABS: { id: Tab; label: string; perm?: string; group: string }[] = [
+  { id: 'sell', label: 'Sell', group: 'Sales' },
+  { id: 'refund', label: 'Refund', group: 'Sales' },
+  { id: 'customers', label: 'Customers', perm: 'customer.payment.record', group: 'Sales' },
+  { id: 'shift', label: 'Shift', group: 'Sales' },
+  { id: 'products', label: 'Products', perm: 'product.manage', group: 'Inventory' },
+  { id: 'stock', label: 'Stock', perm: 'stock.receive', group: 'Inventory' },
+  { id: 'purchases', label: 'Purchases', perm: 'purchase.view', group: 'Purchasing' },
+  { id: 'expenses', label: 'Expenses', perm: 'expense.view', group: 'Finance' },
+  { id: 'accounting', label: 'Accounting', perm: 'finance.view', group: 'Finance' },
+  { id: 'reports', label: 'Reports', perm: 'reports.view', group: 'Insights' },
+  { id: 'audit', label: 'Audit', perm: 'audit.view', group: 'Insights' },
+  { id: 'admin', label: 'Admin', perm: 'backup.run', group: 'System' },
+  { id: 'help', label: 'Help', group: 'System' }, // every role
 ];
 
 export function App() {
@@ -118,6 +119,12 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
   }, [show]);
   useEffect(() => void call('ui.screen', { screen: tab }).catch(() => undefined), [tab]); // noted on audit records
   const can = (p: string) => user.permissions.includes(p);
+  // Names can be hidden to give screens more room. Sell always opens that way, so checkout keeps its width.
+  const [collapsed, setCollapsed] = useRemembered('app', 'navCollapsed', false, validBool);
+  const [sellExpanded, setSellExpanded] = useState(false);
+  useEffect(() => { if (tab !== 'sell') setSellExpanded(false); }, [tab]);
+  const rail = tab === 'sell' ? !sellExpanded : collapsed;
+  const toggleRail = () => (tab === 'sell' ? setSellExpanded(!sellExpanded) : setCollapsed(!collapsed));
   const pane = (id: Tab, node: React.ReactNode) => {
     const perm = TABS.find((x) => x.id === id)?.perm;
     return visited.has(id) && (!perm || can(perm)) && <TabPane id={id} active={tab === id}>{node}</TabPane>;
@@ -125,16 +132,22 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
   return (
     <HelpContext.Provider value={openHelp}>
       <KeyboardProvider tab={tab} openTab={openTab} can={can} helpOpen={helpAt !== null} openHelp={openHelp} closeHelp={closeHelp} openCustomers={openCustomers}>
-      <TopBar>
+      <div className="shell">
+      <aside className={`sidebar${rail ? ' rail' : ''}`}>
         <strong className="brand">POS</strong>
         <nav aria-label="main">
           {TABS.filter((tb) => !tb.perm || can(tb.perm)).map((tb, i, shown) => (
             <span key={tb.id} style={{ display: 'contents' }}>
-              {i > 0 && shown[i - 1]!.group !== tb.group && <span className="sep" aria-hidden="true" />}
-              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => openTab(tb.id)}>{tb.id === 'help' && <span className="help-mark" aria-hidden="true">?</span>}{t(tb.label)}</button>
+              {(i === 0 || shown[i - 1]!.group !== tb.group) && <div className="nav-group"><span className="nav-group-text">{t(tb.group)}</span></div>}
+              <button className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} aria-label={t(tb.label)} title={rail ? t(tb.label) : undefined} onClick={() => openTab(tb.id)}><NavIcon name={tb.id} /><span className="nav-label">{t(tb.label)}</span></button>
             </span>
           ))}
         </nav>
+        <button type="button" className="nav-toggle" aria-label={t(rail ? 'Show menu names' : 'Hide menu names')} title={t(rail ? 'Show menu names' : 'Hide menu names')} onClick={toggleRail}><NavIcon name="collapse" /><span className="nav-label">{t('Hide menu names')}</span></button>
+      </aside>
+      <div className="shell-main">
+      <TopBar>
+        <span className="spacer" />
         <div className="utils">
           <BackupBadge />
           <ThemeSelect />
@@ -157,6 +170,8 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
       {pane('admin', <Admin can={can} />)}
       {pane('audit', <Audit books={can('integrity.view') ? <BooksCheck /> : undefined} can={can} openCustomer={(id) => openCustomers(id)} openSale={(invoice) => { setRefundRequest((r) => ({ invoice, n: r.n + 1 })); show('refund'); }} />)}
       {pane('help', <Help />)}
+      </div>
+      </div>
       {helpAt && <HelpOverlay article={helpAt} onClose={closeHelp} />}
       </KeyboardProvider>
     </HelpContext.Provider>

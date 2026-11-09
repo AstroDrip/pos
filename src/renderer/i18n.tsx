@@ -7,6 +7,12 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'Inventory': 'المخزون',
+  'Purchasing': 'المشتريات',
+  'Finance': 'المالية',
+  'Insights': 'التحليلات',
+  'Show menu names': 'إظهار أسماء القائمة',
+  'Hide menu names': 'إخفاء أسماء القائمة',
   'Dec': 'ديسمبر',
   'Nov': 'نوفمبر',
   'Oct': 'أكتوبر',

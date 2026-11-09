@@ -118,9 +118,9 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await focus('form input[type="password"]');
     await type(hooks.login.pin);
     key('Enter');
-    if (!(await waitFor(`document.querySelector('.top nav')`, 8000))) throw new Error('login failed');
+    if (!(await waitFor(`document.querySelector('nav[aria-label="main"]')`, 8000))) throw new Error('login failed');
 
-    const tabs = await js<string[]>(`[...document.querySelectorAll('.top nav button')].map((b) => b.textContent.trim())`);
+    const tabs = await js<string[]>(`[...document.querySelectorAll('nav[aria-label="main"] button')].map((b) => b.textContent.trim())`);
     if (process.env.POS_UI_AUDIT_DEMO === '1') {
       await demoTour(tabs);
       return;
@@ -138,14 +138,14 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       { id: 'light-ar-1366x768', theme: 'light', ar: true, w: 1366, h: 768 },
       { id: 'light-en-1024x700', theme: 'light', ar: false, w: 1024, h: 700 },
     ].filter((v) => !v.ar || process.env.POS_UI_AUDIT_ARABIC === '1'); // Arabic deferred by the owner (2026-11-08); set POS_UI_AUDIT_ARABIC=1 to include
-    // The top bar must shrink back after its tabs wrapped (it used to keep the taller height)
+    // The menu is in the sidebar now, so the top strip stays one row at any width
     win.setContentSize(1024, 700);
     await sleep(400);
     const tall = await js<number>(`document.querySelector('.top').getBoundingClientRect().height`);
     win.setContentSize(1900, 900);
     await sleep(400);
     const wide = await js<number>(`document.querySelector('.top').getBoundingClientRect().height`);
-    flow('top-bar-shrinks-back', tall > 60 && wide < 60, `height at 1024px: ${tall}, at 1900px: ${wide}`);
+    flow('top-strip-stays-one-row', tall < 60 && wide < 60, `height at 1024px: ${tall}, at 1900px: ${wide}`);
     for (const [vi, v] of variants.entries()) {
       win.setContentSize(v.w, v.h);
       await setSelect('select[aria-label="appearance"]', v.theme);
@@ -153,7 +153,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       if (isAr !== v.ar) await click('button[aria-label="language"]');
       await sleep(300);
       for (const [i, tab] of tabs.entries()) {
-        await js(`document.querySelectorAll('.top nav button')[${i}].click()`);
+        await js(`document.querySelectorAll('nav[aria-label="main"] button')[${i}].click()`);
         await sleep(350);
         await js('window.scrollTo(0, 0)'); // tabs keep their scroll position, and the screens are measured from the top
         const slug = `${String(i + 1).padStart(2, '0')}-${tab.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '')}`;
@@ -223,7 +223,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     };
     for (const tab of tabs) {
       const name = tab.replace(/[^A-Za-z]/g, '').toLowerCase();
-      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim() === ${JSON.stringify(tab)})?.click()`);
+      await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim() === ${JSON.stringify(tab)})?.click()`);
       await sleep(600);
       if (name === 'sell') {
         await sleep(600);
@@ -249,7 +249,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   /** Customers, Refund, Stock and Shift show their lists with nothing typed. */
   async function emptySearchFlows() {
     const tabTo = async (name: string) => {
-      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
       await sleep(700);
     };
     const rows = (label: string) => js<number>(`document.querySelectorAll('table[aria-label="${label}"] tbody tr:not(.empty)').length`);
@@ -276,7 +276,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await tabTo('Shift');
     const shifts = await rows('past shifts');
     flow('past-shifts-listed', shifts >= 1, `rows ${shifts}`);
-    await js(`document.querySelectorAll('.top nav button')[0].click()`);
+    await js(`document.querySelectorAll('nav[aria-label="main"] button')[0].click()`);
     await sleep(400);
   }
 
@@ -284,7 +284,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   async function productListFlows() {
     const setVal = (sel: string, v: string) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) throw new Error('missing ' + ${JSON.stringify(sel)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, ${JSON.stringify(v)}); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     const rows = () => js<number>(`document.querySelectorAll('table[aria-label="products list"] tbody tr').length`);
-    await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith('Products'))?.click()`);
+    await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith('Products'))?.click()`);
     await sleep(600);
     const all = await rows();
     flow('products-listed-without-search', all > 0, `rows ${all}`);
@@ -307,7 +307,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(500);
     const back = await rows();
     flow('product-off-found-and-back-on', fewer === all - 1 && off === 1 && offAfter === 0 && back === all, `all ${all}, after off ${fewer}, inactive ${off}, inactive after on ${offAfter}, active ${back}`);
-    await js(`document.querySelectorAll('.top nav button')[0].click()`);
+    await js(`document.querySelectorAll('nav[aria-label="main"] button')[0].click()`);
     await sleep(400);
   }
 
@@ -315,7 +315,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   async function billFlows() {
     const setVal = (sel: string, v: string) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) throw new Error('missing ' + ${JSON.stringify(sel)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(e, ${JSON.stringify(v)}); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     const tabTo = async (name: string) => {
-      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
       await sleep(400);
     };
     const section = async (name: string) => {
@@ -414,7 +414,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     const box = 'input[aria-label="product search"]';
     const isOpen = () => js<boolean>(`!!document.querySelector('.palette')`);
     const tabTo = async (name: string) => {
-      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
       await sleep(400);
     };
     const shownKey = (id: string) => js<string>(`document.querySelector('[aria-label="key ${id}"]')?.textContent ?? ''`);
@@ -503,7 +503,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     const letter = async (l: string) => { key(l); await sleep(250); };
     const esc = async () => { key('Escape'); await sleep(200); };
     const tabTo = async (name: string) => {
-      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
       await sleep(400);
     };
 
@@ -593,8 +593,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await ctrlK();
     await letter('m');
     await sleep(600);
-    const wentToCustomers = await js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith('Customers')`);
-    await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith('Sell'))?.click()`);
+    const wentToCustomers = await js<boolean>(`document.querySelector('nav[aria-label="main"] button.active')?.textContent.trim().endsWith('Customers')`);
+    await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith('Sell'))?.click()`);
     await sleep(500);
     flow('quick-m-with-bill-keeps-bill', wentToCustomers && (await lineCount()) === 1, `on customers ${wentToCustomers}, lines ${await lineCount()}`);
 
@@ -707,7 +707,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await letter('m');
     await sleep(300);
     // M is allowed with a bill now that tabs stay open: the item scanned meanwhile is still on the bill afterwards.
-    await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith('Sell'))?.click()`);
+    await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith('Sell'))?.click()`);
     await sleep(500);
     flow('palette-scan-keeps-bill-after-m', (await lineCount()) === 1, `lines ${await lineCount()}`);
     await esc();
@@ -848,7 +848,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     flow('quick-s-supplier-search', supplierList > 0, `suppliers listed ${supplierList}`);
 
     // Letters from another screen open that screen
-    const onTab = (name: string) => js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith(${JSON.stringify(name)})`);
+    const onTab = (name: string) => js<boolean>(`document.querySelector('nav[aria-label="main"] button.active')?.textContent.trim().endsWith(${JSON.stringify(name)})`);
     await tabTo('Accounting');
     await ctrlK();
     await letter('p');
@@ -919,7 +919,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await ctrlK();
     await letter('m');
     await sleep(500);
-    const onCustomers = await js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith('Customers')`);
+    const onCustomers = await js<boolean>(`document.querySelector('nav[aria-label="main"] button.active')?.textContent.trim().endsWith('Customers')`);
     flow('quick-m-from-sell-opens-collection', onCustomers && (await active()) === 'customer search', `on customers ${onCustomers}, focus ${await active()}`);
     await tabTo('Sell');
     await sleep(300);
@@ -930,7 +930,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   /** The Audit tab for the owner, handing over a shift, and what a cashier then cannot see. */
   async function auditFlows() {
     const openNamed = async (name: string) => {
-      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
       await sleep(700);
     };
     await openNamed('Purchases');
@@ -980,7 +980,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     // A mouse click on a tab puts the cursor in its main box, even on a second visit.
     await openNamed('Refund');
     await openNamed('Stock');
-    await js(`(() => { const b = [...document.querySelectorAll('.top nav button')].find((x) => x.textContent.trim().endsWith('Refund')); b.focus(); b.click(); })()`);
+    await js(`(() => { const b = [...document.querySelectorAll('nav[aria-label="main"] button')].find((x) => x.textContent.trim().endsWith('Refund')); b.focus(); b.click(); })()`);
     await sleep(500);
     const inBox = await js<string>(`document.activeElement?.getAttribute('data-kb-search') ?? document.activeElement?.tagName ?? ''`);
     flow('tab-click-focuses-main-box', inBox === 'refund', `focus ${inBox}`);
@@ -1008,7 +1008,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(1500);
     const who = await js<string>(`document.querySelector('.who')?.textContent ?? ''`);
     flow('shift-handover-switches-cashier', who !== '' && !who.toLowerCase().includes('owner'), `now ${who}`);
-    const hasAudit = await js<boolean>(`[...document.querySelectorAll('.top nav button')].some((b) => b.textContent.trim().endsWith('Audit'))`);
+    const hasAudit = await js<boolean>(`[...document.querySelectorAll('nav[aria-label="main"] button')].some((b) => b.textContent.trim().endsWith('Audit'))`);
     flow('audit-hidden-from-cashier', !hasAudit, `audit tab shown ${hasAudit}`);
 
     await click('.utils button', 'Log out');
@@ -1018,7 +1018,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await focus('form input[type="password"]');
     await type(hooks.login.pin);
     key('Enter');
-    await waitFor(`document.querySelector('.top nav')`, 8000);
+    await waitFor(`document.querySelector('nav[aria-label="main"]')`, 8000);
     await sleep(800);
     await openNamed('Sell');
     await js(`document.querySelector('[aria-label="bill left open"] button:last-child')?.click()`);
@@ -1045,16 +1045,16 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   async function reloadFlows() {
     const box = 'input[aria-label="product search"]';
     const openNamed = async (name: string) => {
-      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
       await sleep(600);
     };
     const reload = async () => {
       wc.reload();
       await sleep(800);
-      await waitFor(`document.querySelector('.top nav')`, 8000);
+      await waitFor(`document.querySelector('nav[aria-label="main"]')`, 8000);
       await sleep(800);
     };
-    const active = () => js<string>(`document.querySelector('.top nav button.active')?.textContent.trim() ?? ''`);
+    const active = () => js<string>(`document.querySelector('nav[aria-label="main"] button.active')?.textContent.trim() ?? ''`);
     const userPrefix = () => js<string>(`(/^pos\\.ui\\.\\d+\\./.exec(Object.keys(localStorage).find((k) => k.startsWith('pos.ui.')) ?? '') ?? [''])[0]`);
 
     await openNamed('Sell');
@@ -1117,7 +1117,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await focus('form input[type="password"]');
     await type(hooks.login.pin);
     key('Enter');
-    await waitFor(`document.querySelector('.top nav')`, 8000);
+    await waitFor(`document.querySelector('nav[aria-label="main"]')`, 8000);
     await sleep(800);
     const offered = await waitFor(`document.querySelector('[aria-label="bill left open"]')`, 3000);
     flow('logout-clears-screen', offered && (await lineCount()) === 0, `offered ${offered}, lines ${await lineCount()}`);
@@ -1131,7 +1131,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     const box = 'input[aria-label="product search"]';
     const code = '6281000000000';
     const openNamed = async (name: string) => {
-      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
       await sleep(600);
     };
     await clearBill();
@@ -1344,7 +1344,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await click('.help-link');
     await sleep(400);
     const helpShown = await js<boolean>(`!!document.querySelector('.help-article')`);
-    if (!(await click('.help-overlay .close'))) await js(`document.querySelectorAll('.top nav button')[0].click()`);
+    if (!(await click('.help-overlay .close'))) await js(`document.querySelectorAll('nav[aria-label="main"] button')[0].click()`);
     await sleep(400);
     const kept = await lineCount();
     flow('help-link-keeps-bill', helpShown && kept === 1, `help shown: ${helpShown}, lines after coming back: ${kept}`);

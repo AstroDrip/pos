@@ -125,7 +125,7 @@ input:focus, select:focus, textarea:focus { outline: 3px solid var(--focus); out
 label { display: block; font-size: var(--fs-sm); color: var(--muted); margin: var(--sp-3) 0 var(--sp-1); }
 label:has(> input[type='checkbox']) { color: var(--text-2); }
 @media (prefers-reduced-motion: no-preference) {
-  button, .top nav button { transition: background-color 0.12s ease, border-color 0.12s ease; }
+  button { transition: background-color 0.12s ease, border-color 0.12s ease; }
 }
 
 /* ── Shell ────────────────────────────────────────────────── */
@@ -134,14 +134,10 @@ label:has(> input[type='checkbox']) { color: var(--text-2); }
   background: var(--topbar-bg); color: var(--topbar-text); position: sticky; top: 0; z-index: 20;
 }
 .top .brand { font-weight: 700; letter-spacing: 0.02em; flex: 0 0 auto; }
-/* Tabs wrap onto a second line when they do not fit: a tab is never hidden. App.tsx keeps --topbar-h equal to the bar's real height. */
-.top nav { display: flex; flex-wrap: wrap; row-gap: 2px; column-gap: 2px; flex: 1 1 auto; min-width: 0; padding-block: 4px; }
-.top nav button, .top .utils button {
+.top .utils button:hover:not(:disabled) { background: rgba(127, 127, 127, 0.22); }
+.top .utils button {
   min-height: 32px; padding: 0 var(--sp-3); background: transparent; color: var(--topbar-text); border-color: transparent; font-weight: 500;
 }
-.top nav button:hover:not(:disabled), .top .utils button:hover:not(:disabled) { background: rgba(127, 127, 127, 0.22); }
-.top nav button.active { background: var(--primary); color: var(--on-primary); }
-.top nav .sep { width: 1px; background: rgba(127, 127, 127, 0.35); margin: 6px var(--sp-1); flex: 0 0 auto; }
 .top .utils { display: flex; align-items: center; gap: var(--sp-2); flex: 0 0 auto; white-space: nowrap; font-size: var(--fs-sm); }
 .top .utils .who { color: var(--topbar-text); opacity: 0.85; }
 .top .spacer { flex: 1; }
@@ -261,26 +257,18 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 ::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; border: 3px solid var(--bg); }
 ::-webkit-scrollbar-track { background: var(--bg); }
-/* The tab strip scrolls sideways (wheel, keyboard focus) without showing a bulky scrollbar. */
 @media (max-width: 1280px) {
   .top { gap: var(--sp-2); padding: 0 var(--sp-3); }
-  .top nav button { padding: 0 var(--sp-2); font-size: var(--fs-sm); }
   .top .utils { gap: 6px; }
   .top .utils .who { display: none; }
 }
 /* A card used as a page section (not centred, aligned to the page's start). */
 .card.section { max-width: var(--section-w); margin: 0 0 var(--sp-4); }
 
-/* Narrow windows: every tab stays visible on a second row instead of hiding behind sideways scrolling. */
-@media (max-width: 1100px) {
-  .top { flex-wrap: wrap; padding-block: 4px; }
-  .top nav { flex-wrap: wrap; overflow: visible; order: 3; flex-basis: 100%; }
-}
 /* The top bar is dark in both themes: status colours need the light-on-dark shades there. */
 .top .badge-ok { color: #5ad3a4; }
 .top .badge-warn { color: #f5c76b; }
 .top .badge-bad { color: #ff8a80; }
-@media (max-width: 1100px) { .top .utils { margin-inline-start: auto; } }
 /* Second-language product name sits under the main name, on the page's reading side. */
 :root[dir='ltr'] .sub-name { text-align: left; }
 :root[dir='rtl'] .sub-name { text-align: right; }
@@ -291,7 +279,6 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 .help-overlay-panel > .close { position: sticky; top: var(--sp-3); float: inline-end; margin: var(--sp-3) var(--sp-4) 0; z-index: 1; }
 .help-link { min-height: 22px; min-width: 22px; padding: 0; border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 700; line-height: 1; vertical-align: middle; margin-inline-start: var(--sp-1); color: var(--primary); }
 .page-header .actions .help-link { min-height: var(--control-h); min-width: var(--control-h); font-size: var(--fs-md); }
-.top nav .help-mark { display: inline-block; margin-inline-end: var(--sp-1); font-weight: 700; }
 .help-layout { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: var(--sp-4); align-items: start; }
 .help-nav { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--sp-3); max-height: calc(100vh - var(--topbar-h) - 140px); overflow: auto; }
 .help-nav input { width: 100%; margin-bottom: var(--sp-2); }
@@ -394,3 +381,33 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 .pairs > div { display: flex; justify-content: space-between; gap: var(--sp-2); }
 .pairs dt, .pairs .k { color: var(--muted); }
 .pairs dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+/* ── Sidebar: the one navigation ──────────────────────────── */
+.shell { display: grid; grid-template-columns: auto minmax(0, 1fr); min-height: 100vh; }
+.shell-main { min-width: 0; }
+.sidebar { position: sticky; top: 0; align-self: start; height: 100vh; width: 188px; display: flex; flex-direction: column; background: var(--topbar-bg); color: var(--topbar-text); z-index: 21; overflow: hidden; }
+.sidebar .brand { font-weight: 700; letter-spacing: 0.02em; padding: var(--sp-3) var(--sp-4); }
+.sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 var(--sp-2) var(--sp-2); scrollbar-width: thin; }
+.nav-group { margin: var(--sp-2) var(--sp-2) 2px; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.6; }
+.sidebar nav button, .nav-toggle { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: 32px; padding: 0 var(--sp-2); background: transparent; color: var(--topbar-text); border-color: transparent; font-weight: 500; text-align: start; }
+.sidebar nav button:hover:not(:disabled), .nav-toggle:hover:not(:disabled) { background: rgba(127, 127, 127, 0.22); }
+.sidebar nav button.active { background: var(--primary); color: var(--on-primary); }
+.nav-toggle { margin: 0 var(--sp-2) var(--sp-2); width: auto; }
+.nav-icon { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.sidebar.rail { width: 52px; }
+.sidebar.rail .brand { padding-inline: 0; text-align: center; font-size: var(--fs-sm); }
+.sidebar.rail .nav-label, .sidebar.rail .nav-group-text { display: none; }
+.sidebar.rail .nav-group { height: 1px; margin: var(--sp-2) var(--sp-1); background: rgba(127, 127, 127, 0.4); }
+.sidebar.rail nav button, .sidebar.rail .nav-toggle { justify-content: center; padding: 0; }
+.top.strip .spacer { flex: 1; }
+@media (max-width: 1000px) {
+  .sidebar { width: 52px; }
+  .sidebar .brand { padding-inline: 0; text-align: center; font-size: var(--fs-sm); }
+  .sidebar .nav-label, .sidebar .nav-group-text, .nav-toggle { display: none; }
+  .sidebar .nav-group { height: 1px; margin: var(--sp-2) var(--sp-1); background: rgba(127, 127, 127, 0.4); }
+  .sidebar nav button { justify-content: center; padding: 0; }
+}
+@media print {
+  .shell { display: block; }
+  .sidebar { display: none; }
+}
