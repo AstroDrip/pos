@@ -13,6 +13,7 @@ Names and numbers in the examples are made up.
   - [Keyboard keys at the till](#start-keys)
   - [Quick Actions (Ctrl+K)](#start-quick-actions)
   - [Change the keyboard keys](#admin-shortcuts)
+  - [Test the scanner, scale labels and printer](#admin-hardware-test)
 - **Selling**
   - [Scan a product](#selling-scan)
   - [Find a product by name or code](#selling-search)
@@ -43,6 +44,7 @@ Names and numbers in the examples are made up.
   - [Pay a supplier (full or part)](#suppliers-pay)
   - [See what the store owes suppliers](#suppliers-balances)
   - [Return goods to a supplier](#suppliers-return)
+  - [Proforma VAT: when the final tax invoice arrives](#suppliers-proforma-vat)
 - **Stock and products**
   - [See all products](#stock-find-products)
   - [See lists without searching](#stock-see-lists)
@@ -56,6 +58,8 @@ Names and numbers in the examples are made up.
   - [Record an expense (rent, electricity and others)](#expenses-record)
   - [Pay an expense that is still owed](#expenses-pay)
   - [Set up recurring expenses (monthly rent, bills)](#expenses-recurring)
+  - [Accounting words in plain English](#expenses-words)
+  - [Recognise prepaid expenses for a month](#expenses-prepaid)
 - **Reports and the owner overview**
   - [Read the audit log](#audit-log)
   - [Run the books check](#books-check)
@@ -67,6 +71,7 @@ Names and numbers in the examples are made up.
   - [ZATCA and your receipts](#reports-zatca)
   - [View sales for a day or a month](#reports-sales)
   - [Read the owner overview, profit and balances](#reports-owner)
+  - [The owner's phone dashboard](#reports-phone-dashboard)
 - **Shifts and daily work**
   - [Hand over to the next cashier](#shifts-handover)
   - [Start a shift](#shifts-open)
@@ -78,6 +83,8 @@ Names and numbers in the examples are made up.
   - [Make a backup and check it worked](#backup-run)
   - [Restore a backup](#backup-restore)
   - [The computer stops responding](#backup-frozen)
+  - [Cloud Backup & Recovery](#backup-cloud)
+  - [Move the store to another computer from the cloud](#backup-cloud-new-computer)
 - **Real situations, step by step**
   - [A. A customer pays normally](#scenario-a-normal-sale)
   - [B. A customer buys on credit](#scenario-b-credit)
@@ -223,6 +230,29 @@ Names and numbers in the examples are made up.
 - *You changed Enter for cash and now Enter does not pay.* That is correct: the new key pays instead. Enter still picks items and confirms quantities. The Cash button shows the key in use.
 
 **Ask a supervisor:** Only a user allowed to change settings can do this. Every change is written to the audit log.
+
+<a id="admin-hardware-test"></a>
+
+### Test the scanner, scale labels and printer
+
+**What this does:** Check each device before relying on it. Nothing here makes a sale.
+
+**Where:** Admin tab → Hardware test.
+
+**Steps**
+
+1. Barcode scanner: click the box and scan. Each scan is listed with what it found. Scan quickly, scan the same item twice, and scan an unknown code.
+2. Weighing label reader: scan a real label. Check the item code, weight, PLU, product and price. If the weight is ten or a thousand times out, the layout has grams and kilograms mixed up.
+3. Receipt printer: choose the printer and paper width, then press Print test receipt. It is marked TEST - NOT A SALE. Look for cut-off text and long names that do not wrap.
+4. Cash drawer: this screen shows cash figures only. The app cannot open a drawer. If the drawer is wired to the printer, the setting is in the Windows printer driver.
+
+**What you should see:** Each device does what you expect, and the label price matches the scale's printed price.
+
+**If something goes wrong**
+
+- *The scan shows as typed by hand.* The scanner is sending too slowly or has no Enter suffix. Check the scanner's setup sheet.
+- *Double read flagged.* The scanner sent one code twice very quickly. On the Sell screen the cashier is asked before it is added again.
+- *The printer did not accept the test.* Check that it is on, has paper, and is the Windows default printer.
 
 ## Selling
 
@@ -838,6 +868,33 @@ Names and numbers in the examples are made up.
 
 **What you should see:** "Return saved as …" and stock is taken out at cost.
 
+<a id="suppliers-proforma-vat"></a>
+
+### Proforma VAT: when the final tax invoice arrives
+
+**What this does:** VAT on a proforma is treated as a cost, because a proforma is not a tax invoice. When the real invoice arrives, link it here. It does not create another purchase, more stock or a second debt. VAT can be claimed only after your accountant approves it.
+
+**Where:** Purchases tab → Proforma VAT.
+
+**Steps**
+
+1. Open the proforma.
+2. Enter the final invoice number, date, net, VAT, total and the supplier VAT number. Press Save final invoice.
+3. Attach a copy if you have one. Attaching a copy does not make the VAT claimable.
+4. Compare the two rows. Differences are listed. If there are any, write a note, then press Mark details verified.
+5. Show it to your accountant. Then record their name and the VAT they approved, or that they refused it.
+6. If approved, choose the claim date and press Claim VAT. This moves the VAT out of cost and into input VAT.
+
+**What you should see:** Document, payment and VAT each show their own status. The claim appears as its own journal entry. The original purchase stays as it was.
+
+**If something goes wrong**
+
+- *The final invoice is for less than the proforma.* The screen shows the gap. Only the matching VAT can be claimed. The amount owed to the supplier does not change by itself: agree a credit note with the supplier and ask your accountant.
+- *It says this file is already attached.* The same file is on a proforma already. Check you are on the right one.
+- *A claim was made by mistake.* Use Reverse claim and give a reason. It adds an opposite entry. Nothing is erased.
+
+**Ask a supervisor:** Only an administrator can record the decision and claim. The app does not decide whether VAT is deductible: your accountant does.
+
 ## Stock and products
 
 <a id="stock-find-products"></a>
@@ -1057,6 +1114,64 @@ Names and numbers in the examples are made up.
 
 **What you should see:** Drafts appear when each period starts.
 
+<a id="expenses-words"></a>
+
+### Accounting words in plain English
+
+**What this does:** What the words on the Accounting tab mean, with shop examples. The amounts are made up. These are general explanations. Your accountant decides how your own books are treated, and the figures stay provisional until then.
+
+**Where:** Accounting tab.
+
+**Steps**
+
+1. Assets: what the shop owns or is owed. Example: SAR 3,000 in the till, SAR 40,000 of goods on the shelves.
+2. Liabilities: what the shop owes others. Example: SAR 12,000 owed to a dairy supplier, VAT collected and not yet paid.
+3. Equity: the owner's share. It is what is left when liabilities are taken from assets. Example: the SAR 150,000 the owner put in, plus profits kept.
+4. Revenue: the value of what was sold, without VAT and after returns. Example: a bill of SAR 115 including VAT is SAR 100 revenue.
+5. Expenses: what it costs to run the shop. Example: rent, electricity, wages.
+6. Gross profit: revenue less what the goods sold cost. Example: sold for SAR 100, bought for SAR 70, gross profit SAR 30.
+7. Net profit: gross profit less the running expenses. Example: SAR 30 gross profit less SAR 10 of expenses is SAR 20.
+8. Inventory valuation: what the goods in stock cost, at average cost. It is not what they will sell for.
+9. Trial balance: every account with its debits and credits. The two totals must be equal. If they are not, something is wrong.
+10. General ledger: every entry made to one account, in date order. Use it to see why a balance is what it is.
+11. Balance sheet: a picture on one date of assets, liabilities and equity. Assets must equal the other two together.
+12. Profit and loss: revenue less costs across a period. It says whether the shop made money in that time.
+13. Accounts receivable: money customers owe the shop for goods on credit. It is not cash yet.
+14. Accounts payable: money the shop owes suppliers. It has not been paid yet.
+15. VAT: tax collected on sales and paid to the government. It is not income. VAT on purchases can be set against it only when the paperwork allows it.
+16. Prepaid expenses: a cost paid before the time it covers. Example: SAR 12,000 of rent paid for a year counts as SAR 1,000 a month, each month it is used.
+
+**What you should see:** You can read the reports and ask your accountant the right questions.
+
+**If something goes wrong**
+
+- *Cash is high but profit is low.* Cash and profit are different. Money from customers paying old debts is cash but not new profit, and paying suppliers uses cash without being a new cost.
+
+**Ask a supervisor:** Ask your accountant before acting on these figures. The chart of accounts and the reports stay provisional until the accountant approves them.
+
+<a id="expenses-prepaid"></a>
+
+### Recognise prepaid expenses for a month
+
+**What this does:** A cost paid in advance sits in Prepaid expenses. Each month, its share has to be moved into that month's expenses. Reports never do this for you. A person reads the list and confirms it.
+
+**Where:** Expenses tab → Recognise prepaid expenses.
+
+**Steps**
+
+1. Choose the month. Earlier months that were missed are included too.
+2. Read each line: what it is, its full value, the period it covers, the amount for the month, what is left, and the entry that will be made.
+3. Press Confirm and post.
+
+**What you should see:** The list empties for that month. Profit and loss now includes those amounts. Running it again adds nothing.
+
+**If something goes wrong**
+
+- *It says the figures have changed.* Something was posted after you opened the list. Look at the list again, then confirm.
+- *Profit and loss says prepaid expenses are waiting.* Those months are due and not confirmed yet, so profit looks higher than it should. Confirm them here.
+
+**Ask a supervisor:** Needs permission to approve expenses.
+
 ## Reports and the owner overview
 
 <a id="audit-log"></a>
@@ -1257,6 +1372,27 @@ Names and numbers in the examples are made up.
 
 - *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
 
+<a id="reports-phone-dashboard"></a>
+
+### The owner's phone dashboard
+
+**What this does:** The owner can see sales, profit, stock and balances from a phone. The phone only shows figures. Sales, prices, stock and payments are changed on the till.
+
+**Where:** A private web address, opened on the phone. On the till: Admin → Cloud Backup & Recovery shows the last time data was sent.
+
+**Steps**
+
+1. Open the address and log in.
+2. Choose a period at the top: today, this week, this month, or your own dates.
+3. Open More → Till connection to see when the till last reported.
+
+**What you should see:** The same figures as the till for the same days. Net profit is marked provisional.
+
+**If something goes wrong**
+
+- *A figure says Not available.* The till has not sent it. This is different from SAR 0.00, which means the till reported zero.
+- *It says the till is not connected.* The till is off or has no internet. The figures are from its last report. Selling is not affected.
+
 ## Shifts and daily work
 
 <a id="shifts-handover"></a>
@@ -1434,6 +1570,58 @@ Names and numbers in the examples are made up.
 **What you should see:** Sales that showed "SAVED" are kept. A sale that was not saved can be entered again.
 
 **Ask a supervisor:** Only the owner restores backups.
+
+<a id="backup-cloud"></a>
+
+### Cloud Backup & Recovery
+
+**What this does:** A copy of the store's data goes to the cloud automatically. It is locked on this computer before it leaves, and only the paper recovery code can open it. Selling never waits for this, with or without internet.
+
+**Where:** Admin tab → Cloud Backup & Recovery.
+
+**Steps**
+
+1. Set up the backup key first, and write the recovery code on paper. Keep it away from this computer.
+2. Enter the cloud address and the one-time code you were given, and press Connect.
+3. Choose how often to back up.
+4. Press Back up to cloud now once, then Test newest backup. The test downloads the backup and opens it.
+
+**What you should see:** Last backup successful, with today's date. Recovery readiness says Ready.
+
+**If something goes wrong**
+
+- *Waiting for internet.* Nothing is wrong with your data. The backup carries on by itself when the connection returns, from where it stopped.
+- *Remote backup unavailable.* The cloud service is not answering. It keeps trying. If it lasts more than a day, tell whoever set up the service.
+- *Backup verification failed.* Do not rely on that backup. Press Back up to cloud now, then test again. If it fails again, contact support.
+
+**Ask a supervisor:** If the recovery code and this computer are both lost, nobody can open the backups. Not even the people who run the service.
+
+<a id="backup-cloud-new-computer"></a>
+
+### Move the store to another computer from the cloud
+
+**What this does:** If the computer is lost or replaced, install the app on the new one and bring the store back from the cloud. You need the cloud address, the store identity and the paper recovery code.
+
+**Where:** First screen of a new install → Restore from the cloud. On a working till: Admin → Cloud Backup & Recovery → Show backup history.
+
+**Steps**
+
+1. Install the app and open it. Do not create a new owner.
+2. Under Restore from the cloud, enter the cloud address, the store identity and the recovery code, and press Find backups.
+3. Keep Cut off the old computer ticked if the old one is lost.
+4. Press Check this backup on the newest one. It is downloaded, unlocked and checked here. Nothing is replaced yet.
+5. Read its date and sales count. Press Restore this backup and confirm.
+6. After the restart, log in as usual. In Admin, connect the till to the cloud again if it asks.
+
+**What you should see:** The app restarts with the store's data as of that backup. Sales made after the backup are not in it.
+
+**If something goes wrong**
+
+- *The recovery code does not match.* Check for typos. The letters O and I are read as 0 and 1. A backup can only be opened with its own code.
+- *It warns this computer has newer data.* Restoring would take those sales out of the live data. Stop and ask the owner. If you go ahead, the current data is first saved to the side.
+- *It says the backup is from a newer version.* Update the app, then try again.
+
+**Ask a supervisor:** Only an administrator should do this. Write down why, and when.
 
 ## Real situations, step by step
 

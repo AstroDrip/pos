@@ -4,6 +4,7 @@ import { storeDay } from '../core/store-time';
 import type { VatReviewDetail, VatReviewRow } from '../services/vat-review';
 import { call } from './api';
 import { useI18n } from './i18n';
+import { InfoIcon } from './InfoIcon';
 import { EmptyRow } from './PageHeader';
 
 const today = () => storeDay(new Date().toISOString());
@@ -107,8 +108,8 @@ function FinalForm({ d, run }: FormProps) {
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   return (
     <div className="bill-fields">
-      <div><label>{t('Final invoice number')}</label><input aria-label="final invoice number" value={f.no} onChange={set('no')} /></div>
-      <div><label>{t('Final invoice date')}</label><input aria-label="final invoice date" type="date" value={f.date} onChange={set('date')} /></div>
+      <div><label>{t('Final invoice number')} <InfoIcon id="field.vat.finalNo" /></label><input aria-label="final invoice number" value={f.no} onChange={set('no')} /></div>
+      <div><label>{t('Final invoice date')} <InfoIcon id="field.vat.finalDate" /></label><input aria-label="final invoice date" type="date" value={f.date} onChange={set('date')} /></div>
       <div><label>{t('Net')}</label><input aria-label="final net" value={f.net} onChange={set('net')} /></div>
       <div><label>{t('VAT')}</label><input aria-label="final vat" value={f.vat} onChange={set('vat')} /></div>
       <div><label>{t('Total')}</label><input aria-label="final total" value={f.total} onChange={set('total')} /></div>
@@ -148,10 +149,10 @@ function DecideForm({ d, run }: FormProps) {
   const send = (decision: 'approve' | 'reject') => run(call('vat.decide', { billId: d.billId, decision, accountantName: name, reference: ref || undefined, note: note || undefined, approvedVat: decision === 'approve' ? sar(amount) : undefined }));
   return (
     <div className="bill-fields">
-      <div><label>{t('Accountant name')}</label><input aria-label="accountant name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></div>
+      <div><label>{t('Accountant name')} <InfoIcon id="field.vat.accountant" /></label><input aria-label="accountant name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} /></div>
       <div><label>{t('Reference')}</label><input aria-label="decision reference" maxLength={80} value={ref} onChange={(e) => setRef(e.target.value)} /></div>
       <div><label>{t('Note')}</label><input aria-label="decision note" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} /></div>
-      <div><label>{t('VAT approved')}</label><input aria-label="approved vat" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+      <div><label>{t('VAT approved')} <InfoIcon id="field.vat.approved" /></label><input aria-label="approved vat" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
       <div className="row"><button type="button" className="primary" onClick={() => send('approve')}>{t('Accountant approved')}</button><button type="button" onClick={() => send('reject')}>{t('Accountant refused')}</button></div>
     </div>
   );

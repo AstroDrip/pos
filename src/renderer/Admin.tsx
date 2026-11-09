@@ -66,7 +66,7 @@ function Backup({ canSetup, canRestore }: { canSetup: boolean; canRestore: boole
         <>
           <p>{t('Last verified local backup:')} <strong>{s.lastVerifiedLocal ? new Date(s.lastVerifiedLocal.at).toLocaleString() : t('never')}</strong></p>
           {s.lastFailure && <p className="msg error">{t('Last failure {0}: {1}', new Date(s.lastFailure.at).toLocaleString(), s.lastFailure.error)}</p>}
-          <p className="msg warn">{t('Off-site (cloud) backup is not set up yet. Local backups are on this computer only: copy the backups folder to a USB drive regularly.')}</p>
+          <p className="msg warn">{t('Local backups are on this computer only. Connect Cloud Backup below, or copy the backups folder to a USB drive regularly.')}</p>
           {!s.keyConfigured && canSetup && (
             <button className="primary" onClick={() => run(async () => setCode((await call<{ recoveryCode: string }>('backup.setupKey')).recoveryCode))}>
               {t('Set up backup key')}
@@ -365,7 +365,7 @@ function ScaleLabels() {
   );
 }
 
-/** Owner phone dashboard: sync status only. The remote service is not set up yet (owner decision). */
+/** Owner phone dashboard: sync status only. */
 function DashboardHealth() {
   const back = useReturnTick();
   const { t } = useI18n();
@@ -376,7 +376,7 @@ function DashboardHealth() {
     <div className="card section">
       <h3>{t('Owner phone dashboard')}</h3>
       {!h.enabled ? (
-        <p className="msg warn">{t('Not set up. It needs an online dashboard service; choose a provider first. Nothing is sent anywhere until then.')}</p>
+        <p className="msg warn">{t('Not connected. Connect it under Cloud Backup & Recovery. Nothing is sent anywhere until then.')}</p>
       ) : (
         <table className="list"><tbody>
           <tr><td>{t('Last successful sync')}</td><td>{h.lastSuccessAt ? new Date(h.lastSuccessAt).toLocaleString() : t('Never')}</td></tr>

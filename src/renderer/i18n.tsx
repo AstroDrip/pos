@@ -7,6 +7,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'Local backups are on this computer only. Connect Cloud Backup below, or copy the backups folder to a USB drive regularly.': 'النسخ المحلية على هذا الجهاز فقط.',
+  'Not connected. Connect it under Cloud Backup & Recovery. Nothing is sent anywhere until then.': 'غير متصل.',
   'Raw code': 'الرمز الخام',
   'Length': 'الطول',
   'Read as': 'قُرئ كـ',

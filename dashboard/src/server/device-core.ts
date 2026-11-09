@@ -23,6 +23,7 @@ async function rateLimit(db: Db, key: string, max: number, windowMinutes: number
   const [r] = await db.query<{ n: number | string }>('SELECT count(*) AS n FROM cloud.rate_limits WHERE key = $1 AND at > now() - make_interval(mins => $2)', [key, windowMinutes]);
   if (Number(r?.n ?? 0) >= max) throw new ApiError(429, 'RATE_LIMITED', 'Too many attempts. Try again later.');
   await db.query('INSERT INTO cloud.rate_limits (key) VALUES ($1)', [key]);
+  await db.query("DELETE FROM cloud.rate_limits WHERE key = $1 AND at < now() - interval '1 day'", [key]);
 }
 
 const audit = (storeId: string | null, deviceId: string | null, action: string, detail: object = {}): Statement => ({ text: 'INSERT INTO cloud.audit_log (store_id, device_id, action, detail) VALUES ($1, $2, $3, $4)', params: [storeId, deviceId, action, JSON.stringify(detail)] });

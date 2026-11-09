@@ -12,6 +12,7 @@ import { createHandlers, type BackupEnv, type CloudEnv, type Printer, type Sessi
 import { makeCloudApi, type CloudCreds } from '../services/cloud-client';
 import { cloudTick } from '../services/cloud-jobs';
 import { paperWidth } from '../services/hardware';
+import { startupMessage } from './startup-error';
 import { getStoreDetails } from '../services/store-details';
 import { runUiAudit } from './ui-audit';
 import { demandScores } from '../services/demand';
@@ -151,6 +152,7 @@ app.whenReady().then(() => {
   const dataDir = app.getPath('userData');
   const dbPath = join(dataDir, 'pos.db');
   const backupEnv = makeBackupEnv(dataDir, dbPath);
+  try {
   ctx = makeCtx(
     openDatabase(dbPath, {
       // Encrypted when a backup key exists; otherwise the plain default (no key means no encrypted backups at all yet).
@@ -161,6 +163,12 @@ app.whenReady().then(() => {
       },
     }),
   );
+  } catch (e) {
+    const m = startupMessage(e, dataDir);
+    dialog.showErrorBox(m.title, m.body);
+    app.exit(1);
+    return;
+  }
   const cloudEnv = makeCloudEnv(dataDir);
   const dispatch = createHandlers(ctx, printer, backupEnv, cloudEnv);
   // Cloud round: never on the checkout path, and at most one at a time.

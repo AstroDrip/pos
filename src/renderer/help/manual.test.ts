@@ -27,7 +27,7 @@ describe('help content', () => {
   it('does not teach features that are not built', () => {
     // The ZATCA guide exists to say plainly that the link is not set up, so it is the one place the word may appear.
     const text = JSON.stringify(HELP_ARTICLES.filter((a) => a.id !== 'reports-zatca')).toLowerCase();
-    for (const banned of ['zatca', 'fatoora', 'sticker', 'type the weight', 'phone dashboard']) expect(text, banned).not.toContain(banned);
+    for (const banned of ['zatca', 'fatoora', 'sticker', 'type the weight']) expect(text, banned).not.toContain(banned);
   });
 });
 

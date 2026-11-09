@@ -5,6 +5,7 @@ import type { RemoteBackup } from '../services/cloud-client';
 import type { SyncHealth } from '../services/dashboard-sync';
 import { call } from './api';
 import { useI18n } from './i18n';
+import { InfoIcon } from './InfoIcon';
 
 type FullStatus = CloudStatus & { configured: boolean; url: string | null; storeId: string | null; deviceId: string | null; keyConfigured: boolean; recoveryReady: boolean; local: BackupStatus; sync: SyncHealth };
 type Facts = { backupId: string; createdAt: string; lastInvoiceNo: string | null; counts: Record<string, number>; newerLocal: boolean; liveSales: number };
@@ -121,8 +122,8 @@ export function CloudBackup({ can }: { can: (p: string) => boolean }) {
 
       {!s.configured && can('settings.manage') && (
         <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div><label>{t('Cloud address')}</label><input aria-label="cloud address" placeholder="https://" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} /></div>
-          <div><label>{t('One-time code')}</label><input aria-label="cloud code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></div>
+          <div><label>{t('Cloud address')} <InfoIcon id="field.cloud.address" /></label><input aria-label="cloud address" placeholder="https://" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} /></div>
+          <div><label>{t('One-time code')} <InfoIcon id="field.cloud.code" /></label><input aria-label="cloud code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></div>
           <div><label>{t('Name of this till')}</label><input aria-label="device name" value={form.deviceName} onChange={(e) => setForm({ ...form, deviceName: e.target.value })} /></div>
           <button className="primary" disabled={busy || !form.url || !form.code || !s.keyConfigured} onClick={() => void run(async () => { await call('cloud.connect', form); setForm({ url: '', code: '', deviceName: form.deviceName }); return t('Connected.'); })}>{t('Connect')}</button>
           {!s.keyConfigured && <p className="hint">{t('Set up the backup key first.')}</p>}
