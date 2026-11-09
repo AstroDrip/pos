@@ -2,6 +2,18 @@
 
 Not for live trading: there is no ZATCA Phase 2 integration yet, and receipts are marked "NOT A ZATCA TAX INVOICE".
 
+## Unreleased — Redesign and interactive charts (2026-11-10)
+
+Details: `docs/superpowers/specs/2026-11-10-ui-redesign-audit-and-plan.md`.
+
+### Added
+- One sidebar in six groups. One date control with a scrolling strip. One interactive chart with hover, click for detail, drag for dates, keyboard and touch.
+- Stock movement history, shift activity list, customer balance history, purchases over time.
+
+### Changed
+- Reports, Accounting, Expenses, Customers, Purchases, Stock, Products, Shift and Admin open on what matters most, with the rest in views.
+- Suppliers moved from Admin to Purchases.
+
 ## Unreleased — Accounting fixes, cloud backup, owner dashboard (2026-11-09)
 
 Details: `docs/IMPLEMENTATION_REPORT_CLOUD_PHASE.md`. Accounting PROVISIONAL.

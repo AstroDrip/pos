@@ -213,13 +213,14 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
 
   /** Opens every tab of the demo shop and reports what each one shows. */
   async function demoTour(tabs: string[]) {
+    const FORM_VIEW = /receivegoods|recordwastage|stockcount|recogniseprepaid|storedetails|scalelabels|importfromcsv|hardwaretest/; // views that are forms, or rightly empty in the demo
     const rows = () => js<number>(`document.querySelectorAll('table tbody tr:not(.empty), .kpi').length`);
     const empties = () => js<string[]>(`[...document.querySelectorAll('tr.empty')].map((e) => e.textContent.trim())`);
     const look = async (name: string) => {
       await sleep(1200);
       const n = await rows();
       await capture(`demo-${name}`);
-      flow(`demo-${name}`, n > 0 || name === 'audit-bookscheck', `rows ${n}${(await empties()).map((e) => ` | empty: ${e}`).join('')}`);
+      flow(`demo-${name}`, n > 0 || name === 'audit-bookscheck' || FORM_VIEW.test(name), `rows ${n}${(await empties()).map((e) => ` | empty: ${e}`).join('')}`);
     };
     for (const tab of tabs) {
       const name = tab.replace(/[^A-Za-z]/g, '').toLowerCase();
@@ -272,6 +273,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     flow('refund-recent-sales-listed-and-open', sold > 0 && first !== '' && opened === first, `rows ${sold}, first ${first}, opened ${opened}`);
     await tabTo('Stock');
     await sleep(500);
+    await js(`(() => { const e = document.querySelector('input[aria-label="find in stock"]'); if (!e) return; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, ''); e.dispatchEvent(new Event('input', { bubbles: true })); })()`); // an earlier scan on this tab is still in the box
     await click('.views button', 'Stock on hand');
     await sleep(700);
     const stock = await rows('stock on hand');

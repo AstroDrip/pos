@@ -1,6 +1,6 @@
 # UI redesign and interactive data: audit and plan
 
-**Date:** 2026-11-10. **Status:** waiting for owner approval. No code has changed.
+**Date:** 2026-11-10. **Status:** approved and built. See section 12.
 
 Covers two owner briefs: "Interactive data visualisation and contextual visual help", and "Complete POS UI/UX redesign". The second brief arrived cut off at Module 6 (Purchases). Modules 7 to 13 below come from the module table in the first brief and from this audit, until the rest arrives.
 
@@ -150,3 +150,13 @@ VAT, stock, invoice, payment and permission rules. No new framework, database or
 1. Send the rest of the second brief, from Module 6 onward.
 2. Arabic: both briefs ask for RTL checks, but the standing rule is no Arabic checks. Default: the rule stands. Layouts use direction-safe CSS and Arabic is not checked.
 3. Suppliers form moves from Admin to Purchases. Default: yes.
+
+## 12. What was built, and what differs from this plan
+
+Built as planned, in the order above, with these differences:
+
+- **Sell:** the customer box stayed where it is. It sits on the cashier's key path (scan, F2 customer, payment), and the brief says not to disturb that. Key help folded away and Clear bill moved apart from Hold bill.
+- **Purchases:** one strip of sections under four small group names, not two levels of tabs, so every section stays one click away.
+- **Stock:** gained a Find box, because Ctrl+F needs a box on the opening view. It also finds by scanned barcode.
+- **Not built:** Arabic checks (owner's rule) and inventory turnover (no such figure exists). Modules 7 to 13 of the second brief never arrived, so they follow the first brief's table and this audit.
+- Touch on the Windows app is coded through pointer events, but was tested only with simulated events.

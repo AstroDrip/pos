@@ -42,6 +42,13 @@ text, dark cards, visible focus outline).
 - `npm run ui-audit -- <dir> --demo`: 25 screens, 0 findings, 24 of 24 flows.
 - Not run: `npm run e2e`, Playwright. Not tried: real scanner, real Arabic keyboard, true process restart (a full screen reload was used).
 
+## Redesign and interactive data (2026-11-10)
+- POS `npm test`: 774 passed. Dashboard `npm test`: 72 passed. Typecheck and lint clean.
+- `npm run ui-audit` (Electron itself): 54 screens, 0 findings, 111 of 111 flows, including chart hover, click, close, date strip wheel and date choice.
+- `npm run ui-audit -- <dir> --demo`: 60 screens, 0 findings, 59 of 59 flows.
+- Chart touch on the phone dashboard: tried with simulated touch events in the built-in browser at 375 px.
+- Not tried: real touch hardware, a real scanner on the new Stock box, Arabic. Not run: `npm run e2e`, Playwright.
+
 ## Cloud phase (2026-11-09)
 - POS `npm test`: 749 passed. Dashboard `npm test`: 67 passed. Typecheck and lint clean. Dashboard production build passed.
 - `npm run ui-audit`: 54 screens, 0 findings, 101 of 101 flows. Short run with the new screens: 15 of 15.

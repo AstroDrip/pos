@@ -43,6 +43,15 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   const canSee = can('reports.view');
   const [view, setView] = useRemembered<View>('stock', 'view', canSee ? 'attention' : 'receive', validOneOf(VIEWS));
   const [find, setFind] = useState('');
+  // A scan lands in this box: a barcode is not in the name, so look it up the normal way.
+  const [scanned, setScanned] = useState<number | null>(null);
+  useEffect(() => {
+    if (!/^\d{6,}$/.test(find.trim())) return setScanned(null);
+    let live = true;
+    void call<{ product: Product } | null>('catalog.lookup', { code: find.trim() }).then((r) => live && setScanned(r?.product.id ?? null), () => live && setScanned(null));
+    return () => { live = false; };
+  }, [find]);
+  const matches = (r: StockRow) => !find.trim() || r.productId === scanned || `${r.sku} ${r.nameEn} ${r.nameAr}`.toLowerCase().includes(find.trim().toLowerCase());
   const [low, setLow] = useState<StockRow[]>([]);
   const [changes, setChanges] = useState<AdjustmentRow[]>([]);
   const [value, setValue] = useState<number | null>(null);
@@ -138,7 +147,8 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
             <thead><tr><th>SKU</th><th>{t('Product')}</th><th className="num">{t('Qty')} <InfoIcon id="metric.stock.qty" /></th><th className="num">{t('Reorder at')} <InfoIcon id="metric.stock.reorder" /></th><th className="num">{t('Avg cost')} <InfoIcon id="metric.stock.cost" /></th></tr></thead>
             <tbody>
               {rows.length === 0 && <EmptyRow cols={5} text={onlyLow ? t('Nothing is at or below its reorder level.') : t('No products yet.')} />}
-              {rows.filter((r) => !find.trim() || `${r.sku} ${r.nameEn} ${r.nameAr}`.toLowerCase().includes(find.trim().toLowerCase())).map((r) => (
+              {rows.length > 0 && !rows.some(matches) && <EmptyRow cols={5} text={t('No product matches that.')} />}
+              {rows.filter(matches).map((r) => (
                 <tr key={r.productId}>
                   <td>{r.sku}</td><td><ProductName en={r.nameEn} ar={r.nameAr} /></td>
                   <td className={`num${r.qty < 0 ? ' neg' : ''}`}>{formatQty(r.qty, 0)}</td><td className="num">{formatQty(r.reorderLevel, 0)}</td><td className="num">{formatSar(r.avgCost)}</td>

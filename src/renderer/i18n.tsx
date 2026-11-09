@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'No product matches that.': 'لا يوجد منتج مطابق.',
   'Handover': 'تسليم الوردية',
   'Find a product in stock': 'ابحث عن منتج في المخزون',
   'Keys': 'المفاتيح',
