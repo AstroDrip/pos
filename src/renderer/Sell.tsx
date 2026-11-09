@@ -570,6 +570,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
           kind: 'warn',
           text:
             a.reason === 'pendingSearch' ? t('Pick the product (↑↓ Enter) or clear the search first.')
+            : a.reason === 'pendingCustomer' ? t('Finish choosing the customer first, or clear the box.')
             : a.reason === 'pendingQty' ? t('Press Enter to add the item, or {0} to cancel.', keys.escape)
             : t('A split payment is in progress: press {0} in Cash received to finish it.', keys['pay.cash']),
         });

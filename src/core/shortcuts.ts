@@ -3,6 +3,7 @@
 export const DEFAULT_COMBOS = {
   'help.open': 'F1',
   'qty.focus': 'F4',
+  'customer.focus': 'F2',
   'search.focus': 'Ctrl+F',
   'palette.open': 'Ctrl+K',
   'checkout.open': 'Shift+Enter',

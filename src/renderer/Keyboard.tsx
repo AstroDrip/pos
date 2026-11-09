@@ -20,6 +20,7 @@ export interface ScreenKeys {
   state: () => ScreenSnapshot;
   run?: (id: ActionId, arg?: number) => void;
   focusQty?: () => void;
+  focusCustomer?: () => void;
   notify?: (text: string) => void;
 }
 
@@ -53,6 +54,7 @@ export function useScreenKeys(get: () => ScreenKeys): void {
         state: () => latest.current().state(),
         run: (id, arg) => latest.current().run?.(id, arg),
         focusQty: () => latest.current().focusQty?.(),
+        focusCustomer: () => latest.current().focusCustomer?.(),
         notify: (text) => latest.current().notify?.(text),
       }),
     [register],
@@ -189,6 +191,7 @@ export function KeyboardProvider({ tab, openTab, can, helpOpen, openHelp, closeH
         case 'closeModal': l.closeHelp(); break;
         case 'focusSearch': focusPrimary(); break;
         case 'focusQty': screen.current?.focusQty?.(); break;
+        case 'focusCustomer': screen.current?.focusCustomer?.(); break;
         case 'clearSuggest': clearInput(document.activeElement as HTMLInputElement); break;
         case 'refuse':
           screen.current?.notify?.(action.reason === 'qty' ? l.t('Press Enter to add the item, or {0} to cancel.', l.bindings.direct.escape) : l.t('Press {0} to go back to the bill first.', l.bindings.direct.escape));

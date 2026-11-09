@@ -82,3 +82,8 @@ describe('validateOverrides', () => {
     expect(bad({ __proto__x: 'F6' })).not.toBeNull();
   });
 });
+
+describe('customer key', () => {
+  it('cannot share a key with another function', () => expect(validateOverrides({ 'customer.focus': 'F1' })).toBe('That key is already used by another function.'));
+  it('defaults to F2', () => expect(DEFAULT_COMBOS['customer.focus']).toBe('F2'));
+});

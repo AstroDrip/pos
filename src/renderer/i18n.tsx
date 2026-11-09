@@ -141,6 +141,9 @@ const AR: Record<string, string> = {
   "Cancel this held bill": "إلغاء هذه الفاتورة المعلقة",
   "Why is this held bill being cancelled?": "لماذا يتم إلغاء هذه الفاتورة المعلقة؟",
   "Keep it": "إبقاؤها",
+  // master prompt A
+  "Go to the customer box": "الانتقال إلى خانة العميل",
+  "Finish choosing the customer first, or clear the box.": "أكمل اختيار العميل أولاً أو امسح الخانة.",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

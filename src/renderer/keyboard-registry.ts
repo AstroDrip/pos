@@ -39,6 +39,7 @@ export interface Shortcut {
 export const DIRECT_SHORTCUTS: Shortcut[] = [
   { id: 'help.open', enabled: true, focus: ['anywhere except a PIN box'], combo: 'F1', action: 'Open the Help Centre', contexts: EVERY, permission: null, priority: 50, allowedStates: ['no popup open', 'not saving', 'not on the quantity step'], effect: 'ui', owner: 'hub', conflict: 'Refused on the quantity step so the chosen item is not lost.', help: 'opens help for the screen you are on, over the screen. Your bill stays. Esc goes back.' },
   { id: 'qty.focus', enabled: true, focus: ['search box','quantity box','no box'], combo: 'F4', action: 'Go to the quantity box', contexts: ['sell'], permission: null, priority: 50, allowedStates: ['search step', 'quantity step'], effect: 'focus', owner: 'hub', conflict: 'Alt+F4 is never touched. Refused on the payment step.', help: 'on Sell, goes to the quantity of the last item on the bill. Type a number, or press + or −, then Enter.' },
+  { id: 'customer.focus', enabled: true, focus: ['any box except a PIN box'], combo: 'F2', action: 'Go to the customer box', contexts: ['sell'], permission: null, priority: 50, allowedStates: ['search step', 'payment step'], effect: 'focus', owner: 'hub', conflict: 'Refused on the quantity step so the chosen item is not lost. From payment it steps back to the bill first.', help: 'on Sell, goes to the customer box. Your bill stays as it is.' },
   { id: 'search.focus', enabled: true, focus: ['empty box','search box','no box'], combo: 'Ctrl+F', action: "Go to the screen's main search box", contexts: EVERY, permission: null, priority: 50, allowedStates: ['not typing in another box', 'not on the quantity or payment step'], effect: 'focus', owner: 'hub', conflict: 'Does nothing while you are typing in a filled box, a note, a list or a PIN box.', help: "goes to the main search box of the screen. It will not move you while you are typing in another box." },
   { id: 'palette.open', enabled: true, focus: ['anywhere except a PIN box'], combo: 'Ctrl+K', action: 'Open Quick Actions', contexts: EVERY, permission: null, priority: 60, allowedStates: ['no popup open', 'not saving', 'not on the quantity step'], effect: 'ui', owner: 'hub', conflict: 'Pressed again, it closes Quick Actions.', help: 'opens Quick Actions. Then press one letter.' },
   { id: 'checkout.open', enabled: true, focus: ['product search box, empty'], combo: 'Shift+Enter', action: 'Finish the order and go to payment', contexts: ['sell'], permission: null, priority: 40, allowedStates: ['search step, empty box, items on the bill'], effect: 'open-workflow', owner: 'checkout', conflict: 'Refused while a search or quantity is unfinished. Does nothing on the payment step.', help: 'with the search box empty, goes to the payment step. It never takes a payment.' },
@@ -119,18 +120,19 @@ export interface GlobalEnv {
 }
 
 export type GlobalAction =
-  | { type: 'none' | 'swallow' | 'help' | 'palette' | 'closePalette' | 'closeModal' | 'focusSearch' | 'focusQty' | 'clearSuggest' }
+  | { type: 'none' | 'swallow' | 'help' | 'palette' | 'closePalette' | 'closeModal' | 'focusSearch' | 'focusQty' | 'focusCustomer' | 'clearSuggest' }
   | { type: 'refuse'; reason: 'qty' | 'pay' };
 
 const NONE: GlobalAction = { type: 'none' };
 const SWALLOW: GlobalAction = { type: 'swallow' };
 
 /** Which central function this key press is, with the keys the admin chose. */
-function which(k: KeyLike, b: Bindings): 'help' | 'qty' | 'search' | 'palette' | 'escape' | null {
+function which(k: KeyLike, b: Bindings): 'help' | 'qty' | 'customer' | 'search' | 'palette' | 'escape' | null {
   const combo = comboOf(k);
   if (!combo) return null;
   if (combo === b.direct['help.open']) return 'help';
   if (combo === b.direct['qty.focus']) return 'qty';
+  if (combo === b.direct['customer.focus']) return 'customer';
   if (combo === b.direct.escape) return 'escape';
   if (combo === b.direct['search.focus']) return 'search';
   if (combo === b.direct['palette.open']) return 'palette';
@@ -162,8 +164,9 @@ export function canonicalize(k: KeyLike, b: Bindings, active: readonly ShortcutI
 }
 
 /** The changeable checkout functions that apply in each box. */
-export function checkoutActive(field: 'search' | 'qty' | 'cash' | 'cardPart' | 'other'): readonly ShortcutId[] {
+export function checkoutActive(field: 'search' | 'customer' | 'qty' | 'cash' | 'cardPart' | 'other'): readonly ShortcutId[] {
   switch (field) {
+    case 'customer': return ['checkout.open'];
     case 'search': return ['checkout.open', 'qty.inc', 'qty.dec'];
     case 'qty': return ['qty.inc', 'qty.dec', 'escape'];
     case 'cash': return ['pay.cash', 'pay.card', 'escape'];
@@ -177,7 +180,7 @@ export function decideGlobal(k: KeyLike, e: GlobalEnv, b: Bindings = DEFAULT_BIN
   if (k.composing) return NONE;
   const w = which(k, b);
   if (!w) return NONE;
-  if (w === 'qty' && e.context !== 'sell' && !e.paletteOpen && !e.modalOpen) return NONE;
+  if ((w === 'qty' || w === 'customer') && e.context !== 'sell' && !e.paletteOpen && !e.modalOpen) return NONE;
 
   if (e.paletteOpen) {
     if (w === 'escape') return NONE; // the palette closes itself, or closes its list first
@@ -194,6 +197,7 @@ export function decideGlobal(k: KeyLike, e: GlobalEnv, b: Bindings = DEFAULT_BIN
 
   if (w === 'qty') return e.step === 'pay' ? { type: 'refuse', reason: 'pay' } : { type: 'focusQty' };
   if (e.step === 'qty') return { type: 'refuse', reason: 'qty' };
+  if (w === 'customer') return { type: 'focusCustomer' };
   if (w === 'help') return { type: 'help' };
   if (w === 'palette') return { type: 'palette' };
   // Ctrl+F

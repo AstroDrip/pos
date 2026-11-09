@@ -35,7 +35,7 @@ export interface KeyInfo {
 
 export interface KeyContext {
   step: CheckoutStep;
-  field: 'search' | 'qty' | 'cash' | 'cardPart' | 'other';
+  field: 'search' | 'customer' | 'qty' | 'cash' | 'cardPart' | 'other';
   searchEmpty: boolean;
   billHasItems: boolean;
   splitCardTyped: boolean;
@@ -56,7 +56,7 @@ export type KeyAction =
   | { type: 'payCash' }
   | { type: 'payCard' }
   | { type: 'holdBill' }
-  | { type: 'refuse'; reason: 'split' | 'pendingSearch' | 'pendingQty' };
+  | { type: 'refuse'; reason: 'split' | 'pendingSearch' | 'pendingQty' | 'pendingCustomer' };
 
 const NONE: KeyAction = { type: 'none' };
 const SWALLOW: KeyAction = { type: 'swallow' };
@@ -77,6 +77,11 @@ export function decideKey(k: KeyInfo, c: KeyContext): KeyAction {
 
   switch (c.step) {
     case 'search':
+      if (c.field === 'customer') {
+        if (!shiftEnter) return NONE;
+        if (!c.searchEmpty) return { type: 'refuse', reason: 'pendingCustomer' };
+        return c.billHasItems && !c.busy ? { type: 'openPay' } : SWALLOW;
+      }
       if (c.field !== 'search' || k.ctrl) return NONE;
       if (!c.searchEmpty) return shiftEnter ? { type: 'refuse', reason: 'pendingSearch' } : NONE;
       if (isEnter) return c.billHasItems && !c.busy ? { type: 'openPay' } : SWALLOW;

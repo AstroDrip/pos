@@ -152,3 +152,13 @@ describe('Z holds the bill on the payment step', () => {
   });
   it('another letter in the cash box is not a hold', () => expect(act(key('a', { letter: 'A' }), pay())).toBe('none'));
 });
+
+describe('the customer box', () => {
+  const cust = (o: Partial<KeyContext> = {}) => ctx({ step: 'search', field: 'customer', ...o });
+  const shiftEnter = key('Enter', { shift: true });
+  it('Shift+Enter on an empty box opens payment', () => expect(act(shiftEnter, cust())).toBe('openPay'));
+  it('Shift+Enter with text is refused', () => expect(decideKey(shiftEnter, cust({ searchEmpty: false }))).toEqual({ type: 'refuse', reason: 'pendingCustomer' }));
+  it('plain Enter is left to the box', () => expect(act(key('Enter'), cust())).toBe('none'));
+  it('Shift+Enter with no items does nothing', () => expect(act(shiftEnter, cust({ billHasItems: false }))).toBe('swallow'));
+  it('letters type normally', () => expect(act(key('a', { letter: 'A' }), cust())).toBe('none'));
+});

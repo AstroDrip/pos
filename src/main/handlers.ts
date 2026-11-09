@@ -5,7 +5,7 @@ import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto'
 import { getShortcuts, saveShortcuts } from '../services/shortcuts';
 import { billProductCost, createSupplierBill, findSupplierItem, getBill, listBills, priceHistory, purchasesBySupplier, supplierItemsFor } from '../services/supplier-bills';
 import { getStoreDetails, saveStoreDetails } from '../services/store-details';
-import { createProduct, getAliases, getProduct, itemInfo, listProducts, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
+import { createProduct, getAliases, itemInfo, listProducts, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit, verifyAuditChain } from '../services/audit';

@@ -45,7 +45,7 @@ describe('shortcut registry', () => {
   });
 
   it('lists the required shortcuts and letters', () => {
-    expect(DIRECT_SHORTCUTS.map((s) => s.combo).sort()).toEqual(['+', '-', 'Ctrl+Enter', 'Ctrl+F', 'Ctrl+K', 'Enter', 'Esc', 'F1', 'F4', 'Shift+Enter', 'Z'].sort());
+    expect(DIRECT_SHORTCUTS.map((s) => s.combo).sort()).toEqual(['+', '-', 'Ctrl+Enter', 'Ctrl+F', 'Ctrl+K', 'Enter', 'Esc', 'F1', 'F2', 'F4', 'Shift+Enter', 'Z'].sort());
     expect(QUICK_ACTIONS.map((a) => a.id).sort()).toEqual(['C', 'H', 'I', 'M', 'P', 'R', 'S']);
   });
 
@@ -424,4 +424,20 @@ describe('registry fields', () => {
   it('Z is a fixed key for holding on the payment step', () => {
     expect(DIRECT_SHORTCUTS.find((s) => s.id === 'hold.pay')).toMatchObject({ combo: 'Z', fixed: true, owner: 'checkout', contexts: ['sell'] });
   });
+});
+
+describe('F2 goes to the customer box', () => {
+  const f2 = (o: Partial<KeyLike> = {}): KeyLike => ({ key: 'F2', code: 'F2', ctrl: false, shift: false, alt: false, meta: false, composing: false, repeat: false, ...o });
+  const env = (o: Partial<GlobalEnv> = {}): GlobalEnv => ({ context: 'sell', paletteOpen: false, modalOpen: false, focus: 'search', step: 'search', busy: false, ...o });
+  it('works on the search and payment steps', () => {
+    expect(decideGlobal(f2(), env())).toEqual({ type: 'focusCustomer' });
+    expect(decideGlobal(f2(), env({ step: 'pay' }))).toEqual({ type: 'focusCustomer' });
+  });
+  it('is refused on the quantity step', () => expect(decideGlobal(f2(), env({ step: 'qty' }))).toEqual({ type: 'refuse', reason: 'qty' }));
+  it('belongs to Sell only', () => expect(decideGlobal(f2(), env({ context: 'stock', step: undefined }))).toEqual({ type: 'none' }));
+  it('does nothing inside Quick Actions or on repeat', () => {
+    expect(decideGlobal(f2(), env({ paletteOpen: true }))).toEqual({ type: 'swallow' });
+    expect(decideGlobal(f2({ repeat: true }), env())).toEqual({ type: 'swallow' });
+  });
+  it('the customer box only knows the finish key', () => expect(checkoutActive('customer')).toEqual(['checkout.open']));
 });

@@ -129,23 +129,24 @@ Names and numbers in the examples are made up.
 
 **What this does:** You can take a whole order with the keyboard and scanner, without the mouse.
 
-**Keys:** `F1` `F4` `Ctrl+F` `Ctrl+K` `Shift+Enter` `Enter` `Ctrl+Enter` `+` `-` `Z` `Esc` `↑` `↓`
+**Keys:** `F1` `F4` `F2` `Ctrl+F` `Ctrl+K` `Shift+Enter` `Enter` `Ctrl+Enter` `+` `-` `Z` `Esc` `↑` `↓`
 
 **Steps**
 
 1. Type or scan in the search box. Suggestions appear from the first letter. Use ↑ and ↓ to move in the list.
 2. F1: opens help for the screen you are on, over the screen. Your bill stays. Esc goes back.
 3. F4: on Sell, goes to the quantity of the last item on the bill. Type a number, or press + or −, then Enter.
-4. Ctrl+F: goes to the main search box of the screen. It will not move you while you are typing in another box.
-5. Ctrl+K: opens Quick Actions. Then press one letter.
-6. Shift+Enter: with the search box empty, goes to the payment step. It never takes a payment.
-7. Enter: in Cash received on the payment step, pays cash. Elsewhere it picks the highlighted item or confirms the quantity.
-8. Ctrl+Enter: on the payment step, records a card payment. Press it only after the bank terminal shows APPROVED.
-9. +: adds one in the quantity box, or to the last item when the search box is empty.
-10. -: takes one off in the quantity box, or from the last item when the search box is empty.
-11. Z: on the payment step, puts the bill on hold. It is not a sale. No money is taken and no stock moves.
-12. Esc: closes a popup or a suggestion list. On Sell it also goes back one step.
-13. For more, press Ctrl+K and then one letter. See Quick Actions.
+4. F2: on Sell, goes to the customer box. Your bill stays as it is.
+5. Ctrl+F: goes to the main search box of the screen. It will not move you while you are typing in another box.
+6. Ctrl+K: opens Quick Actions. Then press one letter.
+7. Shift+Enter: with the search box empty, goes to the payment step. It never takes a payment.
+8. Enter: in Cash received on the payment step, pays cash. Elsewhere it picks the highlighted item or confirms the quantity.
+9. Ctrl+Enter: on the payment step, records a card payment. Press it only after the bank terminal shows APPROVED.
+10. +: adds one in the quantity box, or to the last item when the search box is empty.
+11. -: takes one off in the quantity box, or from the last item when the search box is empty.
+12. Z: on the payment step, puts the bill on hold. It is not a sale. No money is taken and no stock moves.
+13. Esc: closes a popup or a suggestion list. On Sell it also goes back one step.
+14. For more, press Ctrl+K and then one letter. See Quick Actions.
 
 **What you should see:** Each key does one clear thing. Shift+Enter only opens the payment step; it never takes a payment.
 
