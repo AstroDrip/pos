@@ -7,6 +7,20 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'Arrow keys move between points. Enter opens the detail.': 'الأسهم للتنقل بين النقاط.',
+  'Nothing recorded for these dates.': 'لا شيء مسجل لهذه التواريخ.',
+  'Show the numbers': 'عرض الأرقام',
+  'When': 'متى',
+  'Average sale': 'متوسط البيع',
+  'Earlier period': 'الفترة السابقة',
+  'Hours': 'ساعات',
+  'Days': 'أيام',
+  'Weeks': 'أسابيع',
+  'Months': 'أشهر',
+  'SAR, including VAT': 'ريال شامل الضريبة',
+  'Back to previous dates': 'العودة للتواريخ السابقة',
+  'Loading…': 'جارٍ التحميل…',
+  'Showing the newest 300. Choose fewer dates to see the rest.': 'عرض أحدث 300.',
   'Inventory': 'المخزون',
   'Purchasing': 'المشتريات',
   'Finance': 'المالية',

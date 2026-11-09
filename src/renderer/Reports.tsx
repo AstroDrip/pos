@@ -5,6 +5,7 @@ import type { AdjustmentRow, CashierActivity, RefundRow, SalesSummary, VoidRow }
 import { call } from './api';
 import { DateNavigator, useDateRange } from './DateNavigator';
 import { Kpi, Views } from './Figures';
+import { SalesChart } from './SalesChart';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validOneOf } from './remember';
@@ -51,6 +52,7 @@ export function Reports() {
             <Kpi l={t('Cash (net of change)')} info="metric.report.cash" v={formatMoney(r.cash)} sub={t('Before refunds')} />
             <Kpi l={t('Card')} info="metric.report.card" v={formatMoney(r.card)} />
           </div>
+          <SalesChart dates={dates} onDates={setDates} tick={back} />
           <details className="more">
             <summary>{t('VAT, discounts and refunds')}</summary>
             <table className="list" style={{ maxWidth: 480 }}>

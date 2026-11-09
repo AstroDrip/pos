@@ -33,6 +33,7 @@ import {
   createPurchaseInvoice, createPurchaseReturn, listPurchaseReturns, paySupplier, purchaseRegister, reverseSupplierPayment, setSupplierOpeningBalance,
   supplierAgeing, supplierBalances, supplierStatement, uninvoicedGrns,
 } from '../services/purchasing';
+import { financeSeries, salesList, salesSeries } from '../services/series';
 import { vatSummary } from '../services/vat-report';
 import { attachFinalDocument, claimVat, decideVat, getVatReview, listVatReviews, markNotClaimed, recordFinalInvoice, reverseVatClaim, verifyFinalInvoice } from '../services/vat-review';
 import {
@@ -259,6 +260,9 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, c
     'grn.create': (p, s) => receiveGoods(ctx, userId(s), p),
     'report.stock': (p, s) => stockOnHand(ctx, userId(s), p.onlyLow),
     'report.sales': (p, s) => salesSummary(ctx, userId(s), p.fromDay, p.toDay),
+    'report.series': (p, s) => salesSeries(ctx, userId(s), p),
+    'report.saleList': (p, s) => salesList(ctx, userId(s), p),
+    'finance.series': (p, s) => financeSeries(ctx, userId(s), p.toDay, p.months),
     'import.dryRun': (p, s) => {
       requirePermission(ctx, userId(s), p.kind === 'products' ? 'product.manage' : 'supplier.manage');
       try {
