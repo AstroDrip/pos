@@ -12,6 +12,7 @@
 // pay     card part     Enter        move to the cash box (never pays: the split is still being typed)
 // pay     any           Ctrl+Enter   pay the whole bill by card (refused while a split card part is typed)
 // pay     any           Esc          back to search
+// pay     cash/card     Z            hold the bill (never a sale; a PIN box types Z as usual)
 //
 // Guards: auto-repeated keys are ignored, and Enter cannot open payment or pay within ENTER_GUARD_MS of a
 // step change, so a held or double-tapped Enter can never run through qty → payment → sale. The sale itself is also
@@ -28,6 +29,8 @@ export interface KeyInfo {
   composing: boolean;
   repeat: boolean;
   msSinceStepChange: number;
+  /** The Latin letter of the key, on any keyboard layout (see commandLetter). */
+  letter?: string | null;
 }
 
 export interface KeyContext {
@@ -52,6 +55,7 @@ export type KeyAction =
   | { type: 'focusCash' }
   | { type: 'payCash' }
   | { type: 'payCard' }
+  | { type: 'holdBill' }
   | { type: 'refuse'; reason: 'split' | 'pendingSearch' | 'pendingQty' };
 
 const NONE: KeyAction = { type: 'none' };
@@ -89,6 +93,10 @@ export function decideKey(k: KeyInfo, c: KeyContext): KeyAction {
       return NONE;
     case 'pay':
       if (k.key === 'Escape') return { type: 'toSearch' };
+      if (k.letter === 'Z' && !k.ctrl && !k.shift) {
+        if (c.field !== 'cash' && c.field !== 'cardPart') return NONE; // a PIN or name box: Z is typing
+        return k.repeat || c.busy || !c.billHasItems ? SWALLOW : { type: 'holdBill' };
+      }
       if (!isEnter) return NONE;
       if (c.busy) return SWALLOW;
       if (k.ctrl) return c.splitCardTyped ? { type: 'refuse', reason: 'split' } : { type: 'payCard' };

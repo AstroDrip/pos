@@ -80,7 +80,7 @@ export function KeyboardSettings() {
       <table className="list">
         <thead><tr><th>{t('Function')}</th><th>{t('Key')}</th><th /></tr></thead>
         <tbody>
-          {DIRECT_SHORTCUTS.map((s) => row(s.id, s.action, shown.direct[s.id as ShortcutId], shown.direct[s.id as ShortcutId] === DEFAULT_COMBOS[s.id as ShortcutId]))}
+          {DIRECT_SHORTCUTS.filter((s) => !s.fixed).map((s) => row(s.id, s.action, shown.direct[s.id as ShortcutId], shown.direct[s.id as ShortcutId] === DEFAULT_COMBOS[s.id as ShortcutId]))}
         </tbody>
       </table>
       <h4>{t('Quick Actions letters')}</h4>

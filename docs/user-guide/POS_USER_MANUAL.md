@@ -129,7 +129,7 @@ Names and numbers in the examples are made up.
 
 **What this does:** You can take a whole order with the keyboard and scanner, without the mouse.
 
-**Keys:** `F1` `F4` `Ctrl+F` `Ctrl+K` `Shift+Enter` `Enter` `Ctrl+Enter` `+` `-` `Esc` `↑` `↓`
+**Keys:** `F1` `F4` `Ctrl+F` `Ctrl+K` `Shift+Enter` `Enter` `Ctrl+Enter` `+` `-` `Z` `Esc` `↑` `↓`
 
 **Steps**
 
@@ -143,8 +143,9 @@ Names and numbers in the examples are made up.
 8. Ctrl+Enter: on the payment step, records a card payment. Press it only after the bank terminal shows APPROVED.
 9. +: adds one in the quantity box, or to the last item when the search box is empty.
 10. -: takes one off in the quantity box, or from the last item when the search box is empty.
-11. Esc: closes a popup or a suggestion list. On Sell it also goes back one step.
-12. For more, press Ctrl+K and then one letter. See Quick Actions.
+11. Z: on the payment step, puts the bill on hold. It is not a sale. No money is taken and no stock moves.
+12. Esc: closes a popup or a suggestion list. On Sell it also goes back one step.
+13. For more, press Ctrl+K and then one letter. See Quick Actions.
 
 **What you should see:** Each key does one clear thing. Shift+Enter only opens the payment step; it never takes a payment.
 

@@ -14,7 +14,7 @@ import { SearchBox } from './SearchBox';
 import { decideKey, decrementQtyText, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
 import { HelpLink } from './HelpLink';
 import { useBindings, useOpenCustomers, useScanner, useScreenKeys } from './Keyboard';
-import { canonicalize, checkoutActive, keyLike, lineQtyKey, type ActionId } from './keyboard-registry';
+import { canonicalize, checkoutActive, commandLetter, keyLike, lineQtyKey, type ActionId } from './keyboard-registry';
 import { ProductName, useI18n } from './i18n';
 
 /** A bill line; scanCode = the scale label scanned, kept on the sale line for audit. */
@@ -56,6 +56,9 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   // One key per bill: a retry after an error re-sends the same key, so it can never create a second sale.
   const billKey = useRef<string>(crypto.randomUUID());
   const scanner = useRef(new ScanBuffer());
+  const holding = useRef(false);
+  const zTimer = useRef<ReturnType<typeof setTimeout> | null>(null); // Z waits briefly, so a scanned code is not taken for it
+  const zStartedScan = useRef(false);
   const busyRef = useRef(false); // scans while a payment is being saved must not be lost (BUG-002)
   // Keyboard checkout (ADR-2): exactly one step is active and its input has focus.
   const [step, setStep] = useState<CheckoutStep>('search');
@@ -193,11 +196,17 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
 
   // Scanner input is caught globally, whatever has focus (plan §I).
   useScanner((e, scanTarget) => {
+    if (zTimer.current !== null) { // another key this soon: Z was the start of a scan, not a person
+      clearTimeout(zTimer.current);
+      zTimer.current = null;
+      zStartedScan.current = true;
+    }
     const scan = scanner.current.key(e.key, e.timeStamp);
     if (!scan) return false;
     e.preventDefault();
     e.stopPropagation();
-    if (e.target instanceof HTMLInputElement) removeScannedText(e.target, scan.code);
+    if (e.target instanceof HTMLInputElement) removeScannedText(e.target, zStartedScan.current ? scan.code.slice(1) : scan.code); // that Z never reached the box
+    zStartedScan.current = false;
     if (!scanTarget.current?.(scan.code)) void addCode(scan.code, scan.possibleDuplicate);
     return true;
   });
@@ -395,7 +404,14 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     }
   };
 
-  const holding = useRef(false);
+  const runHold = () => {
+    if (holding.current) return; // a second press while saving can never hold twice
+    holding.current = true;
+    void hold().finally(() => {
+      holding.current = false;
+      goStep('search');
+    });
+  };
   const openCustomers = useOpenCustomers();
   useScreenKeys(() => ({
     state: () => {
@@ -418,13 +434,8 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
       if (id === 'P') goStep('search');
       else if (id === 'C') document.getElementById('customer-phone')?.focus();
       else if (id === 'M') openCustomers(customer?.id);
-      else if (id === 'H' && !holding.current) {
-        holding.current = true; // a second press while saving can never hold twice
-        void hold().finally(() => {
-          holding.current = false;
-          goStep('search');
-        });
-      } else if (id === 'R' && arg) {
+      else if (id === 'H') runHold();
+      else if (id === 'R' && arg) {
         void recall(arg).finally(() => goStep('search'));
       }
     },
@@ -487,7 +498,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   const onStepKey = (field: KeyContext['field'], e: React.KeyboardEvent<HTMLInputElement>, searchEmpty = true): boolean => {
     const c = canonicalize(keyLike(e.nativeEvent), bindings, checkoutActive(field));
     const a = decideKey(
-      { key: c.key, ctrl: c.ctrl || c.meta, shift: c.shift, composing: c.composing, repeat: c.repeat, msSinceStepChange: performance.now() - stepAt.current },
+      { key: c.key, ctrl: c.ctrl || c.meta, shift: c.shift, composing: c.composing, repeat: c.repeat, msSinceStepChange: performance.now() - stepAt.current, letter: commandLetter(c) },
       { step, field, searchEmpty, billHasItems: lines.length > 0 && !!totals, splitCardTyped: cardPart.trim() !== '', busy: busyRef.current },
     );
     if (a.type === 'none') return false;
@@ -513,6 +524,14 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
       case 'focusCash': cashRef.current?.focus(); break;
       case 'payCash': void pay('cash'); break;
       case 'payCard': void pay('card'); break;
+      case 'holdBill':
+        if (zTimer.current === null) {
+          zTimer.current = setTimeout(() => {
+            zTimer.current = null;
+            runHold();
+          }, 40);
+        }
+        break;
       case 'refuse':
         setMsg({
           kind: 'warn',

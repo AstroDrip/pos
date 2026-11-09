@@ -45,7 +45,7 @@ describe('shortcut registry', () => {
   });
 
   it('lists the required shortcuts and letters', () => {
-    expect(DIRECT_SHORTCUTS.map((s) => s.combo).sort()).toEqual(['+', '-', 'Ctrl+Enter', 'Ctrl+F', 'Ctrl+K', 'Enter', 'Esc', 'F1', 'F4', 'Shift+Enter'].sort());
+    expect(DIRECT_SHORTCUTS.map((s) => s.combo).sort()).toEqual(['+', '-', 'Ctrl+Enter', 'Ctrl+F', 'Ctrl+K', 'Enter', 'Esc', 'F1', 'F4', 'Shift+Enter', 'Z'].sort());
     expect(QUICK_ACTIONS.map((a) => a.id).sort()).toEqual(['C', 'H', 'I', 'M', 'P', 'R', 'S']);
   });
 
@@ -329,7 +329,7 @@ describe('changed keys', () => {
   const c = (key: KeyLike, active = pay) => canonicalize(key, b, active);
 
   it('registry defaults are the shared defaults', () => {
-    for (const s of DIRECT_SHORTCUTS) expect(s.combo, s.id).toBe(DEFAULT_COMBOS[s.id as keyof typeof DEFAULT_COMBOS]);
+    for (const s of DIRECT_SHORTCUTS.filter((x) => !x.fixed)) expect(s.combo, s.id).toBe(DEFAULT_COMBOS[s.id as keyof typeof DEFAULT_COMBOS]);
   });
 
   it('the new central key works and the old one no longer does', () => {
@@ -411,5 +411,17 @@ describe('keys in a bill line quantity box', () => {
     expect(lineQtyKey(k('+', { repeat: true }))).toBe('swallow');
     expect(lineQtyKey(k('+', { composing: true }))).toBe('none');
     expect(lineQtyKey(k('Enter', { ctrl: true }))).toBe('none');
+  });
+});
+
+describe('registry fields', () => {
+  it('every shortcut says if it is enabled and where focus must be', () => {
+    for (const s of DIRECT_SHORTCUTS) {
+      expect(typeof s.enabled, s.id).toBe('boolean');
+      expect(Array.isArray(s.focus), s.id).toBe(true);
+    }
+  });
+  it('Z is a fixed key for holding on the payment step', () => {
+    expect(DIRECT_SHORTCUTS.find((s) => s.id === 'hold.pay')).toMatchObject({ combo: 'Z', fixed: true, owner: 'checkout', contexts: ['sell'] });
   });
 });

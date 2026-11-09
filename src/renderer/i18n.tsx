@@ -132,6 +132,8 @@ const AR: Record<string, string> = {
   "Past returns": "المرتجعات السابقة",
   "No returns yet.": "لا توجد مرتجعات بعد.",
   "Return": "مرتجع",
+  // supplier bills and store details
+  "Hold the bill": "تعليق الفاتورة",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

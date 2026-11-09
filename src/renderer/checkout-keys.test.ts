@@ -127,3 +127,28 @@ describe('checkout key state machine (ADR-2)', () => {
     expect(act(key('Enter'), ctx({ step: 'qty', field: 'qty' }))).toBe('qtyConfirm');
   });
 });
+
+describe('Z holds the bill on the payment step', () => {
+  const z = (o: Partial<KeyInfo> = {}) => key('z', { letter: 'Z', ...o });
+  const pay = (o: Partial<KeyContext> = {}) => ctx({ step: 'pay', field: 'cash', ...o });
+  it('Z in Cash received or card part holds', () => {
+    expect(act(z(), pay())).toBe('holdBill');
+    expect(act(z(), pay({ field: 'cardPart' }))).toBe('holdBill');
+  });
+  it('Z anywhere else is typing', () => {
+    expect(act(z(), pay({ field: 'other' }))).toBe('none');
+    expect(act(z(), ctx())).toBe('none');
+    expect(act(z(), ctx({ step: 'qty', field: 'qty' }))).toBe('none');
+  });
+  it('Z is left to an IME', () => expect(act(z({ composing: true }), pay())).toBe('none'));
+  it('repeat or busy cannot hold', () => {
+    expect(act(z({ repeat: true }), pay())).toBe('swallow');
+    expect(act(z(), pay({ busy: true }))).toBe('swallow');
+  });
+  it('Z with an empty bill does nothing', () => expect(act(z(), pay({ billHasItems: false }))).toBe('swallow'));
+  it('Ctrl or Shift with Z is not a hold', () => {
+    expect(act(z({ ctrl: true }), pay())).toBe('none');
+    expect(act(z({ shift: true }), pay())).toBe('none');
+  });
+  it('another letter in the cash box is not a hold', () => expect(act(key('a', { letter: 'A' }), pay())).toBe('none'));
+});
