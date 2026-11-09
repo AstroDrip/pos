@@ -31,7 +31,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Sea
         <MoneyTile label="This week" value={thisWeek.salesInclVat} />
         <MoneyTile label="This month" value={thisMonth.salesInclVat} />
       </div>
-      <PeriodBar period={period} path="/" />
+      <PeriodBar period={period} path="/" today={status.today} />
       <CoverageNote c={coverage} />
       <Hero label="Sales, including VAT" value={s.salesInclVat} now={s.salesInclVat} before={prev.salesInclVat} compareLabel={rangeLabel(period.prevFrom, addDays(period.prevTo, 0))} />
       <div className="grid">

@@ -184,3 +184,15 @@ summary { min-height: 44px; display: flex; align-items: center; color: var(--mut
   .page { padding-bottom: 32px; }
   .periods { margin: 0; padding: 2px 0; flex-wrap: wrap; }
 }
+
+.days { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; overscroll-behavior-x: contain; }
+.days::-webkit-scrollbar { display: none; }
+.days a { flex: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 8px; text-decoration: none; font-size: 12.5px; color: var(--muted); }
+.days a.on { background: var(--primary-soft); color: var(--text); font-weight: 650; }
+.chart-read { min-height: 22px; font-size: 13px; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+.chart-read span { display: inline-block; white-space: nowrap; }
+.chart-read .hint { color: var(--muted); }
+.chart .cross { stroke: var(--text); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .bar.on { opacity: 1; stroke: var(--text); stroke-width: 1; }
+.chart svg { cursor: crosshair; user-select: none; }
+@media (min-width: 720px) { .days { margin: 0; padding: 2px 0; } }

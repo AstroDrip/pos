@@ -72,6 +72,7 @@ Names and numbers in the examples are made up.
   - [View sales for a day or a month](#reports-sales)
   - [Read the owner overview, profit and balances](#reports-owner)
   - [The owner's phone dashboard](#reports-phone-dashboard)
+  - [Reading a chart and choosing dates](#reports-charts)
 - **Shifts and daily work**
   - [Hand over to the next cashier](#shifts-handover)
   - [Start a shift](#shifts-open)
@@ -112,7 +113,7 @@ Names and numbers in the examples are made up.
 3. Press Log in.
 4. When you leave the till, press Log out at the top right.
 
-**What you should see:** The tabs (Sell, Refund and others) appear at the top, and your name is shown at the top right.
+**What you should see:** The menu (Sell, Refund and others) appears down the side, and your name is shown at the top right.
 
 **If something goes wrong**
 
@@ -125,7 +126,7 @@ Names and numbers in the examples are made up.
 
 ### Find your way around the screen
 
-**What this does:** The bar at the top holds the tabs and a few settings for this till.
+**What this does:** The menu down the side holds the screens, in six groups. The thin bar at the top holds a few settings for this till. On Sell the menu shows only icons, so the bill has more room. Press the three lines at the bottom of the menu to show or hide the names.
 
 **Steps**
 
@@ -667,7 +668,7 @@ Names and numbers in the examples are made up.
 
 **What this does:** Add a company the store buys from.
 
-**Where:** Admin tab → Suppliers.
+**Where:** Purchases tab → Suppliers.
 
 **Steps**
 
@@ -687,7 +688,7 @@ Names and numbers in the examples are made up.
 
 **What this does:** Correct a supplier, or add their address, CR number, salesman and your customer number with them.
 
-**Where:** Admin tab → Suppliers.
+**Where:** Purchases tab → Suppliers.
 
 **Steps**
 
@@ -1393,6 +1394,31 @@ Names and numbers in the examples are made up.
 - *A figure says Not available.* The till has not sent it. This is different from SAR 0.00, which means the till reported zero.
 - *It says the till is not connected.* The till is off or has no internet. The figures are from its last report. Selling is not affected.
 
+<a id="reports-charts"></a>
+
+### Reading a chart and choosing dates
+
+**What this does:** Charts on Reports, Accounting, Expenses, Stock, Customers and Purchases work the same way. The dates you choose drive the figures, the chart and the tables on that screen together.
+
+**Where:** Reports tab, and other screens with a chart.
+
+**Steps**
+
+1. Choose dates at the top: press a preset such as This month, press a day in the strip, or type dates in the two boxes. Hold Shift and press a second day to choose a stretch of days.
+2. Move through dates with the arrows at the ends of the strip, or the mouse wheel over the strip.
+3. Point at a bar to read its exact date, amount and count. The figures are always a real record, never a guess.
+4. Click a bar to see what is behind it. Close returns you to the same chart and dates.
+5. On Reports, drag across bars to choose those dates. Back to previous dates undoes it.
+6. Show the numbers lists every value as a table.
+7. With the keyboard: Tab to the chart, left and right arrows to move, Enter to open, Esc to clear.
+
+**What you should see:** The dates shown beside the date strip match the chart, the figures and the tables.
+
+**If something goes wrong**
+
+- *A faint mark instead of a bar.* Nothing was recorded for that period because the shop had not started. It is not a zero.
+- *No bar on a day after the shop began.* That is a real zero: nothing happened that day.
+
 ## Shifts and daily work
 
 <a id="shifts-handover"></a>
@@ -1800,7 +1826,7 @@ Names and numbers in the examples are made up.
 **Steps**
 
 1. Reports tab: choose today, read sales, cash, card, refunds and Activity by cashier.
-2. Accounting tab → Owner overview: profit, expenses and Money position for today.
+2. Accounting tab → Overview: main figures, and what the store has and owes right now.
 3. Customers tab → Ageing: who owes the store and how late.
 4. Purchases tab → What we owe suppliers.
 5. Shift tab: expected cash in the drawer.

@@ -20,7 +20,7 @@ export default async function ProfitPage({ searchParams }: { searchParams: Searc
     <main className="page">
       <h2 className="title">Profit and expenses</h2>
       <Provisional />
-      <PeriodBar period={period} path="/profit" />
+      <PeriodBar period={period} path="/profit" today={status.today} />
       <CoverageNote c={coverage} />
       <Card title="Result for the period" note="excluding VAT">
         <div className="rows">

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { formatCount, formatSar, NOT_AVAILABLE, percentChange } from '@/lib/money';
-import { PERIOD_CHOICES, rangeLabel, type Period } from '@/lib/period';
+import { addDays, PERIOD_CHOICES, rangeLabel, shortDay, type Period } from '@/lib/period';
 import type { Coverage } from '@/lib/summary';
 
 export function Tile({ label, value, note, tag }: { label: string; value: string; note?: string; tag?: string }) {
@@ -45,7 +45,19 @@ export function Row({ label, sub, value, total }: { label: string; sub?: string;
   );
 }
 
-export function PeriodBar({ period, path }: { period: Period; path: string }) {
+/** Scrolls by touch. Tapping a day shows just that day, and every figure on the page follows it. */
+function DayStrip({ period, path, today }: { period: Period; path: string; today: string }) {
+  const days: string[] = [];
+  const last = addDays(period.to, 10) > today ? today : addDays(period.to, 10);
+  for (let d = addDays(period.to, -30); d <= last; d = addDays(d, 1)) days.push(d);
+  return (
+    <nav className="days" aria-label="Choose a day">
+      {days.map((d) => <a key={d} href={`${path}?p=custom&from=${d}&to=${d}`} className={d >= period.from && d <= period.to ? 'on' : ''}>{shortDay(d)}</a>)}
+    </nav>
+  );
+}
+
+export function PeriodBar({ period, path, today }: { period: Period; path: string; today: string }) {
   return (
     <>
       <nav className="periods" aria-label="Choose a period">
@@ -53,6 +65,7 @@ export function PeriodBar({ period, path }: { period: Period; path: string }) {
           <a key={c.key} className={c.key === period.key ? 'on' : ''} aria-current={c.key === period.key ? 'true' : undefined} href={c.key === 'custom' ? `${path}?p=custom&from=${period.from}&to=${period.to}` : `${path}?p=${c.key}`}>{c.label}</a>
         ))}
       </nav>
+      <DayStrip period={period} path={path} today={today} />
       {period.key === 'custom' && (
         <form className="custom" method="get" action={path}>
           <input type="hidden" name="p" value="custom" />

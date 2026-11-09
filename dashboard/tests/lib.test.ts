@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { indexAt, readoutLeft } from '../src/lib/chart.ts';
 import { freshness } from '../src/lib/freshness.ts';
 import { divRound, formatCount, formatQty, formatSar, formatSarShort, percentChange } from '../src/lib/money.ts';
 import { parsePeriod, riyadhToday, weekStart } from '../src/lib/period.ts';
@@ -181,5 +182,19 @@ describe('nothing on the phone can write', () => {
       const s = readFileSync(f, 'utf8');
       for (const banned of ['postgresql://', 'neon.tech', 'DASHBOARD_DATABASE_URL', 'DEVICE_API_DATABASE_URL', 'DATABASE_URL_UNPOOLED', 'dashboard_app', 'device_api', 'password_hash']) expect([relative(root, f), banned, s.includes(banned)]).toEqual([relative(root, f), banned, false]);
     }
+  });
+});
+
+describe('touching a chart', () => {
+  it('always lands on a real bar', () => {
+    expect(indexAt(40, 40, 300, 10)).toBe(0);
+    expect(indexAt(71, 40, 300, 10)).toBe(1);
+    expect(indexAt(9_999, 40, 300, 10)).toBe(9);
+    expect(indexAt(50, 40, 300, 0)).toBe(-1);
+  });
+  it('the readout stays on the screen', () => {
+    expect(readoutLeft(5, 150, 360)).toBe(0);
+    expect(readoutLeft(355, 150, 360)).toBe(210);
+    expect(readoutLeft(180, 150, 360)).toBe(105);
   });
 });

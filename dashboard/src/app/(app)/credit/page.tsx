@@ -39,7 +39,7 @@ export default async function CreditPage({ searchParams }: { searchParams: Searc
         <MoneyTile label="Store owes suppliers" value={position?.payablesOutstanding} note={position ? `${position.suppliersWithBalance ?? 0} suppliers` : undefined} />
         <MoneyTile label="Suppliers overdue" value={position?.payablesOverdue} />
       </div>
-      <PeriodBar period={period} path="/credit" />
+      <PeriodBar period={period} path="/credit" today={status.today} />
       <CoverageNote c={coverage} />
       <div className="grid">
         <MoneyTile label="Credit sales" value={s.onAccount} note="Sold on customer account" />

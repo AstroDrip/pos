@@ -24,7 +24,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   return (
     <main className="page">
       <h2 className="title">Sales</h2>
-      <PeriodBar period={period} path="/sales" />
+      <PeriodBar period={period} path="/sales" today={status.today} />
       <CoverageNote c={coverage} />
       <div className="grid">
         <MoneyTile label="Sales, including VAT" value={s.salesInclVat} />
