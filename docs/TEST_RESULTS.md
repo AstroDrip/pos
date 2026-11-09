@@ -42,6 +42,7 @@ text, dark cards, visible focus outline).
 - `npm run ui-audit -- <dir> --demo`: 25 screens, 0 findings, 24 of 24 flows.
 - Not run: `npm run e2e`, Playwright. Not tried: real scanner, real Arabic keyboard, true process restart (a full screen reload was used).
 
+<!-- cloud-results -->
 ## Manual and hardware tests
 None on store hardware so far. The receipt printer, scanner, scale labels and cash drawer have not been tested; their models are unknown.
 

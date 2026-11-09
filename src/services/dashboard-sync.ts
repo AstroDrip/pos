@@ -39,6 +39,7 @@ export function dashboardEnabled(ctx: Ctx): boolean {
 const shiftDay = (day: string, days: number) => new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 export const SYNC_LOOKBACK_DAYS = 35;
+export const SYNC_FULL_HISTORY_DAYS = 730;
 
 /** One business day, from the same services the desktop reports use. A day with no sales reports real zeros. */
 function daySnapshot(ctx: Ctx, day: string) {
@@ -142,7 +143,8 @@ export function buildSnapshots(ctx: Ctx, lookbackDays = SYNC_LOOKBACK_DAYS): { k
   const from = first.d === null || first.d > today ? today : first.d > window ? first.d : window;
   const out: { kind: string; snapKey: string; payload: unknown }[] = [];
   for (let d = from; d <= today; d = shiftDay(d, 1)) out.push({ kind: 'day', snapKey: d, payload: daySnapshot(ctx, d) });
-  out.push({ kind: 'position', snapKey: 'current', payload: positionSnapshot(ctx, today, from) });
+  const recent = shiftDay(today, -(SYNC_LOOKBACK_DAYS - 1));
+  out.push({ kind: 'position', snapKey: 'current', payload: positionSnapshot(ctx, today, from > recent ? from : recent) });
   out.push({ kind: 'stock', snapKey: 'current', payload: stockSnapshot(ctx) });
   out.push({ kind: 'credit', snapKey: 'current', payload: creditSnapshot(ctx, today) });
   out.push({ kind: 'shift', snapKey: 'current', payload: shiftSnapshot(ctx) });
@@ -166,7 +168,7 @@ const signature = (ctx: Ctx) => {
 export function enqueueSnapshots(ctx: Ctx, lookbackDays = SYNC_LOOKBACK_DAYS): number {
   if (!dashboardEnabled(ctx)) return 0;
   const sig = signature(ctx);
-  if (lastSignature.get(ctx.db) === sig) return 0;
+  if (lookbackDays === SYNC_LOOKBACK_DAYS && lastSignature.get(ctx.db) === sig) return 0; // a full history pass always looks
   const snaps = buildSnapshots(ctx, lookbackDays);
   let queued = 0;
   ctx.db.transaction(() => {
@@ -240,6 +242,12 @@ export function syncHealth(ctx: Ctx): SyncHealth {
   const pending = (ctx.db.prepare("SELECT count(*) AS n FROM sync_outbox WHERE status = 'pending'").get() as { n: number }).n;
   const stale = s.last_success_at === null || Date.parse(ctx.now()) - Date.parse(s.last_success_at) > STALE_AFTER_MS || pending > 0;
   return { enabled: dashboardEnabled(ctx), lastSuccessAt: s.last_success_at, lastError: s.last_error, pending, stale };
+}
+
+/** Keeps the outbox small: older confirmed versions go, and the newest of each record stays, so unchanged figures are not re-sent. */
+export function compactOutbox(ctx: Ctx, days = 3): number {
+  const cutoff = new Date(Date.parse(ctx.now()) - days * 86_400_000).toISOString();
+  return ctx.db.prepare("DELETE FROM sync_outbox WHERE status = 'sent' AND sent_at < ? AND id NOT IN (SELECT MAX(id) FROM sync_outbox GROUP BY kind, snap_key)").run(cutoff).changes;
 }
 
 /** Removes confirmed events older than `days` (pending ones are never removed). */

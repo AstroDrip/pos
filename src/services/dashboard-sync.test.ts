@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase } from '../db/connection';
 import { createProduct } from './catalog';
 import type { Ctx } from './context';
-import { buildSnapshots, enqueueSnapshots, pruneSent, syncHealth, syncOnce, type OutboxEvent, type Transport } from './dashboard-sync';
+import { buildSnapshots, compactOutbox, enqueueSnapshots, SYNC_FULL_HISTORY_DAYS, pruneSent, syncHealth, syncOnce, type OutboxEvent, type Transport } from './dashboard-sync';
 import { ownerKpis } from './financials';
 import { receiveGoods } from './inventory';
 import { createSupplier } from './parties';
@@ -55,6 +55,41 @@ beforeEach(() => {
   openShift(ctx, u.cashier, 0);
 });
 afterEach(() => t.cleanup());
+
+describe('keeping the outbox small and the history whole', () => {
+  it('older confirmed versions go, and the newest of each record stays, so nothing is re-sent', async () => {
+    enable();
+    enqueueSnapshots(ctx);
+    const server = new FakeServer();
+    await syncOnce(ctx, server);
+    sell();
+    enqueueSnapshots(ctx);
+    await syncOnce(ctx, server);
+    t.advance(4 * 86_400_000);
+    expect(compactOutbox(ctx)).toBe(4); // the four records that had a newer version
+    expect(pending()).toBe(0);
+    t.advance(0);
+    const before = (ctx.db.prepare('SELECT count(*) AS n FROM sync_outbox').get() as { n: number }).n;
+    expect(before).toBe(5);
+  });
+
+  it('a long lookback sends old days, and the till totals still cover the recent 35', () => {
+    t.advance(50 * 86_400_000);
+    const snaps = buildSnapshots(ctx, SYNC_FULL_HISTORY_DAYS);
+    expect(snaps.filter((s) => s.kind === 'day').length).toBe(51);
+    const p = snaps.find((s) => s.kind === 'position')!.payload as { reconcile: { fromDay: string; toDay: string } };
+    expect(p.reconcile.toDay).toBe('2026-12-25');
+    expect(p.reconcile.fromDay).toBe('2026-11-21');
+  });
+
+  it('a full pass still looks when nothing has changed', () => {
+    enable();
+    enqueueSnapshots(ctx);
+    t.advance(1000);
+    expect(enqueueSnapshots(ctx)).toBe(0);
+    expect(() => enqueueSnapshots(ctx, SYNC_FULL_HISTORY_DAYS)).not.toThrow();
+  });
+});
 
 describe('dashboard figures match the till', () => {
   it('adding up the days equals the till total for the same range', () => {

@@ -2,7 +2,7 @@ import { createBackup } from './backup';
 import { backupDue, fullVerifyDue, queueNewestBackup, recoveryVerifier, uploadPending, verifyCloudBackup } from './cloud-backup';
 import type { CloudApi } from './cloud-client';
 import type { Ctx } from './context';
-import { dashboardEnabled, enqueueSnapshots, syncOnce } from './dashboard-sync';
+import { compactOutbox, dashboardEnabled, enqueueSnapshots, syncOnce, SYNC_FULL_HISTORY_DAYS, SYNC_LOOKBACK_DAYS } from './dashboard-sync';
 
 // The background round. Runs beside the till, never in its way: a failure here only shows on the status screen.
 
@@ -14,12 +14,20 @@ export interface CloudJobEnv {
   api(): CloudApi | null;
 }
 
+// The whole history is checked on the first round and once a day after, to catch entries dated far back.
+const lastFullPass = new WeakMap<object, number>();
+const FULL_PASS_MS = 86_400_000;
+
 /** One round: send figures, then make and send a backup when one is due. */
 export async function cloudTick(ctx: Ctx, env: CloudJobEnv): Promise<void> {
   const api = env.api();
   if (!api) return;
   if (dashboardEnabled(ctx)) {
-    enqueueSnapshots(ctx);
+    const nowMs = Date.parse(ctx.now());
+    const full = nowMs - (lastFullPass.get(ctx.db) ?? -Infinity) >= FULL_PASS_MS;
+    enqueueSnapshots(ctx, full ? SYNC_FULL_HISTORY_DAYS : SYNC_LOOKBACK_DAYS);
+    if (full) lastFullPass.set(ctx.db, nowMs);
+    compactOutbox(ctx);
     const transport = { send: (events: Parameters<CloudApi['sync']>[0]) => api.sync(events) };
     for (let i = 0; i < 40; i++) {
       const r = await syncOnce(ctx, transport);

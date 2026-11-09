@@ -1,6 +1,6 @@
 # Phone Dashboard: Design
 
-**Date:** 2026-11-09. **Status:** written for owner review.
+**Date:** 2026-11-09. **Status:** replaced. The owner's later brief changed the design: the till now sends its own figures, so the dashboard does no accounting of its own, and the till sends data through a device API. See `docs/CLOUD_BACKUP_AND_SYNC.md` and `dashboard/METRICS.md`. Kept for history.
 **Decisions already made:** [assessment](2026-11-09-master-prompts-assessment.md), sections 7 and 10.
 
 ## 1. What this is
