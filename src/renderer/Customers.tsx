@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatSar, parseSar } from '../core/money';
+import { formatMoney, formatSar, parseSar } from '../core/money';
 import { storeDateTime } from '../core/store-time';
 import type { FinStatus } from '../core/status';
 import type { ArAgeingRow, CreditInvoice, CustomerAccount, StatementLine } from '../services/credit';
 import { call, type ApiError } from './api';
+import { Chart } from './Chart';
+import { Kpi, Views } from './Figures';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validId, validOneOf, validText } from './remember';
-import { PageHeader } from './PageHeader';
+import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { useSuggest } from './useSuggest';
 import { focusWhenReady, useScreenKeys } from './Keyboard';
@@ -110,13 +112,12 @@ export function Customers({ can, request }: { can: (p: string) => boolean; reque
   );
 }
 
-function Amount({ l, v, bad, small, info }: { l: string; v: string; bad?: boolean; small?: boolean; info?: string }) {
-  return <div className="kpi"><div className="l">{l}{info && <InfoIcon id={info} />}</div><div className={`v${bad ? ' neg' : ''}${small ? ' sm' : ''}`} title={v}>{v}</div></div>;
-}
+type AccountView = 'overview' | 'invoices' | 'payments' | 'statement' | 'settings';
 
 function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean; onClose: () => void }) {
   const back = useReturnTick();
   const { t } = useI18n();
+  const [view, setView] = useState<AccountView>('overview');
   const [a, setA] = useState<CustomerAccount | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('open');
   const [st, setSt] = useState<{ lines: StatementLine[]; balance: number } | null>(null);
@@ -154,55 +155,74 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
         <h3 style={{ margin: 0 }}>{a.name} <small>#{a.id} · {a.phone}</small></h3>
         <button onClick={onClose}>{t('Close')}</button>
       </div>
-      <div className="amounts" style={{ marginTop: 8 }}>
-        <Amount info="metric.customer.owed" l={t('Owed now')} v={formatSar(a.outstanding)} />
-        <Amount info="metric.customer.overdue" l={t('Overdue')} v={formatSar(a.overdue)} bad={a.overdue > 0} />
-        <Amount info="metric.customer.advance" l={t('Advance held')} v={formatSar(a.advance)} />
-        <Amount info="metric.customer.limit" l={t('Credit limit')} v={!a.creditEnabled ? t('Credit off') : a.creditLimit === null ? t('No fixed limit') : formatSar(a.creditLimit)} />
-        <Amount info="metric.customer.available" l={t('Available credit')} v={!a.creditEnabled ? '—' : a.available === null ? t('No fixed limit') : formatSar(Math.max(a.available, 0))} />
-        <Amount l={t('Terms')} v={a.paymentTermsDays === null ? t('No due date') : t('{0} days', a.paymentTermsDays)} />
-        <Amount l={t('Unpaid / partly paid invoices')} v={`${a.unpaidCount} / ${a.partialCount}`} />
-        <Amount info="metric.customer.purchases" l={t('Lifetime purchases')} v={formatSar(a.lifetimePurchases)} />
-        <Amount info="metric.customer.payments" l={t('Lifetime payments')} v={formatSar(a.lifetimePayments)} />
-        <div className="kpi"><div className="l">{t('Last purchase / payment')}</div>
-          <div className="v sm"><span className="line">{a.lastPurchase ? storeDateTime(a.lastPurchase).slice(0, 10) : '—'}</span><span className="line">{a.lastPayment ? storeDateTime(a.lastPayment).slice(0, 10) : '—'}</span></div></div>
-      </div>
-      {a.notes && <p className="hint">{t('Notes')}: {a.notes}</p>}
-
-      <h4>{t('Credit invoices')}</h4>
-      <div className="seg" role="group" aria-label="filter invoices">
-        {FILTERS.map((f) => <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{t(f === 'all' ? 'All' : f === 'open' ? 'Still owed' : statusLabel(f))}</button>)}
-      </div>
-      <InvoiceTable rows={shown} can={can} busy={busy} onAct={act} />
-
-      {can('customer.payment.record') && <Collect account={a} can={can} onDone={(m) => { setMsg(m); void load(); }} />}
-      {a.advance > 0 && can('customer.payment.bank') && a.invoices.some((i) => i.open > 0) && <ApplyAdvance account={a} onDone={(m) => { setMsg(m); void load(); }} />}
-
-      <h4>{t('Payments')}</h4>
-      <table className="list">
-        <thead><tr><th>{t('Receipt')}</th><th>{t('Date')}</th><th>{t('Method')}</th><th className="num">{t('Amount')}</th><th>{t('Applied to')}</th><th>{t('Recorded by')}</th><th /></tr></thead>
-        <tbody>{a.receipts.map((r) => (
-          <tr key={r.id}>
-            <td>{r.receiptNo}</td><td>{storeDateTime(r.at)}</td><td>{t(r.method)}</td><td className={`num${r.amount < 0 ? ' neg' : ''}`}>{formatSar(r.amount)}</td>
-            <td>{r.allocations.map((x) => `${x.invoiceNo}: ${formatSar(x.amount)}`).join(', ') || (r.amount > 0 ? t('Advance') : r.notes)}</td><td>{r.user}</td>
-            <td className="actions">
-              {r.reversed && <StatusBadge status="reversed" />}
-              {r.amount > 0 && <button onClick={() => act(() => call('credit.printReceipt', { receiptId: r.id, copy: true }), t('Receipt printed'))}>{t('Reprint')}</button>}
-              {r.amount > 0 && !r.reversed && can('customer.payment.reverse') && <Reason label={t('Reverse')} q={t('Why is this payment being reversed?')} onConfirm={(reason) => act(() => call('credit.reverseReceipt', { receiptId: r.id, requestKey: crypto.randomUUID(), reason }), t('Payment reversed'))} />}
-            </td>
-          </tr>
-        ))}</tbody>
-      </table>
-
-      {can('customer.statements') && (
+      <p className={`answer${a.overdue > 0 ? ' bad' : ''}`} aria-label="account summary">
+        {a.outstanding <= 0 ? t('Owes nothing.') : a.overdue > 0 ? t('Owes {0}, and {1} of it is overdue.', formatMoney(a.outstanding), formatMoney(a.overdue)) : t('Owes {0}. Nothing is overdue.', formatMoney(a.outstanding))}
+        {a.advance > 0 ? ` ${t('The store holds {0} as an advance.', formatMoney(a.advance))}` : ''}
+      </p>
+      <Views name="account view" value={view} onChange={setView} options={[
+        { id: 'overview', label: t('Overview') }, { id: 'invoices', label: t('Credit invoices') }, { id: 'payments', label: t('Payments') },
+        ...(can('customer.statements') ? [{ id: 'statement' as const, label: t('Statement') }] : []),
+        ...(can('customer.credit.manage') ? [{ id: 'settings' as const, label: t('Credit settings') }] : []),
+      ]} />
+      {view === 'overview' && (
         <>
-          <div className="row" style={{ alignItems: 'center', marginTop: 12 }}>
-            <h4 style={{ margin: 0 }}>{t('Statement')}</h4>
+          <div className="amounts">
+            <Kpi info="metric.customer.owed" l={t('Owed now')} v={formatMoney(a.outstanding)} />
+            <Kpi info="metric.customer.overdue" l={t('Overdue')} v={formatMoney(a.overdue)} bad={a.overdue > 0} />
+            <Kpi info="metric.customer.advance" l={t('Advance held')} v={formatMoney(a.advance)} />
+            <Kpi info="metric.customer.available" l={t('Available credit')} v={!a.creditEnabled ? t('Credit off') : a.available === null ? t('No fixed limit') : formatMoney(Math.max(a.available, 0))} />
+          </div>
+          <details className="more">
+            <summary>{t('More about this account')}</summary>
+            <div className="amounts">
+              <Kpi info="metric.customer.limit" l={t('Credit limit')} v={!a.creditEnabled ? t('Credit off') : a.creditLimit === null ? t('No fixed limit') : formatMoney(a.creditLimit)} />
+              <Kpi l={t('Terms')} v={a.paymentTermsDays === null ? t('No due date') : t('{0} days', a.paymentTermsDays)} />
+              <Kpi l={t('Unpaid / partly paid invoices')} v={`${a.unpaidCount} / ${a.partialCount}`} />
+              <Kpi info="metric.customer.purchases" l={t('Lifetime purchases')} v={formatMoney(a.lifetimePurchases)} />
+              <Kpi info="metric.customer.payments" l={t('Lifetime payments')} v={formatMoney(a.lifetimePayments)} />
+              <Kpi l={t('Last purchase / payment')} v={`${a.lastPurchase ? storeDateTime(a.lastPurchase).slice(0, 10) : '—'} · ${a.lastPayment ? storeDateTime(a.lastPayment).slice(0, 10) : '—'}`} />
+            </div>
+          </details>
+          {a.notes && <p className="hint">{t('Notes')}: {a.notes}</p>}
+          {can('customer.statements') && <BalanceHistory id={id} tick={a.outstanding} />}
+          {can('customer.payment.record') && <Collect account={a} can={can} onDone={(m) => { setMsg(m); void load(); }} />}
+          {a.advance > 0 && can('customer.payment.bank') && a.invoices.some((i) => i.open > 0) && <ApplyAdvance account={a} onDone={(m) => { setMsg(m); void load(); }} />}
+        </>
+      )}
+      {view === 'invoices' && (
+        <>
+          <div className="seg" role="group" aria-label="filter invoices">
+            {FILTERS.map((f) => <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>{t(f === 'all' ? 'All' : f === 'open' ? 'Still owed' : statusLabel(f))}</button>)}
+          </div>
+          <InvoiceTable rows={shown} can={can} busy={busy} onAct={act} />
+        </>
+      )}
+      {view === 'payments' && (
+        <>
+          <table className="list">
+            <thead><tr><th>{t('Receipt')}</th><th>{t('Date')}</th><th>{t('Method')}</th><th className="num">{t('Amount')}</th><th>{t('Applied to')}</th><th>{t('Recorded by')}</th><th /></tr></thead>
+            <tbody>{a.receipts.length === 0 && <EmptyRow cols={7} text={t('No payments yet.')} />}{a.receipts.map((r) => (
+              <tr key={r.id}>
+                <td>{r.receiptNo}</td><td>{storeDateTime(r.at)}</td><td>{t(r.method)}</td><td className={`num${r.amount < 0 ? ' neg' : ''}`}>{formatSar(r.amount)}</td>
+                <td>{r.allocations.map((x) => `${x.invoiceNo}: ${formatSar(x.amount)}`).join(', ') || (r.amount > 0 ? t('Advance') : r.notes)}</td><td>{r.user}</td>
+                <td className="actions">
+                  {r.reversed && <StatusBadge status="reversed" />}
+                  {r.amount > 0 && <button onClick={() => act(() => call('credit.printReceipt', { receiptId: r.id, copy: true }), t('Receipt printed'))}>{t('Reprint')}</button>}
+                  {r.amount > 0 && !r.reversed && can('customer.payment.reverse') && <Reason danger label={t('Reverse')} q={t('Why is this payment being reversed?')} onConfirm={(reason) => act(() => call('credit.reverseReceipt', { receiptId: r.id, requestKey: crypto.randomUUID(), reason }), t('Payment reversed'))} />}
+                </td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </>
+      )}
+      {view === 'statement' && can('customer.statements') && (
+        <>
+          <div className="row" style={{ alignItems: 'center' }}>
             <button onClick={async () => setSt(await call('credit.statement', { customerId: id }))}>{st ? t('Refresh') : t('Show statement')}</button>
             {st && <button onClick={copyStatement}>{t('Copy as CSV')}</button>}
           </div>
           {st && (
-            <table className="list">
+            <table className="list" style={{ marginTop: 'var(--sp-2)' }}>
               <thead><tr><th>{t('Date')}</th><th>{t('Description')}</th><th>{t('Reference')}</th><th className="num">{t('Debit (owes more)')}</th><th className="num">{t('Credit (owes less)')}</th><th className="num">{t('Balance')}</th></tr></thead>
               <tbody>{st.lines.map((l, i) => <tr key={i}><td>{storeDateTime(l.at)}</td><td>{t(l.description)}</td><td>{l.ref}</td><td className="num">{l.debit ? formatSar(l.debit) : ''}</td><td className="num">{l.credit ? formatSar(l.credit) : ''}</td><td className="num">{formatSar(l.balance)}</td></tr>)}</tbody>
             </table>
@@ -210,8 +230,7 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
           {st && st.balance < 0 && <p>{t('A negative balance is an advance the store holds for the customer.')}</p>}
         </>
       )}
-
-      {can('customer.credit.manage') && <Settings account={a} onDone={(m) => { setMsg(m); void load(); }} />}
+      {view === 'settings' && can('customer.credit.manage') && <Settings account={a} onDone={(m) => { setMsg(m); void load(); }} />}
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
     </div>
   );
@@ -229,7 +248,7 @@ function InvoiceTable({ rows, can, busy, onAct }: { rows: CreditInvoice[]; can: 
           <td>{i.dueDate ?? t('No due date')}</td><td><StatusBadge status={i.status} /></td>
           <td className="actions">
             {i.open > 0 && can('customer.credit.manage') && <Reason label={i.disputed ? t('Clear dispute') : t('Dispute')} q={t('Note')} onConfirm={(note) => onAct(() => call('credit.dispute', { saleId: i.saleId, disputed: !i.disputed, note }), t('Saved'))} />}
-            {i.open > 0 && can('customer.writeoff') && !busy && <Reason label={t('Write off')} q={t('Why is this debt being written off? (whole remaining amount)')} onConfirm={(reason) => onAct(() => call('credit.writeOff', { requestKey: crypto.randomUUID(), saleId: i.saleId, amount: i.open, reason }), t('Written off'))} />}
+            {i.open > 0 && can('customer.writeoff') && !busy && <Reason danger label={t('Write off')} q={t('Why is this debt being written off? (whole remaining amount)')} onConfirm={(reason) => onAct(() => call('credit.writeOff', { requestKey: crypto.randomUUID(), saleId: i.saleId, amount: i.open, reason }), t('Written off'))} />}
           </td>
         </tr>
       ))}</tbody>
@@ -238,11 +257,30 @@ function InvoiceTable({ rows, can, busy, onAct }: { rows: CreditInvoice[]; can: 
 }
 
 /** Small inline "ask for a reason" control (Electron has no window.prompt). */
-function Reason({ label, q, onConfirm }: { label: string; q: string; onConfirm: (reason: string) => void }) {
+/** How the balance moved, line by line, from the statement. */
+function BalanceHistory({ id, tick }: { id: number; tick: number }) {
+  const { t } = useI18n();
+  const [lines, setLines] = useState<StatementLine[] | null>(null);
+  useEffect(() => void call<{ lines: StatementLine[] }>('credit.statement', { customerId: id }).then((r) => setLines(r.lines), () => setLines(null)), [id, tick]);
+  if (!lines || lines.length < 2) return null;
+  return (
+    <section className="chart-card" aria-label="balance history">
+      <div className="chart-head"><h4>{t('Balance over time')} <small>{t('SAR the customer owes after each record')}</small></h4></div>
+      <Chart
+        name={t('Balance over time')} kind="line" info="metric.chart.balance"
+        axisFormat={(v) => String(Math.floor(v / 100))}
+        series={[{ name: t('Balance'), format: formatMoney }]}
+        points={lines.slice(-60).map((l, i) => ({ key: `${i}`, axis: storeDateTime(l.at).slice(5, 10), title: storeDateTime(l.at), values: [l.balance], extras: [{ label: t('Record'), value: `${t(l.description)} ${l.ref ?? ''}` }] }))}
+      />
+    </section>
+  );
+}
+
+function Reason({ label, q, onConfirm, danger }: { label: string; q: string; onConfirm: (reason: string) => void; danger?: boolean }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [v, setV] = useState('');
-  if (!open) return <button onClick={() => setOpen(true)}>{label}</button>;
+  if (!open) return <button className={danger ? 'danger' : undefined} onClick={() => setOpen(true)}>{label}</button>;
   return (
     <span className="row" style={{ gap: 4, display: 'inline-flex' }}>
       <input aria-label={q} placeholder={q} value={v} onChange={(e) => setV(e.target.value)} style={{ width: 200 }} />

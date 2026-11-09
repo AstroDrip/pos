@@ -27,7 +27,6 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
       {can('backup.run') && <CloudBackup can={can} />}
       {can('settings.manage') && <HardwareTest />}
       {can('user.manage') && <Users />}
-      {can('supplier.manage') && <Suppliers />}
       {(can('product.manage') || can('supplier.manage')) && <Import />}
       {can('settings.manage') && <ScaleLabels />}
       {can('settings.manage') && <DashboardHealth />}
@@ -172,7 +171,7 @@ function Users() {
   );
 }
 
-function Suppliers() {
+export function Suppliers() {
   const back = useReturnTick();
   const { t } = useI18n();
   const [list, setList] = useState<Supplier[]>([]);

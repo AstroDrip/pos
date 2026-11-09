@@ -7,7 +7,8 @@ import { receiveGoods } from './inventory';
 import { createSupplier } from './parties';
 import { salesSummary } from './reports';
 import { finalizeSale } from './sales';
-import { financeSeries, salesList, salesSeries } from './series';
+import { createPurchaseInvoice } from './purchasing';
+import { financeSeries, purchaseSeries, salesList, salesSeries } from './series';
 import { closeShift, openShift, openShiftId } from './shifts';
 import { makeTestCtx, seedUsers } from './test-helpers';
 
@@ -119,6 +120,16 @@ describe('the records behind a point', () => {
 
   it('needs report permission', () => {
     expect(code(() => salesList(ctx, u.cashier, { from: '2026-11-05', to: '2026-11-05' }))).toBe('PERMISSION_DENIED');
+  });
+});
+
+describe('purchases over time', () => {
+  it('equals the invoices entered, and days before the shop began are missing', () => {
+    const sup = createSupplier(ctx, u.admin, { name: 'T' });
+    const grn = receiveGoods(ctx, u.admin, { supplierId: sup, lines: [{ productId: item, qty: 1_000, unitCost: 1_000 }] }).grnId;
+    createPurchaseInvoice(ctx, u.admin, { requestKey: 'series-pinv-0001', supplierId: sup, supplierInvoiceNo: 'A1', invoiceDate: '2026-11-05', dueDate: '2026-12-05', grnIds: [grn], invoiceNet: 1_000, vatAmount: 150, vatRecoverable: false });
+    const pts = purchaseSeries(ctx, u.admin, { from: '2026-11-04', to: '2026-11-05' });
+    expect(pts.map((p) => [p.gross, p.invoices])).toEqual([[null, null], [1_150, 1]]);
   });
 });
 

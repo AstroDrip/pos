@@ -454,3 +454,8 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 .chart-k1 { background: var(--chart-2); }
 .chart-empty { color: var(--muted); text-align: center; padding: var(--sp-6) var(--sp-3); margin: 0; }
 .point-detail { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border); outline: none; }
+
+.answer { font-size: var(--fs-lg); font-weight: 600; margin: var(--sp-2) 0 var(--sp-3); }
+.answer.bad { color: var(--danger); }
+.seg-groups { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-2); }
+.seg-groups small { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }

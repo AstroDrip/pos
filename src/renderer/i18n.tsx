@@ -7,6 +7,20 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'Owes nothing.': 'لا يوجد دين.',
+  'Owes {0}, and {1} of it is overdue.': 'عليه {0} منها {1} متأخرة.',
+  'Owes {0}. Nothing is overdue.': 'عليه {0}. لا متأخرات.',
+  'The store holds {0} as an advance.': 'للمتجر {0} دفعة مقدمة.',
+  'More about this account': 'المزيد عن هذا الحساب',
+  'No payments yet.': 'لا مدفوعات بعد.',
+  'Balance over time': 'الرصيد عبر الوقت',
+  'SAR the customer owes after each record': 'ريال بعد كل سجل',
+  'New': 'جديد',
+  'Owed to suppliers': 'مستحقات الموردين',
+  'Purchases over time': 'المشتريات عبر الوقت',
+  'SAR, including VAT. Click a point to see those dates.': 'ريال شامل الضريبة.',
+  'No supplier invoices in these dates.': 'لا فواتير موردين.',
+  'Invoices': 'الفواتير',
   'Overview': 'نظرة عامة',
   'Balance sheet': 'الميزانية',
   'Trial balance and ledger': 'ميزان المراجعة والأستاذ',

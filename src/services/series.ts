@@ -135,6 +135,42 @@ export function salesList(ctx: Ctx, userId: number, q: { from: string; to: strin
   return { rows: rows.slice(0, LIMIT), more: rows.length > LIMIT };
 }
 
+export interface PurchasePoint {
+  from: string;
+  to: string;
+  gross: number | null;
+  invoices: number | null;
+}
+
+/** Supplier invoices by day, or by month for a long stretch. Read only. */
+export function purchaseSeries(ctx: Ctx, userId: number, q: { from: string; to: string }): PurchasePoint[] {
+  requirePermission(ctx, userId, 'purchase.view');
+  if (q.to < q.from) throw new DomainError('VALIDATION', 'Check the dates');
+  const first = firstDay(ctx);
+  const rows = new Map((ctx.db.prepare('SELECT invoice_date AS d, SUM(gross) AS gross, COUNT(*) AS n FROM purchase_invoices WHERE invoice_date BETWEEN ? AND ? GROUP BY invoice_date').all(q.from, q.to) as { d: string; gross: number; n: number }[]).map((r) => [r.d, r]));
+  const monthly = daysApart(q.from, q.to) > 62;
+  const out: PurchasePoint[] = [];
+  for (let d = q.from; d <= q.to;) {
+    let end = d;
+    if (monthly) {
+      end = monthEnd(d);
+      if (end > q.to) end = q.to;
+    }
+    if (first === null || end < first) out.push({ from: d, to: end, gross: null, invoices: null });
+    else {
+      let gross = 0;
+      let invoices = 0;
+      for (let x = d; x <= end; x = nextDay(x)) {
+        gross += rows.get(x)?.gross ?? 0;
+        invoices += rows.get(x)?.n ?? 0;
+      }
+      out.push({ from: d, to: end, gross, invoices });
+    }
+    d = nextDay(end);
+  }
+  return out;
+}
+
 export interface FinancePoint {
   month: string;
   netSales: number | null;

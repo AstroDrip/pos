@@ -5,7 +5,7 @@ export function Kpi({ l, v, sub, bad, info, lead }: { l: string; v: string; sub?
   return (
     <div className={`kpi${lead ? ' lead' : ''}`}>
       <div className="l">{l}{info && <InfoIcon id={info} />}</div>
-      <div className={`v${bad ? ' neg' : ''}`}>{v}</div>
+      <div className={`v${bad ? ' neg' : ''}`} title={v}>{v}</div>
       {sub && <div className="l">{sub}</div>}
     </div>
   );

@@ -966,7 +966,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(500);
     flow('proforma-vat-screen-opens', await js<boolean>(`!!document.querySelector('table[aria-label="proforma vat review"]')`), 'table shown');
     await openNamed('Expenses');
-    await click('.views button', 'Recognise prepaid');
+    await click('.views button', 'Recognise prepaid expenses');
     await sleep(500);
     flow('prepaid-screen-opens', await js<boolean>(`!!document.querySelector('table[aria-label="prepaid preview"]')`), 'table shown');
     await openNamed('Admin');
@@ -1015,6 +1015,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     flow('tab-click-focuses-main-box', inBox === 'refund', `focus ${inBox}`);
 
     await openNamed('Accounting');
+    await click('.views button', 'Cash flow');
+    await sleep(400);
     const flowShown = await js<boolean>(`!!document.querySelector('[aria-label="cash flow"]')`);
     flow('cash-flow-shown', flowShown, `shown ${flowShown}`);
 

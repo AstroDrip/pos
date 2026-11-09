@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatSar, parseQty, parseSar, roundDiv } from '../core/money';
+import { longDay, rangeText, shortDay } from '../core/date-range';
+import { formatMoney, formatSar, parseQty, parseSar, roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import type { Product } from '../services/catalog';
+import type { PurchasePoint } from '../services/series';
 import type { Supplier } from '../services/parties';
 import type { AgeingRow, PastReturn, StatementLine, SupplierAccount, UninvoicedGrn } from '../services/purchasing';
 import { StatusBadge, StatusLegend } from './StatusBadge';
@@ -14,6 +16,10 @@ import { useSuggest } from './useSuggest';
 import { focusWhenReady, useScreenKeys } from './Keyboard';
 import { HelpLink } from './HelpLink';
 import { VatReview } from './VatReview';
+import { Suppliers } from './Admin';
+import { Chart } from './Chart';
+import { DateNavigator, useDateRange } from './DateNavigator';
+import { Kpi } from './Figures';
 import { SupplierBill } from './SupplierBill';
 import { PurchaseReports, SavedBills } from './SupplierBillsView';
 import { ProductName, useI18n } from './i18n';
@@ -27,7 +33,8 @@ const sar = (s: string) => {
     return NaN;
   }
 };
-const SECTIONS_ALL = ['bill', 'invoice', 'return', 'pay', 'ageing', 'register', 'saved', 'vat', 'reports'] as const;
+const SECTIONS_ALL = ['bill', 'invoice', 'return', 'pay', 'ageing', 'register', 'saved', 'vat', 'reports', 'suppliers'] as const;
+const GROUPS = ['New', 'Owed to suppliers', 'History', 'More'] as const;
 type Section = (typeof SECTIONS_ALL)[number];
 
 /** Purchasing (plan Phase 4). Posting rules are provisional until the accountant approves. */
@@ -54,16 +61,17 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
       }
     },
   }));
-  const tabs: { id: Section; label: string; show: boolean }[] = [
-    { id: 'bill', label: 'Enter supplier bill', show: can('purchase.manage') && can('stock.receive') },
-    { id: 'invoice', label: 'Supplier invoices', show: can('purchase.manage') },
-    { id: 'return', label: 'Return to supplier', show: can('purchase.manage') },
-    { id: 'pay', label: 'Balances and payments', show: true },
-    { id: 'ageing', label: 'Ageing', show: true },
-    { id: 'register', label: 'Purchase register', show: true },
-    { id: 'saved', label: 'Saved bills', show: true },
-    { id: 'vat', label: 'Proforma VAT', show: true },
-    { id: 'reports', label: 'Purchase reports', show: true },
+  const tabs: { id: Section; label: string; show: boolean; group: (typeof GROUPS)[number] }[] = [
+    { id: 'bill', label: 'Enter supplier bill', show: can('purchase.manage') && can('stock.receive'), group: 'New' },
+    { id: 'invoice', label: 'Supplier invoices', show: can('purchase.manage'), group: 'New' },
+    { id: 'return', label: 'Return to supplier', show: can('purchase.manage'), group: 'New' },
+    { id: 'pay', label: 'Balances and payments', show: true, group: 'Owed to suppliers' },
+    { id: 'ageing', label: 'Ageing', show: true, group: 'Owed to suppliers' },
+    { id: 'register', label: 'Purchase register', show: true, group: 'History' },
+    { id: 'saved', label: 'Saved bills', show: true, group: 'History' },
+    { id: 'vat', label: 'Proforma VAT', show: true, group: 'More' },
+    { id: 'reports', label: 'Purchase reports', show: true, group: 'More' },
+    { id: 'suppliers', label: 'Suppliers', show: can('supplier.manage'), group: 'More' },
   ];
   useEffect(() => {
     if (!tabs.some((x) => x.id === section && x.show)) setSection(can('purchase.manage') ? 'bill' : 'pay'); // a remembered section this user cannot open
@@ -73,15 +81,21 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
       <PageHeader
         title={t('Purchases')}
         desc={t('Supplier invoices, returns, what the store owes and payments.')}
-        actions={
-          <div className="seg" role="group" aria-label="purchases section">
-            {tabs.filter((x) => x.show).map((x) => (
-              <button key={x.id} className={section === x.id ? 'on' : ''} onClick={() => { setSupplierRequest({ id: 0, n: 0 }); setSection(x.id); }}>{t(x.label)}</button>
-            ))}
-          </div>
-        }
       />
-      <p className="msg warn" style={{ maxWidth: 900 }}>{t('Purchase accounting is provisional until your accountant approves it.')}</p>
+      <div className="seg-groups">
+        {GROUPS.map((g) => {
+          const items = tabs.filter((x) => x.group === g && x.show);
+          return items.length === 0 ? null : (
+            <div key={g}>
+              <small>{t(g)}</small>
+              <div className="seg" role="group" aria-label="purchases section">
+                {items.map((x) => <button key={x.id} className={section === x.id ? 'on' : ''} onClick={() => { setSupplierRequest({ id: 0, n: 0 }); setSection(x.id); }}>{t(x.label)}</button>)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="hint">{t('Purchase accounting is provisional until your accountant approves it.')}</p>
       {section === 'bill' && <SupplierBill suppliers={suppliers} can={can} />}
       {section === 'invoice' && <InvoiceForm suppliers={suppliers} />}
       {section === 'return' && <ReturnForm suppliers={suppliers} />}
@@ -91,6 +105,7 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
       {section === 'saved' && <SavedBills />}
       {section === 'vat' && <VatReview can={can} />}
       {section === 'reports' && <PurchaseReports />}
+      {section === 'suppliers' && can('supplier.manage') && <Suppliers />}
     </div>
   );
 }
@@ -412,18 +427,25 @@ type Reg = {
 function Register() {
   const back = useReturnTick();
   const { t } = useI18n();
-  const [from, setFrom] = useState(`${todayDay().slice(0, 7)}-01`);
-  const [to, setTo] = useState(todayDay());
+  const [dates, setDates] = useDateRange('purchases-register', 'month');
+  const { from, to } = dates;
+  const [series, setSeries] = useState<PurchasePoint[] | null>(null);
   const [r, setR] = useState<Reg | null>(null);
   const [tick, setTick] = useState(0);
   const reload = () => setTick((n) => n + 1);
   useEffect(() => void call<Reg>('purchase.register', { fromDay: from, toDay: to }).then(setR, () => setR(null)), [from, to, tick, back]);
+  useEffect(() => void call<PurchasePoint[]>('purchase.series', { from, to }).then(setSeries, () => setSeries(null)), [from, to, tick, back]);
   return (
     <div>
-      <div className="row" style={{ maxWidth: 420 }}>
-        <div><label>{t('From')}</label><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-        <div><label>{t('To')}</label><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-      </div>
+      <DateNavigator name="Purchase register" value={dates} onChange={setDates} />
+      {series && (
+        <section className="chart-card" aria-label="purchases over time">
+          <div className="chart-head"><h4>{t('Purchases over time')} <small>{t('SAR, including VAT. Click a point to see those dates.')}</small></h4></div>
+          <Chart name={t('Purchases over time')} kind="bar" info="metric.chart.purchases" axisFormat={(v) => String(Math.floor(v / 100))} series={[{ name: t('Purchases'), format: formatMoney }]} emptyText={t('No supplier invoices in these dates.')}
+            points={series.map((s) => ({ key: s.from, axis: shortDay(s.from), title: s.from === s.to ? longDay(s.from) : rangeText(s), values: [s.gross], extras: [{ label: t('Invoices'), value: s.invoices === null ? t('Not recorded') : String(s.invoices) }] }))}
+            onPick={(pt) => { const s = series.find((x) => x.from === pt.key); if (s) setDates({ from: s.from, to: s.to }); }} />
+        </section>
+      )}
       {r && (
         <>
           <h4>{t('Supplier invoices ({0})', r.invoices.length)}</h4>
@@ -480,12 +502,12 @@ function SupplierItems({ supplierId }: { supplierId: number }) {
   return (
     <div style={{ margin: '8px 0' }}>
       <div className="amounts">
-        <div className="kpi"><div className="l">{t('Owed now')}</div><div className="v">{formatSar(a.outstanding)}</div></div>
-        <div className="kpi"><div className="l">{t('Overdue')}</div><div className={`v${a.overdue > 0 ? ' neg' : ''}`}>{formatSar(a.overdue)}</div></div>
-        <div className="kpi"><div className="l">{t('Paid in advance')}</div><div className="v">{formatSar(a.advance)}</div></div>
-        <div className="kpi"><div className="l">{t('Return credit')}</div><div className="v">{formatSar(a.returnCredit)}</div></div>
-        <div className="kpi"><div className="l">{t('Total purchases / payments')}</div><div className="v">{formatSar(a.totalPurchases)} / {formatSar(a.totalPayments)}</div></div>
-        <div className="kpi"><div className="l">{t('Terms')}</div><div className="v">{t('{0} days', a.paymentTermsDays)}</div></div>
+        <Kpi l={t('Owed now')} v={formatMoney(a.outstanding)} />
+        <Kpi l={t('Overdue')} v={formatMoney(a.overdue)} bad={a.overdue > 0} />
+        <Kpi l={t('Paid in advance')} v={formatMoney(a.advance)} />
+        <Kpi l={t('Return credit')} v={formatMoney(a.returnCredit)} />
+        <Kpi l={t('Total purchases / payments')} v={`${formatSar(a.totalPurchases)} / ${formatSar(a.totalPayments)}`} />
+        <Kpi l={t('Terms')} v={t('{0} days', a.paymentTermsDays)} />
       </div>
       <table className="list">
         <thead><tr><th>{t('Document')}</th><th>{t("Supplier's invoice no.")}</th><th>{t('Date')}</th><th className="num">{t('Total')}</th><th className="num">{t('Paid')}</th><th className="num">{t('Remaining')}</th><th>{t('Due date')}</th><th>{t('Status')}</th></tr></thead>
