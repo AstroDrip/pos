@@ -7,6 +7,21 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'Handover': 'تسليم الوردية',
+  'Find a product in stock': 'ابحث عن منتج في المخزون',
+  'Keys': 'المفاتيح',
+  'Can still refund': 'يمكن إرجاعه',
+  '1. Choose what comes back': '1. اختر ما يُرجع',
+  '2. Why it came back': '2. سبب الإرجاع',
+  '3. Confirm and pay': '3. التأكيد والدفع',
+  'This shift': 'هذه الوردية',
+  'Sale': 'بيع',
+  'Cash in': 'إدخال نقد',
+  'Activity': 'النشاط',
+  'Details': 'التفاصيل',
+  'Nothing yet in this shift.': 'لا شيء بعد.',
+  'Backup and recovery': 'النسخ والاستعادة',
+  'Backups, users, imports and device settings.': 'النسخ والمستخدمون والاستيراد والإعدادات.',
   'Needs attention': 'يحتاج إلى انتباه',
   'Movements': 'الحركات',
   'Running low': 'قارب النفاد',

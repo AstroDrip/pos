@@ -11,7 +11,7 @@ const dir = join(__dirname, '..');
 const screens = readdirSync(dir).filter((f) => f.endsWith('.tsx'));
 const source = (f: string) => readFileSync(join(dir, f), 'utf8');
 const all = [...FIELDS, ...METRICS];
-const COVERED = ['Sell.tsx', 'CustomerBox.tsx', 'Refund.tsx', 'Stock.tsx', 'Products.tsx', 'Shift.tsx', 'Customers.tsx', 'Purchases.tsx', 'SupplierBill.tsx', 'Expenses.tsx', 'Admin.tsx', 'StoreDetailsCard.tsx'];
+const COVERED = ['Audit.tsx', 'VatReview.tsx', 'CloudBackup.tsx', 'Sell.tsx', 'CustomerBox.tsx', 'Refund.tsx', 'Stock.tsx', 'Products.tsx', 'Shift.tsx', 'Customers.tsx', 'Purchases.tsx', 'SupplierBill.tsx', 'Expenses.tsx', 'Admin.tsx', 'StoreDetailsCard.tsx'];
 const used = () => {
   const text = screens.map(source).join('\n');
   return {

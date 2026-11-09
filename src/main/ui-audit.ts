@@ -271,9 +271,14 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     const opened = await js<string>(`document.querySelector('.card.section h3')?.textContent ?? ''`);
     flow('refund-recent-sales-listed-and-open', sold > 0 && first !== '' && opened === first, `rows ${sold}, first ${first}, opened ${opened}`);
     await tabTo('Stock');
-    const stock = await js<number>(`[...document.querySelectorAll('h3')].find((h) => h.textContent.trim() === 'Stock on hand')?.parentElement.querySelectorAll('tbody tr:not(.empty)').length ?? 0`);
-    flow('stock-listed-without-tick', stock >= 8, `rows ${stock}`);
+    await sleep(500);
+    await click('.views button', 'Stock on hand');
+    await sleep(700);
+    const stock = await rows('stock on hand');
+    flow('stock-listed-without-tick', stock >= 8, `rows ${stock}; ${await js<string>(`[...document.querySelectorAll('.views button.on')].map((b) => b.textContent).join() + ' | tables ' + [...document.querySelectorAll('table')].map((t) => t.getAttribute('aria-label')).join() + ' | find ' + (document.querySelector('input[aria-label="find in stock"]')?.value ?? 'none') + ' | low ' + (document.querySelector('input[type=checkbox]')?.checked ?? 'none') + ' | ' + (document.querySelector('tr.empty')?.textContent ?? '')`)}`);
     await tabTo('Shift');
+    await click('.views button', 'Past shifts');
+    await sleep(300);
     const shifts = await rows('past shifts');
     flow('past-shifts-listed', shifts >= 1, `rows ${shifts}`);
     await js(`document.querySelectorAll('nav[aria-label="main"] button')[0].click()`);
@@ -385,6 +390,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
 
     // Store details reach a printed receipt (made-up details, temporary data)
     await tabTo('Admin');
+    await click('[aria-label="admin section"] button', 'Store details');
+    await sleep(200);
     await setVal('input[aria-label="store nameEn"]', 'Fictional Mart');
     await setVal('input[aria-label="store addressLine"]', 'Made Up District');
     await setVal('input[aria-label="store vatNumber"]', '300000000000003');
@@ -431,6 +438,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     const note = () => js<string>(`document.querySelector('[aria-label="keyboard shortcuts"] .msg')?.textContent ?? ''`);
 
     await tabTo('Admin');
+    await click('[aria-label="admin section"] button', 'Keyboard shortcuts');
+    await sleep(200);
     // F1 while recording is recorded, it does not open Help
     await press('qty.focus', 'F1');
     const noHelp = await js<boolean>(`!document.querySelector('.help-overlay')`);
@@ -479,6 +488,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     flow('changed-cash-key-pays-once', label === 'F9' && enterOff && hooks.salesCount() === before + 1, `label ${label}, enter off ${enterOff}, sales ${before} -> ${hooks.salesCount()}`);
 
     await tabTo('Admin');
+    await click('[aria-label="admin section"] button', 'Keyboard shortcuts');
+    await sleep(200);
     await click('button', 'Reset all to default');
     await sleep(400);
     await tabTo('Sell');
@@ -933,6 +944,10 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       await js(`[...document.querySelectorAll('nav[aria-label="main"] button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
       await sleep(700);
     };
+    await openNamed('Stock');
+    await click('.views button', 'Stock on hand');
+    await sleep(500);
+    flow('stock-on-hand-view-lists', (await js<number>(`document.querySelectorAll('table[aria-label="stock on hand"] tbody tr').length`)) > 0, await js<string>(`[...document.querySelectorAll('.views button.on')].map((b) => b.textContent).join() + ' tables ' + document.querySelectorAll('table').length + ' ' + (document.querySelector('table[aria-label="stock on hand"]')?.textContent ?? '').slice(0, 120)`));
     await js(`window.pos.invoke('sale.finalize', { idempotencyKey: 'audit-chart-sale-0001', lines: [{ productId: 1, qty: 1000 }], payments: [{ tender: 'card', amount: 999999 }] }).catch(() => null)`);
     await openNamed('Reports');
     await sleep(900);
@@ -970,8 +985,11 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(500);
     flow('prepaid-screen-opens', await js<boolean>(`!!document.querySelector('table[aria-label="prepaid preview"]')`), 'table shown');
     await openNamed('Admin');
+    await click('[aria-label="admin section"] button', 'Backup and recovery');
     await sleep(700);
     flow('cloud-backup-screen-opens', await js<boolean>(`!!document.querySelector('table[aria-label="cloud backup status"]')`), await js<string>(`document.querySelector('[role="status"]')?.textContent ?? ''`));
+    await click('[aria-label="admin section"] button', 'Hardware test');
+    await sleep(200);
     await click('button', 'Open hardware test');
     await sleep(500);
     flow('hardware-screen-opens', await js<boolean>(`!!document.querySelector('input[aria-label="scanner test box"]') && !!document.querySelector('input[aria-label="label test box"]')`), 'test boxes shown');
@@ -994,6 +1012,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
 
     // Coming back to a tab must not overwrite what was typed there.
     await openNamed('Expenses');
+    await click('.views button', 'Expenses');
+    await sleep(300);
     await js(`[...document.querySelectorAll('table tbody tr')].find((r) => r.textContent.includes('SEC electricity'))?.click()`);
     await sleep(600);
     const payBox = 'input[aria-label="pay amount"]';
@@ -1021,6 +1041,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     flow('cash-flow-shown', flowShown, `shown ${flowShown}`);
 
     await openNamed('Shift');
+    await click('.views button', 'Handover');
+    await sleep(200);
     await js('void (window.alert = () => undefined)');
     await focus('input[aria-label="handover counted cash"]');
     await type('100', 10);
@@ -1190,6 +1212,8 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
 
     // The shift is closed elsewhere while a bill waits in Sell.
     await openNamed('Shift');
+    await click('.views button', 'Close shift');
+    await sleep(200);
     await focus('input');
     await js(`(() => { const label = [...document.querySelectorAll('label')].find((l) => l.textContent.includes('Counted cash')); label?.nextElementSibling?.focus(); })()`);
     await type('0', 10);

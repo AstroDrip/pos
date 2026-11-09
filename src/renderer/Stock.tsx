@@ -42,6 +42,7 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const canSee = can('reports.view');
   const [view, setView] = useRemembered<View>('stock', 'view', canSee ? 'attention' : 'receive', validOneOf(VIEWS));
+  const [find, setFind] = useState('');
   const [low, setLow] = useState<StockRow[]>([]);
   const [changes, setChanges] = useState<AdjustmentRow[]>([]);
   const [value, setValue] = useState<number | null>(null);
@@ -85,6 +86,7 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   return (
     <div className="page">
       <PageHeader title={t('Stock')} desc={t('Receive deliveries, record wastage, count the shelves.')} actions={<HelpLink article="stock-overview" />} />
+      {canSee && <div style={{ maxWidth: 420, marginBottom: 'var(--sp-3)' }}><input data-kb-search="product" data-kb-suggest aria-label="find in stock" placeholder={t('Find a product in stock')} value={find} onChange={(e) => { setFind(e.target.value); if (e.target.value && view !== 'all') setView('all'); }} /></div>}
       <Views name="stock view" value={view} onChange={setView} options={[
         ...(canSee ? [{ id: 'attention' as const, label: t('Needs attention') }, { id: 'all' as const, label: t('Stock on hand') }, { id: 'movements' as const, label: t('Movements') }] : []),
         ...(can('stock.receive') ? [{ id: 'receive' as const, label: t('Receive goods') }] : []),
@@ -132,11 +134,11 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
       {view === 'all' && canSee && (
         <div>
           <label><input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> {t('Only at or below reorder level')}</label>
-          <table className="list">
+          <table className="list" aria-label="stock on hand">
             <thead><tr><th>SKU</th><th>{t('Product')}</th><th className="num">{t('Qty')} <InfoIcon id="metric.stock.qty" /></th><th className="num">{t('Reorder at')} <InfoIcon id="metric.stock.reorder" /></th><th className="num">{t('Avg cost')} <InfoIcon id="metric.stock.cost" /></th></tr></thead>
             <tbody>
               {rows.length === 0 && <EmptyRow cols={5} text={onlyLow ? t('Nothing is at or below its reorder level.') : t('No products yet.')} />}
-              {rows.map((r) => (
+              {rows.filter((r) => !find.trim() || `${r.sku} ${r.nameEn} ${r.nameAr}`.toLowerCase().includes(find.trim().toLowerCase())).map((r) => (
                 <tr key={r.productId}>
                   <td>{r.sku}</td><td><ProductName en={r.nameEn} ar={r.nameAr} /></td>
                   <td className={`num${r.qty < 0 ? ' neg' : ''}`}>{formatQty(r.qty, 0)}</td><td className="num">{formatQty(r.reorderLevel, 0)}</td><td className="num">{formatSar(r.avgCost)}</td>

@@ -63,7 +63,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       'Press Log in.',
       'When you leave the till, press Log out at the top right.',
     ],
-    expect: 'The tabs (Sell, Refund and others) appear at the top, and your name is shown at the top right.',
+    expect: 'The menu (Sell, Refund and others) appears down the side, and your name is shown at the top right.',
     problems: [
       { problem: 'The app says the username or PIN is wrong.', fix: 'Type the PIN again slowly. If it still fails, ask the owner to check your user in Admin → Users.' },
       { problem: 'The screen says "First-time setup: create the owner account".', fix: 'This appears only on a new installation. The owner should fill it in, not a cashier.' },
@@ -75,7 +75,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     section: 'start',
     title: 'Find your way around the screen',
     keywords: ['tabs', 'menu', 'top bar', 'language', 'arabic', 'english', 'dark mode', 'theme'],
-    what: 'The bar at the top holds the tabs and a few settings for this till.',
+    what: 'The menu down the side holds the screens, in six groups. The thin bar at the top holds a few settings for this till. On Sell the menu shows only icons, so the bill has more room. Press the three lines at the bottom of the menu to show or hide the names.',
     steps: [
       'Tabs are grouped: Sell, Refund, Customers · Stock, Products, Purchases · Expenses, Accounting, Reports · Shift, Admin, Help.',
       'Press a tab to open that screen.',
@@ -654,7 +654,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: 'Add a supplier',
     keywords: ['supplier', 'vendor', 'new supplier', 'payment terms'],
     what: 'Add a company the store buys from.',
-    where: 'Admin tab → Suppliers.',
+    where: 'Purchases tab → Suppliers.',
     steps: [
       'Type the Name, and the Phone and VAT number if you have them.',
       'Type the Payment terms in days (for example 30). Use 0 if they want payment on delivery.',
@@ -704,7 +704,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: 'Change a supplier',
     keywords: ['supplier', 'edit', 'address', 'cr number', 'salesman', 'customer number', 'change supplier'],
     what: 'Correct a supplier, or add their address, CR number, salesman and your customer number with them.',
-    where: 'Admin tab → Suppliers.',
+    where: 'Purchases tab → Suppliers.',
     steps: [
       'Press Edit beside the supplier.',
       'Change the boxes you need.',
@@ -1312,7 +1312,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     what: 'Looking at today\'s sales, money collected, and what is owed both ways.',
     steps: [
       'Reports tab: choose today, read sales, cash, card, refunds and Activity by cashier.',
-      'Accounting tab → Owner overview: profit, expenses and Money position for today.',
+      'Accounting tab → Overview: main figures, and what the store has and owes right now.',
       'Customers tab → Ageing: who owes the store and how late.',
       'Purchases tab → What we owe suppliers.',
       'Shift tab: expected cash in the drawer.',
@@ -1473,6 +1473,28 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { problem: 'The scan shows as typed by hand.', fix: 'The scanner is sending too slowly or has no Enter suffix. Check the scanner\'s setup sheet.' },
       { problem: 'Double read flagged.', fix: 'The scanner sent one code twice very quickly. On the Sell screen the cashier is asked before it is added again.' },
       { problem: 'The printer did not accept the test.', fix: 'Check that it is on, has paper, and is the Windows default printer.' },
+    ],
+  },
+  {
+    id: 'reports-charts',
+    section: 'reports',
+    title: 'Reading a chart and choosing dates',
+    keywords: ['chart', 'graph', 'date', 'timeline', 'hover', 'tooltip', 'zoom', 'range', 'period', 'drill down'],
+    what: 'Charts on Reports, Accounting, Expenses, Stock, Customers and Purchases work the same way. The dates you choose drive the figures, the chart and the tables on that screen together.',
+    where: 'Reports tab, and other screens with a chart.',
+    steps: [
+      'Choose dates at the top: press a preset such as This month, press a day in the strip, or type dates in the two boxes. Hold Shift and press a second day to choose a stretch of days.',
+      'Move through dates with the arrows at the ends of the strip, or the mouse wheel over the strip.',
+      'Point at a bar to read its exact date, amount and count. The figures are always a real record, never a guess.',
+      'Click a bar to see what is behind it. Close returns you to the same chart and dates.',
+      'On Reports, drag across bars to choose those dates. Back to previous dates undoes it.',
+      'Show the numbers lists every value as a table.',
+      'With the keyboard: Tab to the chart, left and right arrows to move, Enter to open, Esc to clear.',
+    ],
+    expect: 'The dates shown beside the date strip match the chart, the figures and the tables.',
+    problems: [
+      { problem: 'A faint mark instead of a bar.', fix: 'Nothing was recorded for that period because the shop had not started. It is not a zero.' },
+      { problem: 'No bar on a day after the shop began.', fix: 'That is a real zero: nothing happened that day.' },
     ],
   },
 ];

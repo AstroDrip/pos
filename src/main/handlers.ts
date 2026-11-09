@@ -42,7 +42,7 @@ import {
 } from '../services/credit';
 import { applySupplierAdvance, setSupplierNotes, supplierAccount, supplierControls } from '../services/purchasing';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
-import { closeShift, handOverShift, listShifts, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
+import { closeShift, handOverShift, listShifts, openShift, openShiftId, recordCashMovement, shiftActivity, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
 
 export interface Printer {
@@ -146,6 +146,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, c
       return null;
     },
     'shift.history': (p, s) => listShifts(ctx, userId(s), p.limit),
+    'shift.activity': (p) => shiftActivity(ctx, p.shiftId),
     'shift.current': () => {
       const id = openShiftId(ctx);
       return id === null ? null : shiftSummary(ctx, id);

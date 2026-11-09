@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import { validOneOf } from './remember';
+import { useRemembered } from './TabHost';
+import { Views } from './Figures';
+import { HelpLink } from './HelpLink';
 import { CloudBackup } from './CloudBackup';
 import { HardwareTest } from './HardwareTest';
 import type { BackupStatus } from '../services/backup';
@@ -17,22 +21,37 @@ import { StoreDetailsCard } from './StoreDetailsCard';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
+const ADMIN_SECTIONS = ['backup', 'store', 'users', 'scale', 'import', 'hardware', 'keys'] as const;
+type AdminSection = (typeof ADMIN_SECTIONS)[number];
+
 export function Admin({ can }: { can: (p: string) => boolean }) {
   const { t } = useI18n();
+  const [section, setSection] = useRemembered<AdminSection>('admin', 'section', 'backup', validOneOf(ADMIN_SECTIONS));
+  const settings = can('settings.manage');
+  const sections: { id: AdminSection; label: string }[] = [
+    ...(can('backup.run') ? [{ id: 'backup' as const, label: t('Backup and recovery') }] : []),
+    ...(settings ? [{ id: 'store' as const, label: t('Store details') }] : []),
+    ...(can('user.manage') ? [{ id: 'users' as const, label: t('Users') }] : []),
+    ...(settings ? [{ id: 'scale' as const, label: t('Scale labels') }] : []),
+    ...(can('product.manage') || can('supplier.manage') ? [{ id: 'import' as const, label: t('Import from CSV') }] : []),
+    ...(settings ? [{ id: 'hardware' as const, label: t('Hardware test') }, { id: 'keys' as const, label: t('Keyboard shortcuts') }] : []),
+  ];
+  const shown = sections.some((x) => x.id === section) ? section : (sections[0]?.id ?? 'backup');
   return (
     <div className="page">
-      <PageHeader title={t('Admin')} desc={t('Backups, users, suppliers, imports and device settings.')} />
-      <div className="grid-cards">
-      {can('backup.run') && <Backup canSetup={can('settings.manage')} canRestore={can('backup.restore')} />}
-      {can('backup.run') && <CloudBackup can={can} />}
-      {can('settings.manage') && <HardwareTest />}
-      {can('user.manage') && <Users />}
-      {(can('product.manage') || can('supplier.manage')) && <Import />}
-      {can('settings.manage') && <ScaleLabels />}
-      {can('settings.manage') && <DashboardHealth />}
-      {can('settings.manage') && <StoreDetailsCard />}
-      {can('settings.manage') && <KeyboardSettings />}
+      <PageHeader title={t('Admin')} desc={t('Backups, users, imports and device settings.')} actions={<HelpLink article="admin-store-details" />} />
+      <Views name="admin section" value={shown} onChange={setSection} options={sections} />
+      <div hidden={shown !== 'backup'} className="admin-section">
+        {can('backup.run') && <Backup canSetup={can('settings.manage')} canRestore={can('backup.restore')} />}
+        {can('backup.run') && <CloudBackup can={can} />}
+        {can('settings.manage') && <DashboardHealth />}
       </div>
+      <div hidden={shown !== 'store'} className="admin-section">{can('settings.manage') && <StoreDetailsCard />}</div>
+      <div hidden={shown !== 'users'} className="admin-section">{can('user.manage') && <Users />}</div>
+      <div hidden={shown !== 'scale'} className="admin-section">{can('settings.manage') && <ScaleLabels />}</div>
+      <div hidden={shown !== 'import'} className="admin-section">{(can('product.manage') || can('supplier.manage')) && <Import />}</div>
+      <div hidden={shown !== 'hardware'} className="admin-section">{can('settings.manage') && <HardwareTest />}</div>
+      <div hidden={shown !== 'keys'} className="admin-section">{can('settings.manage') && <KeyboardSettings />}</div>
     </div>
   );
 }

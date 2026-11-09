@@ -8,6 +8,7 @@ const PRELOAD_CHANNELS = [
   'auth.login',
   'auth.logout',
   'shift.current',
+  'shift.activity',
   'shift.history',
   'shift.open',
   'shift.close',

@@ -86,6 +86,27 @@ export function handOverShift(ctx: Ctx, outgoingId: number, incomingId: number, 
   })();
 }
 
+export interface ShiftEvent {
+  at: string;
+  kind: 'sale' | 'refund' | 'cash_in' | 'cash_out';
+  detail: string;
+  user: string;
+  amount: number;
+}
+
+/** The shift's sales, refunds and cash movements in time order, newest first. Reads only. */
+export function shiftActivity(ctx: Ctx, shiftId: number): ShiftEvent[] {
+  return ctx.db
+    .prepare(
+      `SELECT at, kind, detail, user, amount FROM (
+         SELECT s.created_at AS at, 'sale' AS kind, s.invoice_no AS detail, u.display_name AS user, s.total_incl AS amount FROM sales s JOIN users u ON u.id = s.user_id WHERE s.shift_id = @id
+         UNION ALL SELECT r.created_at, 'refund', r.refund_no, u.display_name, -r.total_incl FROM refunds r JOIN users u ON u.id = r.user_id WHERE r.shift_id = @id
+         UNION ALL SELECT m.at, CASE m.kind WHEN 'in' THEN 'cash_in' ELSE 'cash_out' END, m.reason, u.display_name, CASE m.kind WHEN 'in' THEN m.amount ELSE -m.amount END FROM cash_movements m JOIN users u ON u.id = m.user_id WHERE m.shift_id = @id
+       ) ORDER BY at DESC LIMIT 200`,
+    )
+    .all({ id: shiftId }) as ShiftEvent[];
+}
+
 export function shiftSummary(ctx: Ctx, shiftId: number): ShiftSummary {
   const s = ctx.db.prepare('SELECT id, status, opening_float, counted_cash FROM register_shifts WHERE id = ?').get(shiftId) as
     | { id: number; status: 'open' | 'closed'; opening_float: number; counted_cash: number | null }

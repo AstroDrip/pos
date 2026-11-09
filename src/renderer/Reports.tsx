@@ -6,6 +6,7 @@ import { call } from './api';
 import { DateNavigator, useDateRange } from './DateNavigator';
 import { Kpi, Views } from './Figures';
 import { SalesChart } from './SalesChart';
+import { HelpLink } from './HelpLink';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validOneOf } from './remember';
@@ -41,7 +42,7 @@ export function Reports() {
 
   return (
     <div className="page">
-      <PageHeader title={t('Reports')} desc={t('Sales, refunds, cashiers and stock changes for any dates (Saudi time).')} />
+      <PageHeader title={t('Reports')} desc={t('Sales, refunds, cashiers and stock changes for any dates (Saudi time).')} actions={<HelpLink article="reports-charts" />} />
       <DateNavigator name="Reports" value={dates} onChange={setDates} />
       {error && <p className="msg error">{error}</p>}
       {r && (

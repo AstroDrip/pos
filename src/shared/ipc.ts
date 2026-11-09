@@ -45,6 +45,7 @@ export const schemas = {
   'auth.login': z.object({ username: z.string().min(1).max(40), pin: z.string().max(8) }),
   'auth.logout': z.null(),
   'shift.current': z.null(),
+  'shift.activity': z.object({ shiftId: int.positive() }),
   'shift.history': z.object({ limit: int.min(1).max(200) }),
   'shift.open': z.object({ openingFloat: money }),
   'shift.close': z.object({ countedCash: money }),

@@ -156,9 +156,10 @@ export function Refund({ canApprove, request }: { canApprove: boolean; request?:
           ) : (
             <>
               {sale.paidByCard > 0 && <p className="msg warn">{t('This sale was paid {0} by card. Store policy: the refund is given in cash.', formatSar(sale.paidByCard))}</p>}
+              <h4 className="step-title">{t('1. Choose what comes back')}</h4>
               <table className="list">
                 <thead>
-                  <tr><th>{t('Item')}</th><th className="num">{t('Sold')}</th><th className="num">{t('Already refunded')}</th><th className="num">{t('Paid')}</th><th>{t('Refund qty')}</th><th>{t('Back on shelf')}</th></tr>
+                  <tr><th>{t('Item')}</th><th className="num">{t('Sold')}</th><th className="num">{t('Already refunded')}</th><th className="num">{t('Can still refund')}</th><th className="num">{t('Paid')}</th><th>{t('Refund qty')}</th><th>{t('Back on shelf')}</th></tr>
                 </thead>
                 <tbody>
                   {sale.lines.map((l) => (
@@ -166,6 +167,7 @@ export function Refund({ canApprove, request }: { canApprove: boolean; request?:
                       <td><ProductName en={l.nameEn} ar={l.nameAr} /></td>
                       <td className="num">{formatQty(l.soldQty, l.sellMode === 'unit' ? 0 : 3)}</td>
                       <td className="num">{formatQty(l.refundedQty, l.sellMode === 'unit' ? 0 : 3)}</td>
+                      <td className="num"><strong>{formatQty(l.remainingQty, l.sellMode === 'unit' ? 0 : 3)}</strong></td>
                       <td className="num">{formatSar(l.lineIncl)}</td>
                       <td>
                         {l.remainingQty > 0 && (
@@ -188,6 +190,7 @@ export function Refund({ canApprove, request }: { canApprove: boolean; request?:
               </table>
               {invalid && <p className="msg error">{t('Check the quantities: no more than what is left, whole units for items sold by piece.')}</p>}
 
+              <h4 className="step-title">{t('2. Why it came back')}</h4>
               <label>{t('Reason')} <InfoIcon id="field.refund.reason" /></label>
               <select value={reason} onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])}>
                 {REASONS.map((r) => <option key={r} value={r}>{t(r)}</option>)}
@@ -201,9 +204,10 @@ export function Refund({ canApprove, request }: { canApprove: boolean; request?:
                   <input placeholder={t('PIN')} type="password" value={approver.pin} onChange={(e) => setApprover({ ...approver, pin: e.target.value })} />
                 </div>
               )}
+              <h4 className="step-title">{t('3. Confirm and pay')}</h4>
               <p>
                 <button
-                  className="primary"
+                  className="primary refund-go"
                   disabled={busy || chosen.length === 0 || invalid || !reasonText || (!canApprove && (!approver.username || !approver.pin))}
                   onClick={submit}
                 >

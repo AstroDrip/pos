@@ -694,8 +694,11 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
             onCheckoutKey={(e, empty) => onStepKey('search', e, empty)}
             onFocusBox={() => goStep('search', false)}
           />
-          <small className="hint">{t('Empty box: Enter or {0} = payment · {1} / {2} = one more / one less of the last item', keys['checkout.open'], keys['qty.inc'], keys['qty.dec'])}</small>
-          <small className="hint">{t('{0} = quick actions · {1} = quantity · {2} = help', keys['palette.open'], keys['qty.focus'], keys['help.open'])} · {t('{0} = customer', keys['customer.focus'])}</small>
+          <details className="more sell-keys">
+            <summary>{t('Keys')}</summary>
+            <small className="hint">{t('Empty box: Enter or {0} = payment · {1} / {2} = one more / one less of the last item', keys['checkout.open'], keys['qty.inc'], keys['qty.dec'])}</small>
+            <small className="hint">{t('{0} = quick actions · {1} = quantity · {2} = help', keys['palette.open'], keys['qty.focus'], keys['help.open'])} · {t('{0} = customer', keys['customer.focus'])}</small>
+          </details>
         </div>
         {step === 'qty' && pending && (
           <div className="step current" role="group" aria-label="quantity step">
@@ -818,7 +821,7 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
             </div>
           )}
         </div>
-        <div className="row">
+        <div className="bill-actions">
           <button disabled={busy || lines.length === 0} onClick={hold}>{t('Hold bill')}</button>
           <button className="danger" disabled={busy || lines.length === 0} onClick={() => window.confirm(t('Clear the whole bill?')) && removeLines('bill_cleared', lines.map((_, i) => i))}>{t('Clear bill')}</button>
         </div>

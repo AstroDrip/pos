@@ -9,6 +9,7 @@ import { Chart } from './Chart';
 import { DateNavigator, useDateRange } from './DateNavigator';
 import { call } from './api';
 import { Kpi, Views } from './Figures';
+import { HelpLink } from './HelpLink';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validOneOf, validText } from './remember';
@@ -64,7 +65,7 @@ export function Accounting() {
 
   return (
     <div className="page">
-      <PageHeader title={t('Accounting')} desc={t('Owner overview, profit and loss, balance sheet and ledgers (provisional until the accountant approves).')} />
+      <PageHeader title={t('Accounting')} desc={t('Owner overview, profit and loss, balance sheet and ledgers (provisional until the accountant approves).')} actions={<HelpLink article="expenses-words" />} />
       <DateNavigator name="Accounting" value={dates} onChange={setDates} />
       <Views name="accounting view" value={view} onChange={setView} options={[
         { id: 'overview', label: t('Overview') }, { id: 'pl', label: t('Profit and loss') }, { id: 'cash', label: t('Cash flow') }, { id: 'vat', label: t('VAT summary') }, { id: 'bs', label: t('Balance sheet') }, { id: 'ledger', label: t('Trial balance and ledger') },

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { formatSar, parseSar } from '../core/money';
+import { formatMoney, formatSar, parseSar } from '../core/money';
 import { storeDateTime } from '../core/store-time';
-import type { PastShift, ShiftSummary } from '../services/shifts';
+import type { PastShift, ShiftEvent, ShiftSummary } from '../services/shifts';
 import { call } from './api';
+import { Kpi, Views } from './Figures';
+import { HelpLink } from './HelpLink';
+import { validOneOf } from './remember';
 import { InfoIcon } from './InfoIcon';
-import { useReturnTick } from './TabHost';
+import { useRemembered, useReturnTick } from './TabHost';
 import { useI18n } from './i18n';
-import { EmptyRow } from './PageHeader';
+import { EmptyRow, PageHeader } from './PageHeader';
 
 export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUserChange?: () => void }) {
   const back = useReturnTick();
@@ -17,6 +20,7 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [hand, setHand] = useState({ counted: '', username: '', pin: '' });
 
+  const [view, setView] = useRemembered<'now' | 'cash' | 'close' | 'handover' | 'past'>('shift', 'view', 'now', validOneOf(['now', 'cash', 'close', 'handover', 'past']));
   const load = () => call<ShiftSummary | null>('shift.current').then(setS);
   useEffect(() => void load(), [back]);
 
@@ -32,12 +36,26 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
   };
 
   const past = can('reports.view') && <PastShifts refresh={msg} />;
-  if (!s) return <><div className="card">{t('No open shift. Open one from the Sell tab.')}{msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}</div>{past}</>;
+  if (!s) return <div className="page"><PageHeader title={t('Shift')} actions={<HelpLink article="shifts-close" />} /><p className="msg warn">{t('No open shift. Open one from the Sell tab.')}</p>{msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}{past}</div>;
 
   return (
-    <>
-    <div className="card">
-      <h3>{t('Shift #{0}', s.shiftId)}</h3>
+    <div className="page">
+    <PageHeader title={t('Shift #{0}', s.shiftId)} actions={<HelpLink article="shifts-close" />} />
+    <div className="kpis">
+      <Kpi lead info="metric.shift.expected" l={t('Expected cash in drawer')} v={formatMoney(s.expectedCash)} />
+      <Kpi info="metric.shift.float" l={t('Opening float')} v={formatMoney(s.openingFloat)} />
+      <Kpi l={t('Sales ({0})', s.saleCount)} v={formatMoney(s.cashSales + s.cardSales)} />
+    </div>
+    <div style={{ marginTop: 'var(--sp-3)' }}>
+      <Views name="shift view" value={view} onChange={setView} options={[
+        { id: 'now', label: t('This shift') },
+        ...(can('cash.move') ? [{ id: 'cash' as const, label: t('Cash in / out') }] : []),
+        { id: 'close', label: t('Close shift') }, { id: 'handover', label: t('Handover') },
+        ...(can('reports.view') ? [{ id: 'past' as const, label: t('Past shifts') }] : []),
+      ]} />
+    </div>
+    {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+    <div className="card section" hidden={view !== 'now'}>
       <table className="list">
         <tbody>
           <tr><td>{t('Opening float')} <InfoIcon id="metric.shift.float" /></td><td className="num">{formatSar(s.openingFloat)}</td></tr>
@@ -46,13 +64,15 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
           <tr><td>{t('Card sales')} <InfoIcon id="metric.shift.card" /></td><td className="num">{formatSar(s.cardSales)}</td></tr>
           <tr><td>{t('Cash in / out')} <InfoIcon id="metric.shift.moves" /></td><td className="num">{formatSar(s.cashIn)} / {formatSar(s.cashOut)}</td></tr>
           <tr><td>{t('Refunds paid in cash ({0})', s.refundCount)} <InfoIcon id="metric.shift.refunds" /></td><td className="num">{formatSar(s.cashRefunds)}</td></tr>
-          <tr><td><strong>{t('Expected cash in drawer')} <InfoIcon id="metric.shift.expected" /></strong></td><td className="num"><strong>{formatSar(s.expectedCash)}</strong></td></tr>
+          <tr><td><strong>{t('Expected cash in drawer')}</strong></td><td className="num"><strong>{formatSar(s.expectedCash)}</strong></td></tr>
         </tbody>
       </table>
-
+      <ShiftActivity shiftId={s.shiftId} tick={msg} />
+    </div>
+    <div className="card section" hidden={view !== 'cash'}>
       {can('cash.move') && (
         <>
-          <h4>{t('Cash in / out')}</h4>
+          <h4 style={{ marginTop: 0 }}>{t('Cash in / out')}</h4>
           <div className="row">
             <select value={move.kind} onChange={(e) => setMove({ ...move, kind: e.target.value as 'in' | 'out' })}>
               <option value="out">{t('Out')}</option>
@@ -69,8 +89,9 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
           </p>
         </>
       )}
-
-      <h4>{t('Close shift')}</h4>
+    </div>
+    <div className="card section" hidden={view !== 'close'}>
+      <h4 style={{ marginTop: 0 }}>{t('Close shift')}</h4>
       <label>{t('Counted cash in drawer (SAR)')} <InfoIcon id="field.shift.counted" /></label>
       <input value={counted} onChange={(e) => setCounted(e.target.value)} />
       <p>
@@ -87,7 +108,9 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
           {t('Close shift')}
         </button>
       </p>
-      <h4>{t('Hand over to the next cashier')}</h4>
+    </div>
+    <div className="card section" hidden={view !== 'handover'}>
+      <h4 style={{ marginTop: 0 }}>{t('Hand over to the next cashier')}</h4>
       <p className="hint">{t('Count the drawer, then the next cashier types their username and PIN. Your shift closes and theirs opens with this cash.')}</p>
       <div className="row">
         <div><label>{t('Counted cash in drawer (SAR)')} <InfoIcon id="field.shift.counted" /></label><input aria-label="handover counted cash" value={hand.counted} onChange={(e) => setHand({ ...hand, counted: e.target.value })} /></div>
@@ -111,9 +134,26 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
           {t('Hand over')}
         </button>
       </p>
-      {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
     </div>
-    {past}
+    <div hidden={view !== 'past'}>{past}</div>
+    </div>
+  );
+}
+
+/** What has happened in this shift, newest first. It only lists. */
+function ShiftActivity({ shiftId, tick }: { shiftId: number; tick: unknown }) {
+  const { t } = useI18n();
+  const back = useReturnTick();
+  const [rows, setRows] = useState<ShiftEvent[]>([]);
+  useEffect(() => void call<ShiftEvent[]>('shift.activity', { shiftId }).then(setRows, () => setRows([])), [shiftId, tick, back]);
+  const LABEL: Record<ShiftEvent['kind'], string> = { sale: 'Sale', refund: 'Refund', cash_in: 'Cash in', cash_out: 'Cash out' };
+  return (
+    <>
+      <h4>{t('Activity')}</h4>
+      <table className="list" aria-label="shift activity">
+        <thead><tr><th>{t('Time')}</th><th>{t('What happened')}</th><th>{t('Details')}</th><th>{t('User')}</th><th className="num">{t('Amount')}</th></tr></thead>
+        <tbody>{rows.length === 0 && <EmptyRow cols={5} text={t('Nothing yet in this shift.')} />}{rows.map((e, i) => <tr key={i}><td>{storeDateTime(e.at)}</td><td>{t(LABEL[e.kind])}</td><td>{e.detail}</td><td>{e.user}</td><td className={`num${e.amount < 0 ? ' neg' : ''}`}>{formatSar(e.amount)}</td></tr>)}</tbody>
+      </table>
     </>
   );
 }

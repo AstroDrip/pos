@@ -4,6 +4,7 @@ import { storeDay } from '../core/store-time';
 import type { VatReviewDetail, VatReviewRow } from '../services/vat-review';
 import { call } from './api';
 import { useI18n } from './i18n';
+import { HelpLink } from './HelpLink';
 import { InfoIcon } from './InfoIcon';
 import { EmptyRow } from './PageHeader';
 
@@ -41,7 +42,7 @@ export function VatReview({ can }: { can: (p: string) => boolean }) {
   const show = (billId: number) => void call<VatReviewDetail>('vat.get', { billId }).then((d) => { setOpen(d); setError(''); }, (e: Error) => setError(t(e.message)));
   return (
     <div className="card section bill-card">
-      <h3>{t('Proforma VAT review')}</h3>
+      <h3>{t('Proforma VAT review')} <HelpLink article="suppliers-proforma-vat" /></h3>
       <p className="hint">{t('VAT on a proforma stays a cost until the final tax invoice is checked and your accountant approves it.')}</p>
       {error && <p className="msg error">{error}</p>}
       <table className="list" aria-label="proforma vat review">

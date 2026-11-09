@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatSar, parseSar } from '../core/money';
 import type { Product } from '../services/catalog';
 import { call } from './api';
+import { HelpLink } from './HelpLink';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validOneOf, validText } from './remember';
@@ -73,7 +74,7 @@ export function Products() {
 
   return (
     <div className="page">
-      <PageHeader title={t('Products')} desc={t('Add products, change prices, other names for search, deactivate.')} actions={<button className={adding ? undefined : 'primary'} onClick={() => setAdding(!adding)}>{adding ? t('Close') : t('New product')}</button>} />
+      <PageHeader title={t('Products')} desc={t('Add products, change prices, other names for search, deactivate.')} actions={<><button className={adding ? undefined : 'primary'} onClick={() => setAdding(!adding)}>{adding ? t('Close') : t('New product')}</button><HelpLink article="stock-products" /></>} />
       {adding && (
       <form className="card section" onSubmit={save} aria-label="new product form">
         <h3>{t('New product')}</h3>

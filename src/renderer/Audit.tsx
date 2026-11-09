@@ -3,6 +3,8 @@ import { storeDateTime } from '../core/store-time';
 import type { AuditFilterChoices, AuditView } from '../services/audit-view';
 import type { ItemInfo } from '../services/catalog';
 import { call } from './api';
+import { DateNavigator, useDateRange } from './DateNavigator';
+import { HelpLink } from './HelpLink';
 import { useI18n } from './i18n';
 import { formatSar } from '../core/money';
 import { EmptyRow, PageHeader } from './PageHeader';
@@ -35,12 +37,12 @@ export function Audit({ can, openSale, openCustomer, books }: {
       <PageHeader
         title={t('Audit')}
         desc={t('Who did what and when. Nothing here can be changed or removed.')}
-        actions={books ? (
+        actions={<><HelpLink article="audit-log" />{books ? (
           <div className="seg" role="group" aria-label="audit section">
             <button className={section === 'log' ? 'on' : ''} onClick={() => setSection('log')}>{t('Activity log')}</button>
             <button className={section === 'books' ? 'on' : ''} onClick={() => setSection('books')}>{t('Books check')}</button>
           </div>
-        ) : undefined}
+        ) : null}</>}
       />
       {section === 'log' ? <ActivityLog can={can} openSale={openSale} openCustomer={openCustomer} /> : books}
     </div>
@@ -50,7 +52,9 @@ export function Audit({ can, openSale, openCustomer, books }: {
 function ActivityLog({ can, openSale, openCustomer }: { can: (p: string) => boolean; openSale: (invoiceNo: string) => void; openCustomer: (id: number) => void }) {
   const { t } = useI18n();
   const back = useReturnTick();
-  const [f, setF] = useState<Filters>(BLANK);
+  const [dates, setDates] = useDateRange('audit', 'month');
+  const [typed, setF] = useState<Filters>(BLANK);
+  const f = { ...typed, from: dates.from, to: dates.to };
   const [choices, setChoices] = useState<AuditFilterChoices>({ actions: [], entities: [], users: [] });
   const [data, setData] = useState<{ items: AuditView[]; total: number }>({ items: [], total: 0 });
   const [open, setOpen] = useState<number | null>(null);
@@ -64,7 +68,7 @@ function ActivityLog({ can, openSale, openCustomer }: { can: (p: string) => bool
   useEffect(() => {
     const h = setTimeout(() => void load(0), f.text ? 250 : 0);
     return () => clearTimeout(h);
-  }, [f, back]);
+  }, [typed, dates.from, dates.to, back]);
 
   const exportCsv = async () => {
     try {
@@ -80,29 +84,28 @@ function ActivityLog({ can, openSale, openCustomer }: { can: (p: string) => bool
   };
 
   return (
-    <div className="card">
+    <div className="card section" style={{ maxWidth: 'none' }}>
+      <DateNavigator name="Audit" value={dates} onChange={setDates} />
       <div className="row">
-        <div><label>{t('Search')}</label><input data-kb-search="audit" aria-label="audit search" value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} /></div>
+        <div><label>{t('Search')}</label><input data-kb-search="audit" aria-label="audit search" value={f.text} onChange={(e) => setF({ ...typed, text: e.target.value })} /></div>
         <div><label>{t('User')}</label>
-          <select aria-label="audit user" value={f.userId} onChange={(e) => setF({ ...f, userId: Number(e.target.value) })}>
+          <select aria-label="audit user" value={f.userId} onChange={(e) => setF({ ...typed, userId: Number(e.target.value) })}>
             <option value={0}>{t('All')}</option>
             {choices.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
         <div><label>{t('Action')}</label>
-          <select aria-label="audit action" value={f.action} onChange={(e) => setF({ ...f, action: e.target.value })}>
+          <select aria-label="audit action" value={f.action} onChange={(e) => setF({ ...typed, action: e.target.value })}>
             <option value="">{t('All')}</option>
             {choices.actions.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
         <div><label>{t('Record type')}</label>
-          <select aria-label="audit entity" value={f.entity} onChange={(e) => setF({ ...f, entity: e.target.value })}>
+          <select aria-label="audit entity" value={f.entity} onChange={(e) => setF({ ...typed, entity: e.target.value })}>
             <option value="">{t('All')}</option>
             {choices.entities.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div><label>{t('From')}</label><input type="date" aria-label="audit from" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></div>
-        <div><label>{t('To')}</label><input type="date" aria-label="audit to" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></div>
       </div>
       {can('audit.export') && <p><button type="button" onClick={() => void exportCsv()}>{t('Export to CSV')}</button></p>}
       {msg && <p className="msg error">{msg}</p>}

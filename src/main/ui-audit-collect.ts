@@ -28,7 +28,8 @@ export const COLLECT_SOURCE = String.raw`(() => {
     const r = el.getBoundingClientRect();
     let myId = parentId;
     const overlay = overlayAncestor || cs.position === 'absolute' || cs.position === 'fixed' || OVERLAY_CLASS.test(el.className && el.className.baseVal === undefined ? el.className : '');
-    if (visible(el, cs, r) && el !== document.body) {
+    // Days scrolled out of the date strip are meant to be off to the side: the strip has a scrollbar and arrows.
+    if (visible(el, cs, r) && el !== document.body && !el.parentElement?.closest('.date-strip')) {
       myId = 'e' + (++seq);
       idOf.set(el, myId);
       const tag = el.tagName.toLowerCase();
