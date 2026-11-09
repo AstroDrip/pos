@@ -109,6 +109,15 @@ const cogs: Check = (ctx) => {
     const want = expected.get(s.id) ?? 0;
     if (net !== want) out.push({ checkId: 'cogs', severity: 'warning', entityType: 'sale', entityId: s.no, problem: `The cost booked for sale ${s.no} differs from its items.`, explanation: `Booked SAR ${fmt(net)}. The items at their cost come to SAR ${fmt(want)}.`, suggestion: ASK });
   }
+  // A refund has one line for goods back on the shelf. A second line can appear when stock had gone negative, so one of them must match.
+  const restocked = new Map<number, number>();
+  for (const l of all<{ id: number; qty: number; cost: number }>(ctx, 'SELECT refund_id AS id, qty, unit_cost AS cost FROM refund_lines WHERE restock = 1')) restocked.set(l.id, (restocked.get(l.id) ?? 0) + lineCost(l.qty, l.cost));
+  const credits = ctx.db.prepare("SELECT l.credit AS c FROM journal_lines l JOIN journal_entries j ON j.id = l.entry_id JOIN accounts a ON a.id = l.account_id WHERE j.source_type = 'refund' AND j.source_id = ? AND a.code = '5000' AND l.credit > 0");
+  for (const r of all<{ id: number; no: string }>(ctx, 'SELECT id, refund_no AS no FROM refunds')) {
+    const want = restocked.get(r.id) ?? 0;
+    const lines = (credits.all(r.id) as { c: number }[]).map((x) => x.c);
+    if (want === 0 ? lines.length > 0 : !lines.includes(want)) out.push({ checkId: 'cogs', severity: 'warning', entityType: 'refund', entityId: r.no, problem: `The cost booked for refund ${r.no} differs from the goods put back.`, explanation: `The goods put back on the shelf come to SAR ${fmt(want)} at cost.`, suggestion: ASK });
+  }
   return out;
 };
 
@@ -221,9 +230,12 @@ export function checkCashFlow(ctx: Ctx, report?: CashFlow): Finding[] {
 
 const SOURCE_TABLES: Record<string, string> = {
   sale: 'sales', refund: 'refunds', cash_movement: 'cash_movements', customer_receipt: 'customer_receipts', customer_writeoff: 'customer_writeoffs', expense: 'expenses',
-  expense_payment: 'expense_payments', grn: 'goods_receipts', purchase_invoice: 'purchase_invoices', purchase_return: 'purchase_returns', shift_close: 'register_shifts',
+  expense_payment: 'expense_payments', expense_amort: 'expense_amortization', expense_reversal: 'expenses', customer_advance_applied: 'receipt_allocations', supplier_advance_applied: 'supplier_payment_allocations', grn: 'goods_receipts', purchase_invoice: 'purchase_invoices', purchase_return: 'purchase_returns', shift_close: 'register_shifts',
   stock_adjustment: 'stock_adjustments', supplier_opening: 'supplier_opening_balances', supplier_payment: 'supplier_payments',
 };
+
+/** Entries that do not come from a document in the app. */
+const NO_DOCUMENT = new Set(['demo_opening']);
 
 const orphans: Check = (ctx) => {
   const out: Finding[] = [];
@@ -231,6 +243,9 @@ const orphans: Check = (ctx) => {
   for (const [type, table] of Object.entries(SOURCE_TABLES)) {
     for (const r of all<{ id: number; sid: number }>(ctx, `SELECT j.id, j.source_id AS sid FROM journal_entries j WHERE j.source_type = ? AND NOT EXISTS (SELECT 1 FROM ${table} d WHERE d.id = j.source_id)`, type)) add('journal_entry', String(r.id), `Journal entry ${r.id} points to ${type} ${r.sid}, which is missing.`);
     for (const r of all<{ id: number; sid: number }>(ctx, `SELECT m.id, m.source_id AS sid FROM stock_movements m WHERE m.source_type = ? AND NOT EXISTS (SELECT 1 FROM ${table} d WHERE d.id = m.source_id)`, type)) add('stock_movement', String(r.id), `Stock movement ${r.id} points to ${type} ${r.sid}, which is missing.`);
+  }
+  for (const r of all<{ t: string }>(ctx, 'SELECT DISTINCT source_type AS t FROM journal_entries')) {
+    if (!SOURCE_TABLES[r.t] && !NO_DOCUMENT.has(r.t)) add('journal_entry', r.t, `Journal entries of type "${r.t}" are not recognised.`);
   }
   for (const r of all<{ id: number }>(ctx, 'SELECT p.id FROM payments p LEFT JOIN sales s ON s.id = p.sale_id WHERE s.id IS NULL')) add('payment', String(r.id), `Payment ${r.id} has no sale.`);
   for (const r of all<{ no: string }>(ctx, 'SELECT r.receipt_no AS no FROM customer_receipts r WHERE r.amount > 0 AND r.reversed_of IS NULL AND COALESCE((SELECT SUM(a.amount) FROM receipt_allocations a WHERE a.receipt_id = r.id), 0) > r.amount')) add('customer_receipt', r.no, `Customer payment ${r.no} was applied for more than was received.`);

@@ -94,6 +94,12 @@ The checkout is always in exactly one state. The key map is in `renderer/checkou
 - Cash collected comes from payment records (cash basis) and is labelled as such.
 - **One KPI service** (`services/financials.ts`) feeds both the desktop Accounting tab and the dashboard snapshots, so the two can't disagree.
 
+## ADR-7 Tabs stay open; screen memory; audit detail; books check
+- **Tabs stay mounted**, hidden, keyed by user. Hidden tabs take no keys or scans (`useTabActive`).
+- **What survives a restart:** filters and places in `localStorage` per user; unfinished bills in SQLite (`bill_drafts`). PINs and approvers are never kept.
+- **Audit records** carry their extra facts in `details_json` under `_m`, which is already hashed, so the chain and old rows are unaffected.
+- **Books check** (`services/integrity.ts`) is read-only SQL over source documents. It does not call the functions that produce the figures. It reports and never corrects.
+
 ## ADR-6 Owner dashboard (local part built; remote part needs an owner decision)
 - The POS stays the only system that writes data.
 - **Snapshot instead of raw database access.** A reporting snapshot (daily KPIs, low stock, recent activity, sync health) is written to a **transactional outbox** table (`sync_outbox`) in the same SQLite file.

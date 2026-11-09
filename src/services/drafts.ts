@@ -1,3 +1,4 @@
+import { isSupplierDraft } from '../core/bill-draft';
 import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
 import { payloadSchema } from './held-bills';
@@ -27,7 +28,7 @@ function usable(ctx: Ctx, kind: DraftKind, json: string): boolean {
   } catch {
     return false;
   }
-  if (kind !== 'sale') return true;
+  if (kind !== 'sale') return isSupplierDraft(value);
   const parsed = payloadSchema.safeParse(value);
   if (!parsed.success) return false;
   return !parsed.data.billKey || !ctx.db.prepare('SELECT 1 FROM sales WHERE idempotency_key = ?').get(parsed.data.billKey);

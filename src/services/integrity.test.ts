@@ -81,6 +81,28 @@ describe('books check', () => {
     expect(found()).toContain('cogs');
   });
 
+  it('finds refund cost of goods that differs from the restocked lines', () => {
+    unlock('journal_lines');
+    const entry = firstEntry('refund').id;
+    ctx.db.prepare('UPDATE journal_lines SET credit = credit + 500 WHERE entry_id = ? AND account_id = ?').run(entry, accountId('5000'));
+    ctx.db.prepare('UPDATE journal_lines SET debit = debit + 500 WHERE entry_id = ? AND account_id = ?').run(entry, accountId('1200'));
+    expect(found()).toContain('cogs');
+  });
+
+  for (const [source, table] of [['expense_amort', 'expense_amortization'], ['expense_reversal', 'expenses'], ['customer_advance_applied', 'receipt_allocations'], ['supplier_advance_applied', 'supplier_payment_allocations']] as const) {
+    it(`finds a ${source} entry whose record is gone (${table})`, () => {
+      unlock('journal_entries');
+      ctx.db.pragma('foreign_keys = OFF');
+      ctx.db.prepare("INSERT INTO journal_entries (entry_date, source_type, source_id, memo, created_at) VALUES ('2026-11-01', ?, 99999999, 'test', ?)").run(source, NOW);
+      expect(found()).toContain('orphans');
+    });
+  }
+
+  it('a journal entry from an unknown source is reported', () => {
+    ctx.db.prepare("INSERT INTO journal_entries (entry_date, source_type, source_id, memo, created_at) VALUES ('2026-11-01', 'mystery', 1, 'test', ?)").run(NOW);
+    expect(found()).toContain('orphans');
+  });
+
   it('finds a refund for more than was sold', () => {
     unlock('refund_lines');
     ctx.db.prepare('UPDATE refund_lines SET qty = qty + 900000 WHERE rowid = (SELECT MIN(rowid) FROM refund_lines)').run();

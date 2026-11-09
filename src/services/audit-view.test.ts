@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { storeDateTime } from '../core/store-time';
 import { openDatabase } from '../db/connection';
 import { appendAudit, verifyAuditChain } from './audit';
 import { auditFilters, csvCell, exportAudit, listAudit } from './audit-view';
@@ -104,6 +105,7 @@ describe('exporting the log', () => {
     add('test.a', u.admin);
     const csv = exportAudit(ctx, u.admin, { ...page, action: 'test.a' });
     expect(csv.split('\r\n')[0]).toContain('Action');
+    expect(csv.split('\r\n')[1]).toContain(storeDateTime(ctx.now())); // the same store time the screen shows
     expect(csv).toContain('test.a');
     expect(listAudit(ctx, u.admin, { ...page, action: 'audit.export' }).items).toHaveLength(1);
   });
@@ -117,7 +119,7 @@ describe('exporting the log', () => {
   }, 60_000);
 
   it('escapes cells that a spreadsheet would run as a formula', () => {
-    for (const bad of ['=1+1', '+1', '-1', '@x']) expect(csvCell(bad)).toBe(`'${bad}`);
+    for (const bad of ['=1+1', '+1', '-1', '@x', '\t=1', '\r=1']) expect(csvCell(bad).replace(/^"|"$/g, '')).toBe(`'${bad}`);
     expect(csvCell('a,b')).toBe('"a,b"');
     expect(csvCell('say "hi"')).toBe('"say ""hi"""');
     expect(csvCell(null)).toBe('');

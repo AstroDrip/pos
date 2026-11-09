@@ -80,7 +80,7 @@ export function TabPane({ id, active, children }: { id: string; active: boolean;
       // The screen moves focus itself if it needs a particular box; otherwise its main box gets it.
       requestAnimationFrame(() => {
         const current = document.activeElement;
-        if (current && current !== document.body && current.closest('[hidden]') === null) return;
+        if (current && current !== document.body && current.closest('[hidden]') === null && current.closest('nav') === null) return; // a click on a tab leaves focus on the tab button
         const box = [...(ref.current?.querySelectorAll<HTMLElement>('[data-kb-search]') ?? [])].find((el) => el.offsetParent !== null && !(el as HTMLInputElement).disabled);
         box?.focus();
       });

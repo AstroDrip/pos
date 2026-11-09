@@ -36,6 +36,12 @@ Not re-run in this round: `e2e/installer.mjs`, `e2e/packaged.mjs`.
 Visual check by eye: dark-mode Sell screen and light-mode Accounting screen screenshots from the e2e run (readable
 text, dark cards, visible focus outline).
 
+## Master Prompt A (2026-11-09)
+- `npm test`: 651 passed. `npm run typecheck` and `npm run lint`: clean.
+- `npm run ui-audit` (Electron itself, temporary data): 54 screens, 0 findings, 101 of 101 flows.
+- `npm run ui-audit -- <dir> --demo`: 25 screens, 0 findings, 24 of 24 flows.
+- Not run: `npm run e2e`, Playwright. Not tried: real scanner, real Arabic keyboard, true process restart (a full screen reload was used).
+
 ## Manual and hardware tests
 None on store hardware so far. The receipt printer, scanner, scale labels and cash drawer have not been tested; their models are unknown.
 

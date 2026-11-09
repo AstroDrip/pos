@@ -8,6 +8,7 @@ import type { LookupResult, Product } from '../services/catalog';
 import type { Supplier } from '../services/parties';
 import type { DocType, SupplierItem } from '../services/supplier-bills';
 import { singleMatch } from '../core/suggest-keys';
+import { isSupplierDraft } from '../core/bill-draft';
 import { call, type ApiError } from './api';
 import { InfoIcon } from './InfoIcon';
 import { HelpLink } from './HelpLink';
@@ -53,7 +54,9 @@ interface Draft { key: string; head: Head; paper: Paper; rows: Row[] }
 function readDraft(): Draft | null {
   try {
     const raw = localStorage.getItem(DRAFT);
-    return raw ? (JSON.parse(raw) as Draft) : null;
+    if (!raw) return null;
+    const v: unknown = JSON.parse(raw);
+    return isSupplierDraft(v) ? (v as Draft) : null;
   } catch {
     return null;
   }
@@ -103,7 +106,7 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
       let d: Draft | null;
       try {
         const saved = await call<{ json: string } | null>('draft.get', { kind: 'supplier_bill' });
-        d = saved ? (JSON.parse(saved.json) as Draft) : readDraft(); // a draft from before drafts were kept per user
+        d = saved ? (JSON.parse(saved.json) as Draft) : readDraft(); // the server has already checked its shape; the other is from before drafts were kept per user
       } catch {
         d = readDraft();
       }
@@ -113,8 +116,8 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
         // nothing to clear
       }
       if (d) {
-        setHead(d.head);
-        setPaper(d.paper);
+        setHead({ ...blankHead(), ...d.head });
+        setPaper({ ...blankPaper(), ...d.paper });
         setRows(d.rows);
         requestKey.current = d.key;
       }

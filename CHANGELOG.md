@@ -2,6 +2,20 @@
 
 Not for live trading: there is no ZATCA Phase 2 integration yet, and receipts are marked "NOT A ZATCA TAX INVOICE".
 
+## Unreleased — Sell keys, tab memory, audit log, books check, Help registry (2026-11-09)
+
+Details: `docs/IMPLEMENTATION_REPORT_MASTER_PROMPT_A.md`. Accounting PROVISIONAL.
+
+### Added
+- Z holds the bill on the payment step. F2 goes to the customer box.
+- Customer suggestions on Sell. Nobody is chosen until the cashier chooses.
+- Held bills keep discounts, customer and typed amounts, and can be cancelled.
+- Tabs stay as they were left. Filters, last tab and Help position survive a restart. A bill left open comes back.
+- Search ranking uses time of day, day of week and stock, with plain tags.
+- Audit tab for the administrator. Records hold who, role, screen, before, after and result.
+- Shift handover. Cash flow report. Books check with 19 read-only checks.
+- 151 field and 64 figure explanations behind an "i" icon, with worked examples tested against the real services.
+
 ## Unreleased — Customer and supplier credit (2026-11-06)
 
 Details: `docs/CREDIT_MANAGEMENT_IMPLEMENTATION_REPORT.md`. Accounting PROVISIONAL.

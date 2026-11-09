@@ -71,6 +71,19 @@ describe('bills left open', () => {
     expect(count('bill_drafts')).toBe(0);
   });
 
+  it('a supplier bill draft of the wrong shape is removed and returns null', () => {
+    for (const bad of ['{}', '{"key":"k","head":{},"paper":{},"rows":[]}', '{"key":"k","head":{"docNo":"1","supplierId":1},"paper":{},"rows":"none"}', '{"key":"k","head":{"docNo":"1","supplierId":1},"paper":{},"rows":[{"uid":"a"}]}']) {
+      saveDraft(ctx, u.admin, 'supplier_bill', bad);
+      expect(loadDraft(ctx, u.admin, 'supplier_bill'), bad).toBeNull();
+      expect(count('bill_drafts')).toBe(0);
+    }
+  });
+
+  it('a good supplier bill draft is kept', () => {
+    saveDraft(ctx, u.admin, 'supplier_bill', JSON.stringify({ key: 'k', head: { docNo: 'INV-1', supplierId: 1 }, paper: {}, rows: [{ uid: 'a', product: { id: 1 } }] }));
+    expect(loadDraft(ctx, u.admin, 'supplier_bill')).not.toBeNull();
+  });
+
   it('a very large draft is refused', () => expect(() => saveDraft(ctx, u.cashier, 'sale', 'x'.repeat(200_001))).toThrow());
 
   it('clearing is silent; restore and discard are audited', () => {

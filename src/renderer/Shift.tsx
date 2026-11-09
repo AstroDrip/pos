@@ -99,7 +99,9 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
           disabled={!hand.counted.trim() || !hand.username.trim() || !hand.pin}
           onClick={() =>
             run(async () => {
-              const r = await call<{ closed: ShiftSummary }>('shift.handover', { countedCash: parseSar(hand.counted), username: hand.username, pin: hand.pin });
+              const pin = hand.pin;
+              setHand((h) => ({ ...h, pin: '' })); // used once: a wrong PIN must be typed again, not re-sent
+              const r = await call<{ closed: ShiftSummary }>('shift.handover', { countedCash: parseSar(hand.counted), username: hand.username, pin });
               setHand({ counted: '', username: '', pin: '' });
               window.alert(t('Shift handed over. Expected {0}, counted {1}, difference {2}.', formatSar(r.closed.expectedCash), formatSar(r.closed.countedCash ?? 0), formatSar((r.closed.countedCash ?? 0) - r.closed.expectedCash)));
               onUserChange?.();

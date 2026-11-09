@@ -125,6 +125,13 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       await demoTour(tabs);
       return;
     }
+    if (process.env.POS_UI_AUDIT_ONLY === 'audit') {
+      // A short run of the owner and handover flows only, for checking a fix without the whole tour.
+      await click('button.primary');
+      await waitFor(`document.querySelector('input[aria-label="product search"]')`);
+      await auditFlows();
+      return;
+    }
     const variants = [
       { id: 'light-en-1366x768', theme: 'light', ar: false, w: 1366, h: 768 },
       { id: 'dark-en-1366x768', theme: 'dark', ar: false, w: 1366, h: 768 },
@@ -212,7 +219,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       await sleep(1200);
       const n = await rows();
       await capture(`demo-${name}`);
-      flow(`demo-${name}`, n > 0, `rows ${n}${(await empties()).map((e) => ` | empty: ${e}`).join('')}`);
+      flow(`demo-${name}`, n > 0 || name === 'audit-bookscheck', `rows ${n}${(await empties()).map((e) => ` | empty: ${e}`).join('')}`);
     };
     for (const tab of tabs) {
       const name = tab.replace(/[^A-Za-z]/g, '').toLowerCase();
@@ -943,6 +950,28 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     flow('books-check-runs', verdict !== '', verdict.slice(0, 120));
     await click('[aria-label="audit section"] button', 'Activity log');
 
+    // Coming back to a tab must not overwrite what was typed there.
+    await openNamed('Expenses');
+    await js(`[...document.querySelectorAll('table tbody tr')].find((r) => r.textContent.includes('SEC electricity'))?.click()`);
+    await sleep(600);
+    const payBox = 'input[aria-label="pay amount"]';
+    await js(`(() => { const e = document.querySelector(${JSON.stringify(payBox)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, '50'); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await openNamed('Stock');
+    await openNamed('Expenses');
+    await sleep(500);
+    const typedPay = await js<string>(`document.querySelector(${JSON.stringify(payBox)})?.value ?? 'gone'`);
+    flow('expense-part-payment-survives-return', typedPay === '50', `pay box ${typedPay}`);
+    await click('button', 'Close');
+    await sleep(200);
+
+    // A mouse click on a tab puts the cursor in its main box, even on a second visit.
+    await openNamed('Refund');
+    await openNamed('Stock');
+    await js(`(() => { const b = [...document.querySelectorAll('.top nav button')].find((x) => x.textContent.trim().endsWith('Refund')); b.focus(); b.click(); })()`);
+    await sleep(500);
+    const inBox = await js<string>(`document.activeElement?.getAttribute('data-kb-search') ?? document.activeElement?.tagName ?? ''`);
+    flow('tab-click-focuses-main-box', inBox === 'refund', `focus ${inBox}`);
+
     await openNamed('Accounting');
     const flowShown = await js<boolean>(`!!document.querySelector('[aria-label="cash flow"]')`);
     flow('cash-flow-shown', flowShown, `shown ${flowShown}`);
@@ -954,6 +983,13 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await focus('input[aria-label="handover username"]');
     await type("cashier", 10);
     await focus('input[aria-label="handover pin"]');
+    await type('0000', 10);
+    await click('button', 'Hand over');
+    await sleep(900);
+    const pinAfterWrong = await js<string>(`document.querySelector('input[aria-label="handover pin"]')?.value ?? 'gone'`);
+    flow('handover-wrong-pin-clears-pin', pinAfterWrong === '', `pin box "${pinAfterWrong.length} characters"`);
+    await focus('input[aria-label="handover pin"]');
+    await js(`(() => { const e = document.querySelector('input[aria-label="handover pin"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, ''); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     await type("1111", 10);
     await click('button', 'Hand over');
     await sleep(1500);

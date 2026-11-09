@@ -1,4 +1,4 @@
-import { nextDay, storeDayStartUtc } from '../core/store-time';
+import { nextDay, storeDateTime, storeDayStartUtc } from '../core/store-time';
 import { appendAudit } from './audit';
 import type { Ctx } from './context';
 import { requirePermission } from './users';
@@ -119,8 +119,8 @@ export function auditFilters(ctx: Ctx, userId: number): AuditFilterChoices {
 export function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
   let s = typeof v === 'string' ? v : JSON.stringify(v);
-  if (/^[=+\-@]/.test(s)) s = `'${s}`;
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\r\n\t]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function exportAudit(ctx: Ctx, userId: number, f: AuditFilters): string {
@@ -128,7 +128,7 @@ export function exportAudit(ctx: Ctx, userId: number, f: AuditFilters): string {
   const w = where(f);
   const rows = (ctx.db.prepare(`${SELECT} ${w.sql} ORDER BY a.id DESC LIMIT ?`).all(...w.args, MAX_EXPORT) as Row[]).map(view);
   const head = ['Time', 'User', 'Role', 'Action', 'Record type', 'Record', 'Result', 'Before', 'After', 'Reason', 'Details'];
-  const csv = [head.join(','), ...rows.map((r) => [r.at, r.actor, r.role, r.action, r.entity, r.entityId, r.status, r.before, r.after, r.reason, r.details].map(csvCell).join(','))].join('\r\n');
+  const csv = [head.join(','), ...rows.map((r) => [storeDateTime(r.at), r.actor, r.role, r.action, r.entity, r.entityId, r.status, r.before, r.after, r.reason, r.details].map(csvCell).join(','))].join('\r\n');
   ctx.db.transaction(() => appendAudit(ctx, { userId, action: 'audit.export', entity: 'audit_log', details: { rows: rows.length } }))();
   return csv;
 }

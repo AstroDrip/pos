@@ -26,7 +26,7 @@ const electronBin = join(root, 'node_modules', 'electron', 'dist', process.platf
 const child = spawn(electronBin, ['.'], {
   cwd: root,
   stdio: 'inherit',
-  env: { ...process.env, POS_USER_DATA: dir, POS_RECEIPT_TO_FILE: join(dir, 'r.html'), POS_UI_AUDIT: out, POS_UI_AUDIT_LOGIN: 'owner:4321', POS_NO_RELAUNCH: '1', ...(demo ? { POS_UI_AUDIT_DEMO: '1' } : {}) },
+  env: { ...process.env, POS_USER_DATA: dir, POS_RECEIPT_TO_FILE: join(dir, 'r.html'), POS_UI_AUDIT: out, POS_UI_AUDIT_LOGIN: 'owner:4321', POS_NO_RELAUNCH: '1', ...(demo ? { POS_UI_AUDIT_DEMO: '1' } : {}), ...(process.argv.includes('--only-audit') ? { POS_UI_AUDIT_ONLY: 'audit' } : {}) },
 });
 const timer = setTimeout(() => { console.error('ui-audit: timed out after 20 minutes'); child.kill(); }, 1_200_000);
 child.on('exit', (code) => {

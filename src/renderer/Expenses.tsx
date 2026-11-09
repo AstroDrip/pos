@@ -335,11 +335,14 @@ function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: stri
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const payKey = useRef(crypto.randomUUID());
-  const load = () => call<{ expense: ExpenseRow; payments: Payment[] }>('expense.get', { id }).then((r) => {
+  const load = (keepTyped = false) => call<{ expense: ExpenseRow; payments: Payment[] }>('expense.get', { id }).then((r) => {
     setD(r);
-    setPay((p) => ({ ...p, amount: r.expense.outstanding ? formatSar(r.expense.outstanding) : '' }));
+    if (!keepTyped) setPay((p) => ({ ...p, amount: r.expense.outstanding ? formatSar(r.expense.outstanding) : '' }));
   });
-  useEffect(() => void load(), [id, back]);
+  useEffect(() => void load(), [id]);
+  useEffect(() => {
+    if (back) void load(true); // shown again: refresh the figures, but never change an amount someone typed
+  }, [back]);
 
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     if (busy) return;
