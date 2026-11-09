@@ -25,7 +25,7 @@ The central listener ignores the payment keys, so one key press cannot be handle
 | Ctrl+F while a filled box, a note, a list or a PIN box has focus | Does nothing. An empty box may be left |
 | Z on the payment step while focus is in a box | Works only in Cash received and the card part, which hold numbers. Any other box types Z. A scanned code that starts with Z is not taken for it (40 ms wait) |
 | Customer box on Sell | F2 goes there and keeps the bill. Nothing is chosen until a row is highlighted and Enter is pressed. Shift+Enter with the box empty goes to payment. Esc closes the list, then goes back to product search |
-| Leaving Sell loses the bill | M and S are grey while the bill has items |
+| Leaving Sell | Tabs now stay open, so the bill stays. M and S work with items on the bill. A hidden tab takes no keys or scans |
 | Every letter on every screen (the owner's choice, replacing "only what fits the screen") | A letter from another screen opens its screen first. I works on the spot. S and R pick from their list first, so Esc leaves you where you were. H is grey away from Sell because no bill exists there. Permissions still hide letters |
 | Letters on an Arabic keyboard | The physical key is used |
 | A scanned code that starts with a letter | A letter waits 40 ms; another key that soon means a scanner, and the command is dropped |

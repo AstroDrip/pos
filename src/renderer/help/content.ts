@@ -124,7 +124,6 @@ export const HELP_ARTICLES: HelpArticle[] = [
     problems: [
       { problem: 'Ctrl+K shows "Press Enter to add the item, or Esc to cancel."', fix: 'The quantity box is open. Finish the quantity first, then press Ctrl+K.' },
       { problem: 'The letter you want is not in the list.', fix: 'Your user is not allowed to use it.' },
-      { problem: 'Supplier search is grey on Sell.', fix: 'It opens Purchases, and that would lose the bill. Finish or hold the bill first.' },
       { problem: 'Collection or settlement did not take a payment.', fix: 'That is correct. The letter only opens the place to pay. You type the amount and press the button yourself.' },
     ],
   },

@@ -8,6 +8,7 @@ import { Expenses } from './Expenses';
 import { Help } from './Help';
 import { HelpContext } from './help/HelpContext';
 import { KeyboardProvider, focusEl } from './Keyboard';
+import { TabPane, UserProvider } from './TabHost';
 import { Customers } from './Customers';
 import { Products } from './Products';
 import { Purchases } from './Purchases';
@@ -40,38 +41,8 @@ const TABS: { id: Tab; label: string; perm?: string; group: number }[] = [
 export function App() {
   const { t } = useI18n();
   const [status, setStatus] = useState<Status | null>(null);
-  const [tab, setTab] = useState<Tab>('sell');
   const [error, setError] = useState('');
-  // A "?" link opens help OVER the current screen, so a bill or a half-filled form is never lost.
-  const [helpAt, setHelpAt] = useState<string | null>(null);
-  const helpReturn = useRef<HTMLElement | null>(null);
-  const openHelp = useCallback((id: string) => {
-    helpReturn.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setHelpAt(id);
-  }, []);
-  const closeHelp = useCallback(() => {
-    setHelpAt(null);
-    const el = helpReturn.current;
-    helpReturn.current = null;
-    requestAnimationFrame(() => focusEl(el)); // back to the box the cashier was in
-  }, []);
-  const [customerRequest, setCustomerRequest] = useState<{ id?: number; n: number }>({ n: 0 });
-  const openCustomers = useCallback((id?: number) => {
-    setCustomerRequest((r) => ({ id, n: r.n + 1 }));
-    setTab('customers');
-  }, []);
-
-  const openTab = useCallback((screen: Tab) => {
-    setCustomerRequest({ n: 0 });
-    setTab(screen);
-  }, []);
-
-  // Every login starts on Sell: the previous user's tab may be one the new user is not allowed to see.
-  const refresh = () =>
-    call<Status>('auth.status').then((s) => {
-      setTab('sell');
-      setStatus(s);
-    }, (e: Error) => setError(t(e.message)));
+  const refresh = () => call<Status>('auth.status').then(setStatus, (e: Error) => setError(t(e.message)));
   useEffect(() => void refresh(), []);
 
   if (error) return <div className="card msg error">{error}</div>;
@@ -96,8 +67,49 @@ export function App() {
     );
   }
 
-  const user = status.user;
+  return (
+    <UserProvider value={status.user}>
+      <Workspace key={status.user.id} user={status.user} onAuthChange={() => void refresh()} />
+    </UserProvider>
+  );
+}
+
+/** Everything a logged-in user sees. Keyed by user: logging out or changing cashier destroys all of it. */
+function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => void }) {
+  const { t } = useI18n();
+  const [tab, setTab] = useState<Tab>('sell');
+  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>(['sell']));
+  const show = useCallback((screen: Tab) => {
+    setVisited((v) => (v.has(screen) ? v : new Set(v).add(screen)));
+    setTab(screen);
+  }, []);
+  // A "?" link opens help OVER the current screen, so a bill or a half-filled form is never lost.
+  const [helpAt, setHelpAt] = useState<string | null>(null);
+  const helpReturn = useRef<HTMLElement | null>(null);
+  const openHelp = useCallback((id: string) => {
+    helpReturn.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setHelpAt(id);
+  }, []);
+  const closeHelp = useCallback(() => {
+    setHelpAt(null);
+    const el = helpReturn.current;
+    helpReturn.current = null;
+    requestAnimationFrame(() => focusEl(el)); // back to the box the cashier was in
+  }, []);
+  const [customerRequest, setCustomerRequest] = useState<{ id?: number; n: number }>({ n: 0 });
+  const openCustomers = useCallback((id?: number) => {
+    setCustomerRequest((r) => ({ id, n: r.n + 1 }));
+    show('customers');
+  }, [show]);
+  const openTab = useCallback((screen: Tab) => {
+    setCustomerRequest({ n: 0 });
+    show(screen);
+  }, [show]);
   const can = (p: string) => user.permissions.includes(p);
+  const pane = (id: Tab, node: React.ReactNode) => {
+    const perm = TABS.find((x) => x.id === id)?.perm;
+    return visited.has(id) && (!perm || can(perm)) && <TabPane id={id} active={tab === id}>{node}</TabPane>;
+  };
   return (
     <HelpContext.Provider value={openHelp}>
       <KeyboardProvider tab={tab} openTab={openTab} can={can} helpOpen={helpAt !== null} openHelp={openHelp} closeHelp={closeHelp} openCustomers={openCustomers}>
@@ -116,22 +128,22 @@ export function App() {
           <ThemeSelect />
           <LangToggle />
           <span className="who" title={user.displayName}>{user.displayName}</span>
-          <button onClick={() => call('auth.logout').then(refresh)}>{t('Log out')}</button>
+          <button onClick={() => void call('auth.logout').then(onAuthChange)}>{t('Log out')}</button>
         </div>
       </TopBar>
       {can('reports.view') && <HealthBanner />}
-      {tab === 'sell' && <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} canCreateCustomer={can('customer.manage')} />}
-      {tab === 'refund' && <Refund canApprove={can('sale.refund')} />}
-      {tab === 'stock' && <Stock can={can} />}
-      {tab === 'products' && <Products />}
-      {tab === 'reports' && <Reports />}
-      {tab === 'customers' && <Customers can={can} request={customerRequest} />}
-      {tab === 'purchases' && <Purchases can={can} />}
-      {tab === 'expenses' && <Expenses can={can} />}
-      {tab === 'accounting' && <Accounting />}
-      {tab === 'shift' && <Shift can={can} />}
-      {tab === 'admin' && <Admin can={can} />}
-      {tab === 'help' && <Help />}
+      {pane('sell', <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} canCreateCustomer={can('customer.manage')} />)}
+      {pane('refund', <Refund canApprove={can('sale.refund')} />)}
+      {pane('stock', <Stock can={can} />)}
+      {pane('products', <Products />)}
+      {pane('reports', <Reports />)}
+      {pane('customers', <Customers can={can} request={customerRequest} />)}
+      {pane('purchases', <Purchases can={can} />)}
+      {pane('expenses', <Expenses can={can} />)}
+      {pane('accounting', <Accounting />)}
+      {pane('shift', <Shift can={can} />)}
+      {pane('admin', <Admin can={can} />)}
+      {pane('help', <Help />)}
       {helpAt && <HelpOverlay article={helpAt} onClose={closeHelp} />}
       </KeyboardProvider>
     </HelpContext.Provider>

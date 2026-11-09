@@ -4,6 +4,7 @@ import type { Product } from '../services/catalog';
 import type { Supplier } from '../services/parties';
 import type { StockRow } from '../services/reports';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { HelpLink } from './HelpLink';
@@ -16,6 +17,7 @@ interface GrnLine {
 }
 
 export function Stock({ can }: { can: (p: string) => boolean }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierId, setSupplierId] = useState(0);
@@ -28,10 +30,10 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   const requestKey = useRef(crypto.randomUUID());
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), []);
+  useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), [back]);
   useEffect(() => {
     if (can('reports.view')) void call<StockRow[]>('report.stock', { onlyLow }).then(setRows);
-  }, [onlyLow, msg, can]);
+  }, [onlyLow, msg, can, back]);
   const { items: found } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
 
   const save = async () => {

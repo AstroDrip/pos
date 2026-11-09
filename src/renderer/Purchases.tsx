@@ -6,6 +6,7 @@ import type { Supplier } from '../services/parties';
 import type { AgeingRow, PastReturn, StatementLine, SupplierAccount, UninvoicedGrn } from '../services/purchasing';
 import { StatusBadge, StatusLegend } from './StatusBadge';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { focusWhenReady, useScreenKeys } from './Keyboard';
@@ -27,10 +28,11 @@ type Section = 'bill' | 'invoice' | 'return' | 'pay' | 'ageing' | 'register' | '
 
 /** Purchasing (plan Phase 4). Posting rules are provisional until the accountant approves. */
 export function Purchases({ can }: { can: (p: string) => boolean }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [section, setSection] = useState<Section>(can('purchase.manage') ? 'bill' : 'pay');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), []);
+  useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), [back]);
   const [supplierRequest, setSupplierRequest] = useState<{ id: number; n: number }>({ id: 0, n: 0 });
   // These only open a section. M never records a payment: the amount and the save button stay with the user.
   useScreenKeys(() => ({
@@ -95,6 +97,7 @@ function SupplierSelect({ suppliers, value, onChange }: { suppliers: Supplier[];
 }
 
 function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [supplierId, setSupplierId] = useState(0);
   const [grns, setGrns] = useState<UninvoicedGrn[]>([]);
@@ -110,7 +113,7 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
     const s = suppliers.find((x) => x.id === supplierId);
     setF((p) => ({ ...p, vatNo: s?.vatNumber ?? '' }));
     void load(supplierId); // no supplier chosen: everything still waiting for an invoice
-  }, [supplierId]);
+  }, [supplierId, back]);
   // A delivery note was typed in full: its net and VAT fill the invoice boxes. They can still be changed.
   useEffect(() => {
     const chosen = grns.filter((g) => picked.includes(g.grnId));
@@ -215,6 +218,7 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
 }
 
 function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [supplierId, setSupplierId] = useState(0);
   const [search, setSearch] = useState('');
@@ -225,7 +229,7 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
   const requestKey = useRef(crypto.randomUUID());
   const { items: found } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
   const [past, setPast] = useState<PastReturn[]>([]);
-  useEffect(() => void call<PastReturn[]>('purchase.returns', { limit: 50 }).then(setPast, () => setPast([])), [msg]);
+  useEffect(() => void call<PastReturn[]>('purchase.returns', { limit: 50 }).then(setPast, () => setPast([])), [msg, back]);
   const save = async () => {
     if (busy) return;
     setBusy(true);
@@ -287,6 +291,7 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
 }
 
 function Balances({ suppliers, can, request }: { suppliers: Supplier[]; can: (p: string) => boolean; request?: { id: number; n: number } }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [rows, setRows] = useState<{ supplierId: number; supplier: string; balance: number }[]>([]);
   const [open, setOpen] = useState(0);
@@ -299,7 +304,7 @@ function Balances({ suppliers, can, request }: { suppliers: Supplier[]; can: (p:
   useEffect(() => {
     if (request?.id) setOpen(request.id);
   }, [request]);
-  useEffect(() => void load(), []);
+  useEffect(() => void load(), [back]);
   useEffect(() => {
     if (open) void call<typeof st>('purchase.statement', { supplierId: open }).then(setSt);
     else setSt(null);
@@ -361,10 +366,11 @@ function Balances({ suppliers, can, request }: { suppliers: Supplier[]; can: (p:
 }
 
 function Ageing() {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [asOf, setAsOf] = useState(todayDay());
   const [rows, setRows] = useState<AgeingRow[]>([]);
-  useEffect(() => void call<AgeingRow[]>('purchase.ageing', { asOf }).then(setRows, () => setRows([])), [asOf]);
+  useEffect(() => void call<AgeingRow[]>('purchase.ageing', { asOf }).then(setRows, () => setRows([])), [asOf, back]);
   const total = (k: keyof AgeingRow) => rows.reduce((s, r) => s + (r[k] as number), 0);
   const cols: [keyof AgeingRow, string][] = [['notDue', 'Not due'], ['d1_30', '1–30 days late'], ['d31_60', '31–60'], ['d61_90', '61–90'], ['over90', 'Over 90'], ['noDue', 'No due date'], ['balance', 'Total'], ['advance', 'Advance'], ['returnCredit', 'Return credit']];
   return (
@@ -389,13 +395,14 @@ type Reg = {
 };
 
 function Register() {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [from, setFrom] = useState(`${todayDay().slice(0, 7)}-01`);
   const [to, setTo] = useState(todayDay());
   const [r, setR] = useState<Reg | null>(null);
   const [tick, setTick] = useState(0);
   const reload = () => setTick((n) => n + 1);
-  useEffect(() => void call<Reg>('purchase.register', { fromDay: from, toDay: to }).then(setR, () => setR(null)), [from, to, tick]);
+  useEffect(() => void call<Reg>('purchase.register', { fromDay: from, toDay: to }).then(setR, () => setR(null)), [from, to, tick, back]);
   return (
     <div>
       <div className="row" style={{ maxWidth: 420 }}>
@@ -450,9 +457,10 @@ function ReverseButton({ paymentId, onDone }: { paymentId: number; onDone: () =>
 
 /** Open supplier invoices with total, paid, remaining, due date and status. */
 function SupplierItems({ supplierId }: { supplierId: number }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [a, setA] = useState<SupplierAccount | null>(null);
-  useEffect(() => void call<SupplierAccount>('purchase.account', { supplierId }).then(setA, () => setA(null)), [supplierId]);
+  useEffect(() => void call<SupplierAccount>('purchase.account', { supplierId }).then(setA, () => setA(null)), [supplierId, back]);
   if (!a) return null;
   return (
     <div style={{ margin: '8px 0' }}>

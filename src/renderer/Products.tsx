@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatSar, parseSar } from '../core/money';
 import type { Product } from '../services/catalog';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { ProductName, useI18n } from './i18n';
@@ -12,6 +13,7 @@ type Status = 'active' | 'inactive' | 'all';
 const empty = { sku: '', nameAr: '', nameEn: '', sellMode: 'unit' as 'unit' | 'weight', vat: '15', price: '', barcode: '', plu: '' };
 
 export function Products() {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [form, setForm] = useState(empty);
   const [search, setSearch] = useState('');
@@ -34,7 +36,7 @@ export function Products() {
     if (!browsing) return;
     const h = setTimeout(() => void load(0).catch(loadFailed), search.trim() ? 150 : 0);
     return () => clearTimeout(h);
-  }, [status, search, browsing]);
+  }, [status, search, browsing, back]);
   const list = browsing ? browse.items : found;
   const reload = () => {
     refresh();

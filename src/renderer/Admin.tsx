@@ -6,6 +6,7 @@ import type { Supplier } from '../services/parties';
 import type { SyncHealth } from '../services/dashboard-sync';
 import { formatQty } from '../core/money';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { KeyboardSettings } from './KeyboardSettings';
@@ -35,12 +36,13 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
 export type FullBackupStatus = BackupStatus & { keyConfigured: boolean };
 
 function Backup({ canSetup, canRestore }: { canSetup: boolean; canRestore: boolean }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [s, setS] = useState<FullBackupStatus | null>(null);
   const [code, setCode] = useState('');
   const [msg, setMsg] = useState<Msg>(null);
   const load = () => call<FullBackupStatus>('backup.status').then(setS);
-  useEffect(() => void load(), []);
+  useEffect(() => void load(), [back]);
 
   const run = async (fn: () => Promise<unknown>) => {
     setMsg(null);
@@ -124,12 +126,13 @@ export function Restore() {
 }
 
 function Users() {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [list, setList] = useState<{ id: number; username: string; displayName: string; roles: string; active: boolean }[]>([]);
   const [f, setF] = useState({ username: '', displayName: '', pin: '', role: 'cashier' });
   const [msg, setMsg] = useState<Msg>(null);
   const load = () => call<typeof list>('user.list').then(setList);
-  useEffect(() => void load(), []);
+  useEffect(() => void load(), [back]);
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
@@ -164,6 +167,7 @@ function Users() {
 }
 
 function Suppliers() {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [list, setList] = useState<Supplier[]>([]);
   const blank = { name: '', phone: '', vatNumber: '', terms: '0', address: '', crNumber: '', ourCustomerNo: '', salesman: '' };
@@ -171,7 +175,7 @@ function Suppliers() {
   const [editing, setEditing] = useState<number | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
   const load = () => call<Supplier[]>('supplier.list').then(setList);
-  useEffect(() => void load(), []);
+  useEffect(() => void load(), [back]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -288,13 +292,14 @@ function Import() {
  * "Test a label" and adjust the layout until the product and weight are right.
  */
 function ScaleLabels() {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [rows, setRows] = useState<ScaleLayoutRow[]>([]);
   const [f, setF] = useState({ id: 0, name: '', spec: 'lit=2 item:4 weight_g:5 plu:3', itemMatches: 'plu' as 'plu' | 'sku', active: true });
   const [test, setTest] = useState('');
   const [msg, setMsg] = useState<Msg>(null);
   const load = () => call<ScaleLayoutRow[]>('scale.layouts').then(setRows, () => setRows([]));
-  useEffect(() => void load(), []);
+  useEffect(() => void load(), [back]);
 
   const save = async () => {
     setMsg(null);
@@ -356,9 +361,10 @@ function ScaleLabels() {
 
 /** Owner phone dashboard: sync status only. The remote service is not set up yet (owner decision). */
 function DashboardHealth() {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [h, setH] = useState<SyncHealth | null>(null);
-  useEffect(() => void call<SyncHealth>('dashboard.health').then(setH, () => setH(null)), []);
+  useEffect(() => void call<SyncHealth>('dashboard.health').then(setH, () => setH(null)), [back]);
   if (!h) return null;
   return (
     <div className="card section">

@@ -3,6 +3,7 @@ import { formatSar, parseSar, roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, VatClass } from '../services/expenses';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { HelpLink } from './HelpLink';
@@ -30,6 +31,7 @@ const VAT: VatClass[] = ['standard', 'zero', 'exempt', 'out_of_scope'];
 const VAT_LABEL: Record<VatClass, string> = { standard: 'Standard-rated (15%)', zero: 'Zero-rated', exempt: 'Exempt', out_of_scope: 'Out of scope / no VAT' };
 
 export function Expenses({ can }: { can: (p: string) => boolean }) {
+  const back = useReturnTick();
   const { t, lang } = useI18n();
   const [range, setRange] = useState<[string, string]>(monthRange(0));
   const [preset, setPreset] = useState<'this' | 'prev' | 'custom'>('this');
@@ -43,13 +45,13 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
   const [tick, setTick] = useState(0);
   const reload = () => setTick((n) => n + 1);
 
-  useEffect(() => void call<ExpenseCategory[]>('expense.categories').then(setCats), [tick]);
+  useEffect(() => void call<ExpenseCategory[]>('expense.categories').then(setCats), [tick, back]);
   useEffect(() => {
     const [fromDay, toDay] = range;
     call<ExpenseRow[]>('expense.list', { fromDay, toDay, categoryId: filter.categoryId || undefined, payState: filter.payState || undefined, payee: filter.payee || undefined })
       .then(setRows, (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
     call<ExpenseSummary>('expense.summary', { fromDay, toDay }).then(setSum, () => setSum(null));
-  }, [range, filter, tick]);
+  }, [range, filter, tick, back]);
 
   const catName = (id: number) => {
     const c = cats.find((x) => x.id === id);
@@ -318,6 +320,7 @@ function ExpenseForm({ cats, can, initial, onClose }: { cats: ExpenseCategory[];
 type Payment = { id: number; amount: number; method: PayMethod; paidOn: string; reference: string | null; reversedOf: number | null; reason: string | null; user: string; reversed: number | null };
 
 function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: string) => boolean; onEdit: (r: ExpenseRow) => void; onClose: () => void }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [d, setD] = useState<{ expense: ExpenseRow; payments: Payment[] } | null>(null);
   const [pay, setPay] = useState({ amount: '', method: 'bank' as PayMethod, paidOn: todayDay(), reference: '' });
@@ -328,7 +331,7 @@ function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: stri
     setD(r);
     setPay((p) => ({ ...p, amount: r.expense.outstanding ? formatSar(r.expense.outstanding) : '' }));
   });
-  useEffect(() => void load(), [id]);
+  useEffect(() => void load(), [id, back]);
 
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     if (busy) return;
@@ -424,13 +427,14 @@ function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: stri
 type RecurringRow = { id: number; name: string; categoryId: number; category: string; expectedGross: number; variableAmount: number; interval: 'monthly' | 'quarterly' | 'yearly'; startDate: string; endDate: string | null; dueDay: number; payee: string | null; vatClass: VatClass; vatRecoverable: number; active: number };
 
 function Recurring({ cats, can, onChange }: { cats: ExpenseCategory[]; can: (p: string) => boolean; onChange: () => void }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [rows, setRows] = useState<RecurringRow[]>([]);
   const empty = { id: 0, name: '', categoryId: 0, expected: '', variableAmount: false, interval: 'monthly' as RecurringRow['interval'], startDate: todayDay(), endDate: '', dueDay: '1', payee: '', vatClass: 'out_of_scope' as VatClass, vatRecoverable: false, active: true };
   const [f, setF] = useState(empty);
   const [msg, setMsg] = useState<Msg>(null);
   const load = () => call<RecurringRow[]>('expense.recurring').then(setRows);
-  useEffect(() => void load(), []);
+  useEffect(() => void load(), [back]);
   const save = async () => {
     setMsg(null);
     try {

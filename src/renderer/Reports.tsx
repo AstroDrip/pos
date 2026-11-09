@@ -3,12 +3,14 @@ import { formatQty, formatSar } from '../core/money';
 import { storeDateTime, storeDay } from '../core/store-time';
 import type { AdjustmentRow, CashierActivity, RefundRow, SalesSummary, VoidRow } from '../services/reports';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 
 const today = () => storeDay(new Date().toISOString());
 
 export function Reports() {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [from, setFrom] = useState(today());
   const [to, setTo] = useState(today());
@@ -27,7 +29,7 @@ export function Reports() {
     call<CashierActivity[]>('report.cashiers', { fromDay: from, toDay: to }).then(setCashiers, () => setCashiers([]));
     call<RefundRow[]>('report.refunds', { fromDay: from, toDay: to }).then(setRefunds, () => setRefunds([]));
     call<AdjustmentRow[]>('report.adjustments', { fromDay: from, toDay: to }).then(setAdjustments, () => setAdjustments([]));
-  }, [from, to]);
+  }, [from, to, back]);
 
   return (
     <div className="page">

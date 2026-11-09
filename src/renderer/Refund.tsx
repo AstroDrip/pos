@@ -3,6 +3,7 @@ import { formatQty, formatSar, parseQty, roundDiv } from '../core/money';
 import { storeDateTime } from '../core/store-time';
 import type { RecentSale, RefundableSale, RefundResult } from '../services/refunds';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
@@ -17,6 +18,7 @@ interface Pick {
 }
 
 export function Refund({ canApprove }: { canApprove: boolean }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [invoiceNo, setInvoiceNo] = useState('');
   const [sale, setSale] = useState<RefundableSale | null>(null);
@@ -32,7 +34,7 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
 
   const [recent, setRecent] = useState<{ items: RecentSale[]; total: number }>({ items: [], total: 0 });
   const loadRecent = (offset: number) => call<{ items: RecentSale[]; total: number }>('refund.recent', { offset, limit: PAGE }).then((r) => setRecent((a) => ({ items: offset === 0 ? r.items : [...a.items, ...r.items], total: r.total })), (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
-  useEffect(() => void loadRecent(0), [lastRefundId]);
+  useEffect(() => void loadRecent(0), [lastRefundId, back]);
 
   const find = async (e?: React.FormEvent, no = invoiceNo) => {
     e?.preventDefault();

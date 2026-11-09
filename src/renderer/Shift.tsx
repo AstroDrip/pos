@@ -3,10 +3,12 @@ import { formatSar, parseSar } from '../core/money';
 import { storeDateTime } from '../core/store-time';
 import type { PastShift, ShiftSummary } from '../services/shifts';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { useI18n } from './i18n';
 import { EmptyRow } from './PageHeader';
 
 export function Shift({ can }: { can: (p: string) => boolean }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [s, setS] = useState<ShiftSummary | null>(null);
   const [counted, setCounted] = useState('');
@@ -14,7 +16,7 @@ export function Shift({ can }: { can: (p: string) => boolean }) {
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const load = () => call<ShiftSummary | null>('shift.current').then(setS);
-  useEffect(() => void load(), []);
+  useEffect(() => void load(), [back]);
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setMsg(null);
@@ -92,9 +94,10 @@ export function Shift({ can }: { can: (p: string) => boolean }) {
 
 /** Earlier shifts with their cash differences. Only for people who can see reports. */
 function PastShifts({ refresh }: { refresh: unknown }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [rows, setRows] = useState<PastShift[]>([]);
-  useEffect(() => void call<PastShift[]>('shift.history', { limit: 60 }).then(setRows, () => setRows([])), [refresh]);
+  useEffect(() => void call<PastShift[]>('shift.history', { limit: 60 }).then(setRows, () => setRows([])), [refresh, back]);
   return (
     <div className="card">
       <h3>{t('Past shifts')}</h3>

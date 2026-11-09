@@ -4,6 +4,7 @@ import { storeDateTime } from '../core/store-time';
 import type { FinStatus } from '../core/status';
 import type { ArAgeingRow, CreditInvoice, CustomerAccount, StatementLine } from '../services/credit';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { useSuggest } from './useSuggest';
@@ -25,6 +26,7 @@ const FILTERS: (FinStatus | 'all' | 'open')[] = ['all', 'open', 'paid', 'partial
 
 /** Customer accounts (accounts receivable). Balances come from the records; nothing here is typed in as a total. */
 export function Customers({ can, request }: { can: (p: string) => boolean; request?: { id?: number; n: number } }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [text, setText] = useState('');
   const [openId, setOpenId] = useState<number | null>(null);
@@ -46,7 +48,7 @@ export function Customers({ can, request }: { can: (p: string) => boolean; reque
   const browsing = !text.trim();
   const [all, setAll] = useState<{ items: Found[]; total: number }>({ items: [], total: 0 });
   const loadAll = (offset: number) => call<{ items: Found[]; total: number }>('credit.list', { offset, limit: PAGE }).then((r) => setAll((a) => ({ items: offset === 0 ? r.items : [...a.items, ...r.items], total: r.total })), (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
-  useEffect(() => void loadAll(0), []);
+  useEffect(() => void loadAll(0), [back]);
   const search = () => {
     refresh();
     void loadAll(0);
@@ -111,6 +113,7 @@ function Amount({ l, v, bad, small }: { l: string; v: string; bad?: boolean; sma
 }
 
 function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean; onClose: () => void }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [a, setA] = useState<CustomerAccount | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('open');
@@ -118,7 +121,7 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const load = () => call<CustomerAccount>('credit.account', { customerId: id }).then(setA, (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
-  useEffect(() => void load(), [id]);
+  useEffect(() => void load(), [id, back]);
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     if (busy) return;
     setBusy(true);
@@ -375,9 +378,10 @@ function Settings({ account, onDone }: { account: CustomerAccount; onDone: (m: M
 }
 
 function Ageing({ onOpen }: { onOpen: (id: number) => void }) {
+  const back = useReturnTick();
   const { t } = useI18n();
   const [rows, setRows] = useState<ArAgeingRow[]>([]);
-  useEffect(() => void call<ArAgeingRow[]>('credit.ageing').then(setRows, () => setRows([])), []);
+  useEffect(() => void call<ArAgeingRow[]>('credit.ageing').then(setRows, () => setRows([])), [back]);
   const cols: [keyof ArAgeingRow['buckets'], string][] = [['notDue', 'Not due'], ['d1_30', '1–30 days late'], ['d31_60', '31–60'], ['d61_90', '61–90'], ['over90', 'Over 90'], ['noDue', 'No due date']];
   return (
     <table className="list" style={{ maxWidth: 1100 }}>

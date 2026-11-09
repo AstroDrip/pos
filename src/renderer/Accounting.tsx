@@ -4,6 +4,7 @@ import { storeDay } from '../core/store-time';
 import type { BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
 import type { VatSummary } from '../services/vat-report';
 import { call } from './api';
+import { useReturnTick } from './TabHost';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 
@@ -13,6 +14,7 @@ type Gl = { account: { code: string; nameEn: string }; opening: number; closing:
 
 /** Owner overview and financial statements (ADR-5). Same service as the owner dashboard snapshots. */
 export function Accounting() {
+  const back = useReturnTick();
   const { t, lang } = useI18n();
   const [from, setFrom] = useState(`${todayDay().slice(0, 7)}-01`);
   const [to, setTo] = useState(todayDay());
@@ -33,8 +35,8 @@ export function Accounting() {
     call<BalanceSheet>('finance.bs', { asOf: to }).then(setBs, fail);
     call<Tb>('finance.tb', { fromDay: from, toDay: to }).then(setTb, fail);
     call<VatSummary>('finance.vat', { fromDay: from, toDay: to }).then(setVat, fail);
-  }, [from, to]);
-  useEffect(() => void call<Gl>('finance.gl', { code: glCode, fromDay: from, toDay: to }).then(setGl, () => setGl(null)), [glCode, from, to]);
+  }, [from, to, back]);
+  useEffect(() => void call<Gl>('finance.gl', { code: glCode, fromDay: from, toDay: to }).then(setGl, () => setGl(null)), [back, glCode, from, to]);
 
   const name = (a: { nameEn: string; nameAr: string }) => (lang === 'ar' ? a.nameAr : a.nameEn);
   const Line = ({ l, v, strong, neg }: { l: string; v: number; strong?: boolean; neg?: boolean }) => (

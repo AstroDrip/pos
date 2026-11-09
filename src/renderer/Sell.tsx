@@ -15,6 +15,7 @@ import { decideKey, decrementQtyText, incrementQtyText, parseStepQty, type Check
 import { HelpLink } from './HelpLink';
 import { CustomerBox } from './CustomerBox';
 import { useBindings, useOpenCustomers, useScanner, useScreenKeys } from './Keyboard';
+import { useOnReturn, useTabActive } from './TabHost';
 import { canonicalize, checkoutActive, commandLetter, keyLike, lineQtyKey, type ActionId } from './keyboard-registry';
 import { ProductName, useI18n } from './i18n';
 
@@ -91,15 +92,16 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
     });
   }, []);
   // The search box is disabled while a payment is saving, so a pending focus request waits until saving ends.
+  const active = useTabActive();
   useEffect(() => {
-    if (busy || !focusWanted.current) return;
+    if (busy || !active || !focusWanted.current) return;
     focusWanted.current = false;
     if (step === 'search') searchRef.current?.focus();
     else if (step === 'qty') {
       qtyRef.current?.focus();
       qtyRef.current?.select();
     } else cashRef.current?.focus();
-  }, [step, busy, focusTick]);
+  }, [step, busy, focusTick, active]);
 
   const heldLoaded = useRef(false);
   const loadHeld = () => call<HeldBill[]>('hold.list').then((h) => {
@@ -116,6 +118,11 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
     void call<ShiftSummary | null>('shift.current').then(setShift);
     void loadHeld();
   }, []);
+  useOnReturn(() => {
+    void call<ShiftSummary | null>('shift.current').then(setShift); // the shift may have been closed on the Shift tab
+    void loadHeld();
+    goStep(step);
+  });
 
   const totals = useMemo(() => {
     try {
@@ -455,12 +462,9 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
         if (lines.length === 0) unavailable.H = t('The bill is empty.');
         if (held.length === 0) unavailable.R = t('No held orders.');
         else if (lines.length > 0) unavailable.R = t('Finish or hold the current bill first.');
-        if (lines.length > 0) unavailable.M = t('Finish or hold the current bill first.');
         if (customer) unavailable.C = t('A customer is already on this bill.');
       }
-      // Supplier search opens Purchases, and leaving Sell loses the bill.
       if (step !== 'search') unavailable.S = t('Press {0} to go back to the bill first.', keys.escape);
-      else if (lines.length > 0) unavailable.S = t('Finish or hold the current bill first.');
       return { unavailable, step, busy: busyRef.current, loading: shift === undefined || !heldLoaded.current, held: held.map((h) => ({ id: h.id, label: `${h.label} (${h.lineCount})` })) };
     },
     run: (id, arg) => {

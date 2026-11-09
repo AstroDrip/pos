@@ -6,6 +6,7 @@ import { CONTEXT_HELP, decideGlobal, keyLike, type ActionId, type FocusKind, typ
 import type { CheckoutStep } from './checkout-keys';
 import { useI18n } from './i18n';
 import { QuickActions } from './QuickActions';
+import { useTabActive } from './TabHost';
 
 export interface ScreenSnapshot extends ScreenState {
   step?: CheckoutStep;
@@ -46,27 +47,28 @@ function useKeyboard(): KeyboardApi {
 /** Lets a screen take part in the shortcuts. Always reads the screen's latest state. */
 export function useScreenKeys(get: () => ScreenKeys): void {
   const { register } = useKeyboard();
+  const active = useTabActive();
   const latest = useRef(get);
   latest.current = get;
-  useEffect(
-    () =>
-      register({
-        state: () => latest.current().state(),
-        run: (id, arg) => latest.current().run?.(id, arg),
-        focusQty: () => latest.current().focusQty?.(),
-        focusCustomer: () => latest.current().focusCustomer?.(),
-        notify: (text) => latest.current().notify?.(text),
-      }),
-    [register],
-  );
+  useEffect(() => {
+    if (!active) return undefined; // a hidden tab must never answer a key
+    return register({
+      state: () => latest.current().state(),
+      run: (id, arg) => latest.current().run?.(id, arg),
+      focusQty: () => latest.current().focusQty?.(),
+      focusCustomer: () => latest.current().focusCustomer?.(),
+      notify: (text) => latest.current().notify?.(text),
+    });
+  }, [register, active]);
 }
 
 /** Barcode scanner hook for the Sell screen, through the one global listener. */
 export function useScanner(fn: (e: KeyboardEvent, scanTarget: KeyboardApi['scanTarget']) => boolean): void {
   const { hub, scanTarget } = useKeyboard();
+  const active = useTabActive();
   const latest = useRef(fn);
   latest.current = fn;
-  useEffect(() => hub.setScanner((e) => latest.current(e, scanTarget)), [hub, scanTarget]);
+  useEffect(() => (active ? hub.setScanner((e) => latest.current(e, scanTarget)) : undefined), [hub, scanTarget, active]); // a scan on another tab must not reach a hidden bill
 }
 
 export const useOpenCustomers = () => useKeyboard().openCustomers;
@@ -97,9 +99,9 @@ export function focusEl(el: HTMLElement | null | undefined): boolean {
 export function focusWhenReady(selector: string, fallback?: string): void {
   let tries = 0;
   const tryIt = () => {
-    if (focusEl(document.querySelector<HTMLElement>(selector))) return;
+    if ([...document.querySelectorAll<HTMLElement>(selector)].some(focusEl)) return; // the match may be in a hidden tab
     if (++tries < 30) return void requestAnimationFrame(tryIt);
-    if (fallback) focusEl(document.querySelector<HTMLElement>(fallback));
+    if (fallback) [...document.querySelectorAll<HTMLElement>(fallback)].some(focusEl);
   };
   requestAnimationFrame(tryIt);
 }
@@ -173,7 +175,7 @@ export function KeyboardProvider({ tab, openTab, can, helpOpen, openHelp, closeH
       const action = decideGlobal(keyLike(e), {
         context: l.tab,
         paletteOpen: l.palette,
-        modalOpen: l.helpOpen || !!document.querySelector('[aria-modal="true"]'),
+        modalOpen: l.helpOpen || [...document.querySelectorAll('[aria-modal="true"]')].some((el) => el.closest('[hidden]') === null), // a popup in a hidden tab blocks nothing
         focus: focusKind(document.activeElement),
         step: l.tab === 'sell' ? snap?.step : undefined,
         busy: snap?.busy ?? false,

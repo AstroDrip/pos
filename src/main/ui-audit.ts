@@ -23,7 +23,22 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAuditHooks): Promise<void> {
   mkdirSync(outDir, { recursive: true });
   const wc = win.webContents;
-  const js = <T = unknown>(code: string): Promise<T> => wc.executeJavaScript(code, true) as Promise<T>;
+  // Audit scripts see only what is on screen: tabs that are open but hidden stay in the page. The app's own document is untouched.
+  const VISIBLE_DOCUMENT = `window.__auditDocument ??= (() => {
+    const shown = (list) => [...list].filter((e) => e.closest('[hidden]') === null);
+    const wrap = (target) => new Proxy(target, {
+      get(t, k) {
+        if (k === 'querySelectorAll') return (s) => shown(t.querySelectorAll(s));
+        if (k === 'querySelector') return (s) => shown(t.querySelectorAll(s))[0] ?? null;
+        if (k === 'textContent' && t === window.document.body) return t.innerText;
+        if (k === 'body') return wrap(t.body);
+        const v = t[k];
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+    });
+    return wrap(window.document);
+  })();`;
+  const js = <T = unknown>(code: string): Promise<T> => wc.executeJavaScript(`{ ${VISIBLE_DOCUMENT} const document = window.__auditDocument; ${code} }`, true) as Promise<T>;
   const waitFor = async (expr: string, ms = 4000) => {
     const end = Date.now() + ms;
     while (Date.now() < end) {
@@ -142,6 +157,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
             await rebindFlows();
             await billFlows();
             await sellStepFlows();
+            await tabMemoryFlows();
             await productListFlows();
             await emptySearchFlows();
           }
@@ -885,6 +901,56 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(300);
     await tabTo('Sell');
     await sleep(300);
+  }
+
+  /** Open tabs stay as they were left, and a hidden tab cannot react to anything. */
+  async function tabMemoryFlows() {
+    const box = 'input[aria-label="product search"]';
+    const code = '6281000000000';
+    const openNamed = async (name: string) => {
+      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await sleep(600);
+    };
+    await clearBill();
+    await focus(box);
+    await scan(code);
+    await sleep(300);
+    await openNamed('Stock');
+    const waiting = await js<boolean>(`!!window.document.querySelector('[data-tab="sell"][hidden]')`);
+    await scan(code);
+    await sleep(400);
+    await openNamed('Sell');
+    flow('hidden-sell-ignores-scan', waiting && (await lineCount()) === 1, `sell kept hidden ${waiting}, lines ${await lineCount()}`);
+    flow('bill-survives-tab-switch', (await lineCount()) === 1, `lines ${await lineCount()}`);
+
+    // A popup left open in a hidden tab must not block the keys of the tab on screen.
+    await openNamed('Stock');
+    await js(`(() => { const d = window.document.createElement('div'); d.id = 'audit-fake-popup'; d.setAttribute('aria-modal', 'true'); window.document.querySelector('[data-tab="sell"]').appendChild(d); })()`);
+    key('k', ['control']);
+    await sleep(300);
+    const opened = await js<boolean>(`!!document.querySelector('.palette')`);
+    key('Escape');
+    await sleep(200);
+    await js(`window.document.getElementById('audit-fake-popup')?.remove()`);
+    flow('hidden-popup-does-not-block-keys', opened, `quick actions opened ${opened}`);
+
+    // The shift is closed elsewhere while a bill waits in Sell.
+    await openNamed('Shift');
+    await focus('input');
+    await js(`(() => { const label = [...document.querySelectorAll('label')].find((l) => l.textContent.includes('Counted cash')); label?.nextElementSibling?.focus(); })()`);
+    await type('0', 10);
+    await click('button.primary', 'Close shift');
+    await sleep(800);
+    await openNamed('Sell');
+    await sleep(400);
+    const asked = await js<boolean>(`!document.querySelector('input[aria-label="product search"]') && !!document.querySelector('button.primary')`);
+    await click('button.primary');
+    await waitFor(`document.querySelector('input[aria-label="product search"]')`);
+    await sleep(300);
+    flow('shift-closed-while-bill-held-in-sell', asked && (await lineCount()) === 1, `asked to open ${asked}, lines ${await lineCount()}`);
+    await clearBill();
+    await focus(box);
+    await sleep(600);
   }
 
   /** Z on the payment step, F2, and the customer list on Sell. */

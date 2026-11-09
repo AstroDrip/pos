@@ -185,7 +185,6 @@ Names and numbers in the examples are made up.
 
 - *Ctrl+K shows "Press Enter to add the item, or Esc to cancel."* The quantity box is open. Finish the quantity first, then press Ctrl+K.
 - *The letter you want is not in the list.* Your user is not allowed to use it.
-- *Supplier search is grey on Sell.* It opens Purchases, and that would lose the bill. Finish or hold the bill first.
 - *Collection or settlement did not take a payment.* That is correct. The letter only opens the place to pay. You type the amount and press the button yourself.
 
 <a id="admin-shortcuts"></a>
