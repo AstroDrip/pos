@@ -235,7 +235,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
       }
       if (name === 'help') continue;
       await look(name);
-      const seg = name === 'purchases' ? '[aria-label="purchases section"] button' : '.page-header .seg button, .seg button';
+      const seg = name === 'purchases' ? '[aria-label="purchases section"] button' : '.page-header .seg button, .seg:not(.chart-head *):not(.date-nav *) button';
       const count = await js<number>(`document.querySelectorAll(${JSON.stringify(seg)}).length`);
       for (let i = 0; i < count; i++) {
         const label = await js<string>(`document.querySelectorAll(${JSON.stringify(seg)})[${i}].textContent.trim()`);
@@ -966,6 +966,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(500);
     flow('proforma-vat-screen-opens', await js<boolean>(`!!document.querySelector('table[aria-label="proforma vat review"]')`), 'table shown');
     await openNamed('Expenses');
+    await click('.views button', 'Recognise prepaid');
     await sleep(500);
     flow('prepaid-screen-opens', await js<boolean>(`!!document.querySelector('table[aria-label="prepaid preview"]')`), 'table shown');
     await openNamed('Admin');

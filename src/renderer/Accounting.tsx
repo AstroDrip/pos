@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react';
-import { formatSar } from '../core/money';
-import { storeDay } from '../core/store-time';
+import { formatMoney, formatSar } from '../core/money';
+import { monthOf } from '../core/date-range';
+import { addDays } from '../core/date-range';
 import type { CashFlow, BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
+import type { FinancePoint } from '../services/series';
 import type { VatSummary } from '../services/vat-report';
+import { Chart } from './Chart';
+import { DateNavigator, useDateRange } from './DateNavigator';
 import { call } from './api';
-import { Kpi } from './Figures';
+import { Kpi, Views } from './Figures';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
-import { validDay, validText } from './remember';
+import { validOneOf, validText } from './remember';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 
-const todayDay = () => storeDay(new Date().toISOString());
+const VIEWS = ['overview', 'pl', 'cash', 'vat', 'bs', 'ledger'] as const;
+type View = (typeof VIEWS)[number];
+const axisSar = (h: number) => { const s = Math.floor(Math.abs(h) / 100); const x = s >= 1000 ? `${Math.floor(s / 100) / 10}K` : String(s); return h < 0 ? `-${x}` : x; };
 type Tb = { rows: { code: string; nameEn: string; nameAr: string; type: string; debit: number; credit: number }[]; totalDebit: number; totalCredit: number };
 type Gl = { account: { code: string; nameEn: string }; opening: number; closing: number; lines: { date: string; source: string; sourceId: number; memo: string; debit: number; credit: number; balance: number }[] };
 
@@ -24,8 +30,10 @@ const FLOW_LABEL: Record<CashFlow['groups'][number]['id'], string> = {
 export function Accounting() {
   const back = useReturnTick();
   const { t, lang } = useI18n();
-  const [from, setFrom] = useRemembered('accounting', 'from', `${todayDay().slice(0, 7)}-01`, validDay);
-  const [to, setTo] = useRemembered('accounting', 'to', todayDay(), validDay);
+  const [dates, setDates] = useDateRange('accounting', 'month');
+  const { from, to } = dates;
+  const [view, setView] = useRemembered<View>('accounting', 'view', 'overview', validOneOf(VIEWS));
+  const [months, setMonths] = useState<FinancePoint[] | null>(null);
   const [k, setK] = useState<OwnerKpis | null>(null);
   const [pl, setPl] = useState<ProfitAndLoss | null>(null);
   const [bs, setBs] = useState<BalanceSheet | null>(null);
@@ -46,6 +54,7 @@ export function Accounting() {
     call<VatSummary>('finance.vat', { fromDay: from, toDay: to }).then(setVat, fail);
     call<CashFlow>('finance.cashflow', { fromDay: from, toDay: to }).then(setCf, fail);
   }, [from, to, back]);
+  useEffect(() => void call<FinancePoint[]>('finance.series', { toDay: to, months: 12 }).then(setMonths, () => setMonths(null)), [to, back]);
   useEffect(() => void call<Gl>('finance.gl', { code: glCode, fromDay: from, toDay: to }).then(setGl, () => setGl(null)), [back, glCode, from, to]);
 
   const name = (a: { nameEn: string; nameAr: string }) => (lang === 'ar' ? a.nameAr : a.nameEn);
@@ -56,52 +65,65 @@ export function Accounting() {
   return (
     <div className="page">
       <PageHeader title={t('Accounting')} desc={t('Owner overview, profit and loss, balance sheet and ledgers (provisional until the accountant approves).')} />
-      <div className="row" style={{ maxWidth: 420 }}>
-        <div><label>{t('From')}</label><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-        <div><label>{t('To')}</label><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-      </div>
+      <DateNavigator name="Accounting" value={dates} onChange={setDates} />
+      <Views name="accounting view" value={view} onChange={setView} options={[
+        { id: 'overview', label: t('Overview') }, { id: 'pl', label: t('Profit and loss') }, { id: 'cash', label: t('Cash flow') }, { id: 'vat', label: t('VAT summary') }, { id: 'bs', label: t('Balance sheet') }, { id: 'ledger', label: t('Trial balance and ledger') },
+      ]} />
       {error && <p className="msg error">{error}</p>}
 
-      {k && (
+      {view === 'overview' && k && (
         <>
-          <h3>{t('Owner overview')}</h3>
-          <div className="kpis">
-            <Kpi info="metric.salesIncl" l={t('Sales incl. VAT')} v={formatSar(k.salesInclVat)} />
-            <Kpi info="metric.refundsIncl" l={t('Refunds incl. VAT')} v={formatSar(k.refundsInclVat)} />
-            <Kpi info="metric.transactions" l={t('Transactions')} v={String(k.saleCount)} sub={k.averageBasket !== null ? t('Average basket {0}', formatSar(k.averageBasket)) : undefined} />
-            <Kpi info="metric.netSales" l={t('Net sales excl. VAT')} v={formatSar(k.netSales)} />
-            <Kpi info="metric.grossProfit" l={t('Gross profit')} v={formatSar(k.grossProfit)} />
-            <Kpi info="metric.operating" l={t('Operating expenses')} v={formatSar(k.operatingExpenses)} />
-            <Kpi info="metric.netProfit" l={t('Net profit (provisional)')} v={formatSar(k.netProfit)} bad={k.netProfit < 0} />
-            <Kpi info="metric.cashCollected" l={t('Cash collected (net)')} v={formatSar(k.cashCollected)} />
-            <Kpi info="metric.cardRecorded" l={t('Card recorded by cashiers')} v={formatSar(k.cardRecorded)} />
-            <Kpi info="metric.inventoryValue" l={t('Inventory value (at cost)')} v={formatSar(k.inventoryValue)} />
-            <Kpi info="metric.expensesOwed" l={t('Expenses still owed')} v={formatSar(k.expensesOutstanding)} />
-            <Kpi info="metric.lowStock" l={t('Products at/below reorder level')} v={String(k.lowStockCount)} />
+          <div className="kpis" aria-label="main figures">
+            <Kpi lead info="metric.netProfit" l={t('Net profit (provisional)')} v={formatMoney(k.netProfit)} bad={k.netProfit < 0} />
+            <Kpi info="metric.salesIncl" l={t('Sales incl. VAT')} v={formatMoney(k.salesInclVat)} />
+            <Kpi info="metric.grossProfit" l={t('Gross profit')} v={formatMoney(k.grossProfit)} />
+            <Kpi info="metric.operating" l={t('Operating expenses')} v={formatMoney(k.operatingExpenses)} />
           </div>
-          <h4>{t('Money position (right now)')}</h4>
+          {months && (
+            <section className="chart-card" aria-label="monthly result">
+              <div className="chart-head"><h4>{t('Result by month')} <small>{t('SAR, provisional. Click a month to see it.')}</small></h4></div>
+              <Chart
+                name={t('Result by month')} kind="bar" info="metric.chart.monthly" axisFormat={axisSar}
+                series={[{ name: t('Gross profit'), format: formatMoney }, { name: t('Net profit (provisional)'), format: formatMoney }]}
+                points={months.map((m) => ({ key: m.month, axis: `${monthOf(`${m.month}-01`)} ${m.month.slice(2, 4)}`, title: `${monthOf(`${m.month}-01`)} ${m.month.slice(0, 4)}`, values: [m.grossProfit, m.netProfit], extras: [{ label: t('Net sales'), value: m.netSales === null ? t('Not recorded') : formatMoney(m.netSales) }, { label: t('Operating expenses'), value: m.expenses === null ? t('Not recorded') : formatMoney(m.expenses) }] }))}
+                onPick={(p) => { const start = `${p.key}-01`; const end = addDays(`${addDays(start, 32).slice(0, 7)}-01`, -1); setDates({ from: start, to: end < to || p.key !== to.slice(0, 7) ? end : to }); setView('pl'); }}
+              />
+            </section>
+          )}
+          <h4 className="kpis-title">{t('In these dates')}</h4>
+          <div className="kpis">
+            <Kpi info="metric.transactions" l={t('Transactions')} v={String(k.saleCount)} sub={k.averageBasket !== null ? t('Average basket {0}', formatSar(k.averageBasket)) : undefined} />
+            <Kpi info="metric.netSales" l={t('Net sales excl. VAT')} v={formatMoney(k.netSales)} />
+            <Kpi info="metric.refundsIncl" l={t('Refunds incl. VAT')} v={formatMoney(k.refundsInclVat)} />
+            <Kpi info="metric.cashCollected" l={t('Cash collected (net)')} v={formatMoney(k.cashCollected)} sub={t('After refunds')} />
+            <Kpi info="metric.cardRecorded" l={t('Card recorded by cashiers')} v={formatMoney(k.cardRecorded)} />
+            <Kpi info="metric.collections" l={t('Customer payments received (period)')} v={formatMoney(k.collectionsInPeriod)} />
+            <Kpi info="metric.supplierPayments" l={t('Supplier payments made (period)')} v={formatMoney(k.supplierPaymentsInPeriod)} />
+          </div>
+          <h4 className="kpis-title">{t('Right now')}</h4>
           <p className="hint">{t('Cash and bank is money the store has. Money customers owe is not cash until they pay; money owed to suppliers is not yet paid out.')}</p>
           <div className="kpis">
-            <Kpi info="metric.cashBank" l={t('Cash and bank (books)')} v={formatSar(k.cashAndBank)} />
-            <Kpi info="metric.receivables" l={t('Customers owe the store')} v={formatSar(k.receivablesOutstanding)} sub={t('{0} customers · overdue {1} · due soon {2}', k.customersWithBalance, formatSar(k.receivablesOverdue), formatSar(k.receivablesDueSoon))} />
-            <Kpi info="metric.customerAdvances" l={t('Advances held for customers')} v={formatSar(k.customerAdvances)} />
-            <Kpi info="metric.payables" l={t('Store owes suppliers')} v={formatSar(k.payablesOutstanding)} sub={t('{0} suppliers · overdue {1} · due soon {2}', k.suppliersWithBalance, formatSar(k.payablesOverdue), formatSar(k.payablesDueSoon))} />
-            <Kpi info="metric.supplierAdvances" l={t('Paid to suppliers in advance')} v={formatSar(k.supplierAdvances)} />
-            <Kpi info="metric.collections" l={t('Customer payments received (period)')} v={formatSar(k.collectionsInPeriod)} />
-            <Kpi info="metric.supplierPayments" l={t('Supplier payments made (period)')} v={formatSar(k.supplierPaymentsInPeriod)} />
+            <Kpi info="metric.cashBank" l={t('Cash and bank (books)')} v={formatMoney(k.cashAndBank)} bad={k.cashAndBank < 0} sub={k.cashAndBank < 0 ? t('Below zero: more was paid out than recorded in. Check opening balances.') : undefined} />
+            <Kpi info="metric.receivables" l={t('Customers owe the store')} v={formatMoney(k.receivablesOutstanding)} sub={t('{0} customers · overdue {1} · due soon {2}', k.customersWithBalance, formatSar(k.receivablesOverdue), formatSar(k.receivablesDueSoon))} />
+            <Kpi info="metric.payables" l={t('Store owes suppliers')} v={formatMoney(k.payablesOutstanding)} sub={t('{0} suppliers · overdue {1} · due soon {2}', k.suppliersWithBalance, formatSar(k.payablesOverdue), formatSar(k.payablesDueSoon))} />
+            <Kpi info="metric.inventoryValue" l={t('Inventory value (at cost)')} v={formatMoney(k.inventoryValue)} />
+            <Kpi info="metric.expensesOwed" l={t('Expenses still owed')} v={formatMoney(k.expensesOutstanding)} />
+            <Kpi info="metric.customerAdvances" l={t('Advances held for customers')} v={formatMoney(k.customerAdvances)} />
+            <Kpi info="metric.supplierAdvances" l={t('Paid to suppliers in advance')} v={formatMoney(k.supplierAdvances)} />
+            <Kpi info="metric.lowStock" l={t('Products at/below reorder level')} v={String(k.lowStockCount)} />
           </div>
         </>
       )}
 
-      {pl && (
+      {view === 'pl' && pl && (
         <>
           <h3>{t('Profit and loss')} <span className="tag">{t('accrual basis')}</span></h3>
           {pl.entryCount === 0 && <p className="msg warn">{t('No records for this period. The zeros below mean nothing was recorded.')}</p>}
           {pl.prepaidWaiting > 0 && <p className="msg warn">{t('Prepaid expenses of {0} are due but not recognised yet. Confirm them under Expenses.', formatSar(pl.prepaidWaiting))}</p>}
-          <div className="msg warn">
-            <strong>{t('Provisional figures')}</strong>
+          <details className="more">
+            <summary><span className="tag partial">{t('Provisional figures')}</span>&nbsp;{t('Why?')}</summary>
             <ul style={{ margin: 'var(--sp-1) 0 0' }}>{pl.provisionalReasons.map((r) => { const m = /^(\d+) draft/.exec(r); return <li key={r}>{m ? t('{0} draft expense(s) in this period are not posted yet', m[1]!) : t(r)}</li>; })}</ul>
-          </div>
+          </details>
           <table className="list" style={{ maxWidth: 560 }}>
             <tbody>
               <Line info="metric.salesGross" l={t('Sales (excl. VAT)')} v={pl.salesGross} />
@@ -120,7 +142,7 @@ export function Accounting() {
         </>
       )}
 
-      {vat && (
+      {view === 'vat' && vat && (
         <>
           <h3>{t('VAT summary')} {vat.reconciles ? <span className="tag paid">{t('matches the VAT accounts')}</span> : <span className="tag overdue">{t('DOES NOT match the VAT accounts')}</span>}</h3>
           <p className="msg warn">{t('A working summary for your accountant, not the official VAT return. 0% sales cannot be split into zero-rated and exempt.')}</p>
@@ -144,7 +166,7 @@ export function Accounting() {
         </>
       )}
 
-      {cf && (
+      {view === 'cash' && cf && (
         <div className="card section" aria-label="cash flow">
           <h3>{t('Cash flow')}</h3>
           <p className="hint">{t('Money that actually moved in and out of cash and bank. This is not the same as profit: a sale on credit is profit before any money arrives.')}</p>
@@ -156,7 +178,7 @@ export function Accounting() {
           </tbody></table>
         </div>
       )}
-      {bs && (
+      {view === 'bs' && bs && (
         <>
           <h3>{t('Balance sheet as of {0}', bs.asOf)} {!bs.balanced && <span className="tag overdue">{t('NOT BALANCED')}</span>}</h3>
           <div className="row" style={{ alignItems: 'flex-start', maxWidth: 1000, flexWrap: 'wrap' }}>
@@ -177,7 +199,7 @@ export function Accounting() {
         </>
       )}
 
-      {tb && (
+      {view === 'ledger' && tb && (
         <>
           <h3>{t('Trial balance')} {tb.totalDebit === tb.totalCredit ? <span className="tag paid">{t('balanced')}</span> : <span className="tag overdue">{t('NOT BALANCED')}</span>}</h3>
           <table className="list" style={{ maxWidth: 760 }}>
@@ -190,7 +212,7 @@ export function Accounting() {
         </>
       )}
 
-      {gl && (
+      {view === 'ledger' && gl && (
         <>
           <h3>{t('General ledger')}: {gl.account.code} {gl.account.nameEn}</h3>
           <table className="list">

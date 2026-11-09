@@ -1,27 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatSar, parseSar, roundDiv } from '../core/money';
+import { addDays, monthOf } from '../core/date-range';
+import { formatMoney, formatSar, parseSar, roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, PrepaidPreview, VatClass } from '../services/expenses';
 import { call } from './api';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
-import { validDay, validOneOf, validText } from './remember';
+import { validOneOf, validText } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { HelpLink } from './HelpLink';
 import { StatusBadge } from './StatusBadge';
-import { Kpi } from './Figures';
+import { Chart } from './Chart';
+import { DateNavigator, useDateRange } from './DateNavigator';
+import { Kpi, Views } from './Figures';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 const todayDay = () => storeDay(new Date().toISOString());
-const monthRange = (offset: number): [string, string] => {
-  const d = new Date(`${todayDay().slice(0, 7)}-01T00:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + offset);
-  const start = d.toISOString().slice(0, 10);
-  d.setUTCMonth(d.getUTCMonth() + 1);
-  d.setUTCDate(0);
-  return [start, d.toISOString().slice(0, 10)];
-};
 const sarOrZero = (s: string) => {
   try {
     return s.trim() ? parseSar(s) : 0;
@@ -33,7 +28,9 @@ const STATES = ['draft', 'unpaid', 'partial', 'overdue', 'paid', 'cancelled', 'r
 const VAT: VatClass[] = ['standard', 'zero', 'exempt', 'out_of_scope'];
 const VAT_LABEL: Record<VatClass, string> = { standard: 'Standard-rated (15%)', zero: 'Zero-rated', exempt: 'Exempt', out_of_scope: 'Out of scope / no VAT' };
 
-const validRange = (v: unknown): v is [string, string] => Array.isArray(v) && v.length === 2 && validDay(v[0]) && validDay(v[1]);
+const VIEWS = ['list', 'recurring', 'prepaid', 'categories'] as const;
+type View = (typeof VIEWS)[number];
+const axisSar = (h: number) => { const s = Math.floor(Math.abs(h) / 100); const x = s >= 1000 ? `${Math.floor(s / 100) / 10}K` : String(s); return h < 0 ? `-${x}` : x; };
 const validFilter = (v: unknown): v is { categoryId: number; payState: string; payee: string } => {
   const f = v as { categoryId?: unknown; payState?: unknown; payee?: unknown } | null;
   return !!f && Number.isInteger(f.categoryId) && validText(f.payState) && validText(f.payee);
@@ -42,8 +39,9 @@ const validFilter = (v: unknown): v is { categoryId: number; payState: string; p
 export function Expenses({ can }: { can: (p: string) => boolean }) {
   const back = useReturnTick();
   const { t, lang } = useI18n();
-  const [range, setRange] = useRemembered<[string, string]>('expenses', 'range', monthRange(0), validRange);
-  const [preset, setPreset] = useRemembered<'this' | 'prev' | 'custom'>('expenses', 'preset', 'this', validOneOf(['this', 'prev', 'custom']));
+  const [dates, setDates] = useDateRange('expenses', 'month');
+  const range = [dates.from, dates.to] as const;
+  const [view, setView] = useRemembered<View>('expenses', 'view', 'list', validOneOf(VIEWS));
   const [filter, setFilter] = useRemembered('expenses', 'filter', { categoryId: 0, payState: '', payee: '' }, validFilter);
   const [cats, setCats] = useState<ExpenseCategory[]>([]);
   const [rows, setRows] = useState<ExpenseRow[]>([]);
@@ -60,7 +58,7 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
     call<ExpenseRow[]>('expense.list', { fromDay, toDay, categoryId: filter.categoryId || undefined, payState: filter.payState || undefined, payee: filter.payee || undefined })
       .then(setRows, (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
     call<ExpenseSummary>('expense.summary', { fromDay, toDay }).then(setSum, () => setSum(null));
-  }, [range, filter, tick, back]);
+  }, [dates.from, dates.to, filter, tick, back]);
 
   const catName = (id: number) => {
     const c = cats.find((x) => x.id === id);
@@ -81,22 +79,11 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
   return (
     <div className="page">
       <PageHeader title={t('Expenses')} desc={t('Rent, bills, salaries and other store costs: owed, paid and overdue.')} actions={<>{can('expense.create') && <button className="primary" onClick={() => setEditing('new')}>{t('New expense')}</button>}<HelpLink article="expenses-record" /></>} />
-      <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', maxWidth: 1100 }}>
-        <div>
-          <label>{t('Period')}</label>
-          <select value={preset} onChange={(e) => {
-            const v = e.target.value as typeof preset;
-            setPreset(v);
-            if (v === 'this') setRange(monthRange(0));
-            if (v === 'prev') setRange(monthRange(-1));
-          }}>
-            <option value="this">{t('This month')}</option>
-            <option value="prev">{t('Previous month')}</option>
-            <option value="custom">{t('Custom')}</option>
-          </select>
-        </div>
-        <div><label>{t('From')}</label><input type="date" value={range[0]} onChange={(e) => { setPreset('custom'); setRange([e.target.value, range[1]]); }} /></div>
-        <div><label>{t('To')}</label><input type="date" value={range[1]} onChange={(e) => { setPreset('custom'); setRange([range[0], e.target.value]); }} /></div>
+      <DateNavigator name="Expenses" value={dates} onChange={setDates} />
+      <Views name="expenses view" value={view} onChange={setView} options={[{ id: 'list', label: t('Expenses') }, { id: 'recurring', label: t('Recurring expenses') }, { id: 'prepaid', label: t('Recognise prepaid expenses') }, ...(can('expense.approve') ? [{ id: 'categories' as const, label: t('Expense categories') }] : [])]} />
+      {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+      {view === 'list' && <>
+      <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', maxWidth: 760 }}>
         <div>
           <label>{t('Category')} <InfoIcon id="field.expense.category" /></label>
           <select value={filter.categoryId} onChange={(e) => setFilter({ ...filter, categoryId: Number(e.target.value) })}>
@@ -113,34 +100,37 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
         </div>
         <div><label>{t('Payee')} <InfoIcon id="field.expense.payee" /></label><input data-kb-search="filter" value={filter.payee} onChange={(e) => setFilter({ ...filter, payee: e.target.value })} /></div>
       </div>
-      {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
 
       {sum && (
         <>
-          <div className="kpis" style={{ marginTop: 12 }}>
-            <Kpi info="metric.expense.posted" l={t('Expenses in period (posted, incl. VAT)')} v={formatSar(sum.totalPosted)} />
-            <Kpi info="metric.expense.net" l={t('Excl. recoverable VAT')} v={formatSar(sum.netOfRecoverableVat)} />
-            <Kpi info="metric.expense.vat" l={t('Recoverable input VAT')} v={formatSar(sum.recoverableVat)} />
-            <Kpi info="metric.expense.paid" l={t('Paid in period (cash basis)')} v={formatSar(sum.paidInPeriod)} />
-            <Kpi info="metric.expense.owed" l={t('Still owed today')} v={formatSar(sum.outstandingNow)} />
-            <Kpi info="metric.expense.overdue" l={t('Overdue today')} v={formatSar(sum.overdueNow)} bad={sum.overdueNow > 0} />
-            <Kpi info="metric.expense.drafts" l={t('Drafts waiting')} v={String(sum.draftsCount)} />
+          <div className="kpis" style={{ marginTop: 12 }} aria-label="main figures">
+            <Kpi lead info="metric.expense.posted" l={t('Expenses in period (posted, incl. VAT)')} v={formatMoney(sum.totalPosted)} />
+            <Kpi info="metric.expense.paid" l={t('Paid in period (cash basis)')} v={formatMoney(sum.paidInPeriod)} />
+            <Kpi info="metric.expense.owed" l={t('Still owed today')} v={formatMoney(sum.outstandingNow)} />
+            <Kpi info="metric.expense.overdue" l={t('Overdue today')} v={formatMoney(sum.overdueNow)} bad={sum.overdueNow > 0} />
           </div>
+          <details className="more">
+            <summary>{t('VAT and drafts')}</summary>
+            <div className="kpis">
+              <Kpi info="metric.expense.net" l={t('Excl. recoverable VAT')} v={formatMoney(sum.netOfRecoverableVat)} />
+              <Kpi info="metric.expense.vat" l={t('Recoverable input VAT')} v={formatMoney(sum.recoverableVat)} />
+              <Kpi info="metric.expense.drafts" l={t('Drafts waiting')} v={String(sum.draftsCount)} />
+            </div>
+          </details>
           <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap', marginTop: 12 }}>
-            <div style={{ minWidth: 280 }}>
-              <h4>{t('By category')}</h4>
-              <table className="list"><tbody>{sum.byCategory.map((c) => <tr key={c.category}><td>{t(c.category)}</td><td className="num">{c.count}</td><td className="num">{formatSar(c.gross)}</td></tr>)}</tbody></table>
-            </div>
-            <div style={{ minWidth: 280 }}>
-              <h4>{t('Monthly trend (posted)')}</h4>
-              <Bars data={sum.byMonth.map((m) => ({ label: m.month, value: m.gross }))} />
-            </div>
-            <div style={{ minWidth: 320 }}>
-              <h4>{t('Recurring: expected vs actual')}</h4>
-              <table className="list">
-                <thead><tr><th>{t('Name')}</th><th>{t('Period')}</th><th className="num">{t('Expected')}</th><th className="num">{t('Actual')}</th><th>{t('Status')}</th></tr></thead>
-                <tbody>{sum.recurring.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.period?.split('@')[0] ?? '—'}</td><td className="num">{formatSar(r.expected)}</td><td className="num">{r.actual === null ? '—' : formatSar(r.actual)}</td><td>{t(r.status)}</td></tr>)}</tbody>
-              </table>
+            <section className="chart-card" style={{ flex: '2 1 420px', marginTop: 0 }} aria-label="expenses by month">
+              <div className="chart-head"><h4>{t('Monthly trend (posted)')} <small>{t('SAR, including VAT. Click a month to see it.')}</small></h4></div>
+              <Chart
+                name={t('Monthly trend (posted)')} kind="bar" info="metric.chart.expenses" axisFormat={axisSar}
+                series={[{ name: t('Expenses'), format: formatMoney }]}
+                points={sum.byMonth.map((m) => ({ key: m.month, axis: `${monthOf(`${m.month}-01`)} ${m.month.slice(2, 4)}`, title: `${monthOf(`${m.month}-01`)} ${m.month.slice(0, 4)}`, values: [m.gross] }))}
+                onPick={(p) => { const from = `${p.key}-01`; const end = addDays(`${addDays(from, 32).slice(0, 7)}-01`, -1); const now = todayDay(); setDates({ from, to: end > now ? now : end }); }}
+                emptyText={t('No posted expenses in these dates.')}
+              />
+            </section>
+            <div style={{ flex: '1 1 260px' }}>
+              <h4 style={{ marginTop: 0 }}>{t('By category')}</h4>
+              <table className="list"><tbody>{sum.byCategory.length === 0 && <EmptyRow cols={3} text={t('No posted expenses in these dates.')} />}{sum.byCategory.map((c) => { const cat = cats.find((x) => x.nameEn === c.category); return <tr key={c.category} style={{ cursor: cat ? 'pointer' : undefined }} tabIndex={cat ? 0 : undefined} title={cat ? t('Show only this category') : undefined} onClick={() => cat && setFilter({ ...filter, categoryId: filter.categoryId === cat.id ? 0 : cat.id })}><td>{t(c.category)}</td><td className="num">{c.count}</td><td className="num">{formatSar(c.gross)}</td></tr>; })}</tbody></table>
             </div>
           </div>
         </>
@@ -163,31 +153,22 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
         </tbody>
       </table>
 
+      </>}
+      {view === 'recurring' && sum && (
+        <>
+          <h4 style={{ marginTop: 0 }}>{t('Recurring: expected vs actual')}</h4>
+          <table className="list" style={{ marginBottom: 'var(--sp-4)' }}>
+            <thead><tr><th>{t('Name')}</th><th>{t('Period')}</th><th className="num">{t('Expected')}</th><th className="num">{t('Actual')}</th><th>{t('Status')}</th></tr></thead>
+            <tbody>{sum.recurring.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.period?.split('@')[0] ?? '—'}</td><td className="num">{formatSar(r.expected)}</td><td className="num">{r.actual === null ? '—' : formatSar(r.actual)}</td><td>{t(r.status)}</td></tr>)}</tbody>
+          </table>
+        </>
+      )}
       {editing && <ExpenseForm cats={cats.filter((c) => c.active)} can={can} initial={editing === 'new' ? null : editing} onClose={(m) => { setEditing(null); if (m) setMsg(m); reload(); }} />}
       {openId !== null && !editing && <ExpenseDetail id={openId} can={can} onEdit={(r) => setEditing(r)} onClose={() => { setOpenId(null); reload(); }} />}
-      {can('expense.view') && <PrepaidRun can={can} />}
-      {can('expense.view') && <Recurring cats={cats} can={can} onChange={reload} />}
-      {can('expense.approve') && <Categories cats={cats} onChange={reload} />}
+      {view === 'prepaid' && can('expense.view') && <PrepaidRun can={can} />}
+      {view === 'recurring' && can('expense.view') && <Recurring cats={cats} can={can} onChange={reload} />}
+      {view === 'categories' && can('expense.approve') && <Categories cats={cats} onChange={reload} />}
     </div>
-  );
-}
-
-/** Simple labelled bars: every bar also shows its number, so nothing depends on reading the bar length. */
-export function Bars({ data }: { data: { label: string; value: number }[] }) {
-  const max = Math.max(1, ...data.map((d) => Math.abs(d.value)));
-  if (data.length === 0) return <p className="hint">—</p>;
-  return (
-    <table className="list">
-      <tbody>
-        {data.map((d) => (
-          <tr key={d.label}>
-            <td style={{ width: 80 }}>{d.label}</td>
-            <td><div style={{ height: 12, width: `${Math.max(2, roundDiv(Math.abs(d.value) * 100, max))}%`, background: d.value < 0 ? 'var(--danger)' : 'var(--primary)', borderRadius: 3 }} /></td>
-            <td className="num" style={{ width: 110 }}>{formatSar(d.value)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
   );
 }
 

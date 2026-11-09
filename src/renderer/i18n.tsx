@@ -7,6 +7,20 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'Overview': 'نظرة عامة',
+  'Balance sheet': 'الميزانية',
+  'Trial balance and ledger': 'ميزان المراجعة والأستاذ',
+  'Result by month': 'النتيجة الشهرية',
+  'SAR, provisional. Click a month to see it.': 'ريال، مؤقت. انقر الشهر لعرضه.',
+  'In these dates': 'في هذه التواريخ',
+  'After refunds': 'بعد المرتجعات',
+  'Right now': 'الآن',
+  'Below zero: more was paid out than recorded in. Check opening balances.': 'أقل من صفر: تحقق من الأرصدة الافتتاحية.',
+  'Why?': 'لماذا؟',
+  'VAT and drafts': 'الضريبة والمسودات',
+  'SAR, including VAT. Click a month to see it.': 'ريال شامل الضريبة. انقر الشهر.',
+  'No posted expenses in these dates.': 'لا مصروفات مرحلة.',
+  'Show only this category': 'عرض هذه الفئة فقط',
   'Arrow keys move between points. Enter opens the detail.': 'الأسهم للتنقل بين النقاط.',
   'Nothing recorded for these dates.': 'لا شيء مسجل لهذه التواريخ.',
   'Show the numbers': 'عرض الأرقام',
