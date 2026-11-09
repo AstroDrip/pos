@@ -41,6 +41,7 @@ const PRELOAD_CHANNELS = [
   'hold.create',
   'hold.list',
   'hold.recall',
+  'hold.cancel',
   'supplier.list',
   'supplier.create',
   'customer.find',

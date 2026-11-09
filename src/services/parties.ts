@@ -152,6 +152,10 @@ export function rankCustomers<T extends { id: number; name: string; phone: strin
     .map((x) => x.r);
 }
 
+export function getCustomer(ctx: Ctx, id: number): Customer | null {
+  return (ctx.db.prepare('SELECT id, name, phone, vat_number AS vatNumber FROM customers WHERE id = ?').get(id) as Customer | undefined) ?? null;
+}
+
 export function findCustomers(ctx: Ctx, text: string): Customer[] {
   const t = text.trim().replace(/[%_]/g, '');
   if (!t) return [];

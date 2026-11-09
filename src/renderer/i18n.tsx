@@ -134,6 +134,13 @@ const AR: Record<string, string> = {
   "Return": "مرتجع",
   // supplier bills and store details
   "Hold the bill": "تعليق الفاتورة",
+  // master prompt A
+  "Held: {0}.": "تم التعليق: {0}.",
+  "The price of {0} changed from {1} to {2}.": "تغير سعر {0} من {1} إلى {2}.",
+  "{0} is no longer sold and was left off.": "{0} لم يعد يباع وتم استبعاده.",
+  "Cancel this held bill": "إلغاء هذه الفاتورة المعلقة",
+  "Why is this held bill being cancelled?": "لماذا يتم إلغاء هذه الفاتورة المعلقة؟",
+  "Keep it": "إبقاؤها",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

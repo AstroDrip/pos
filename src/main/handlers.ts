@@ -9,7 +9,7 @@ import { createProduct, getAliases, getProduct, itemInfo, listProducts, lookup, 
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit, verifyAuditChain } from '../services/audit';
-import { holdBill, listHeldBills, recallBill, recordRemoval } from '../services/held-bills';
+import { cancelHeldBill, holdBill, hydrateBill, listHeldBills, recallBill, recordRemoval } from '../services/held-bills';
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from '../services/import';
 import { receiveGoods } from '../services/inventory';
 import { createCustomer, createSupplier, findCustomers, listSuppliers, updateSupplier } from '../services/parties';
@@ -161,13 +161,10 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       await printer.printReceipt(data, p.copy);
       return null;
     },
-    'hold.create': (p, s) => holdBill(ctx, userId(s), p.label, { lines: p.lines, customerId: p.customerId, billKey: p.billKey }),
+    'hold.create': (p, s) => holdBill(ctx, userId(s), p.label, { lines: p.lines, customerId: p.customerId, billKey: p.billKey, cash: p.cash, card: p.card }),
     'hold.list': () => listHeldBills(ctx),
-    'hold.recall': (p, s) => {
-      const bill = recallBill(ctx, userId(s), p.id);
-      // Current product data; prices are the live ones, as for any new bill.
-      return { customerId: bill.customerId, billKey: bill.billKey, lines: bill.lines.map((l) => ({ product: getProduct(ctx, l.productId), qty: l.qty })).filter((l) => l.product?.active) };
-    },
+    'hold.recall': (p, s) => hydrateBill(ctx, recallBill(ctx, userId(s), p.id)),
+    'hold.cancel': (p, s) => cancelHeldBill(ctx, userId(s), p.id, p.reason),
     'supplier.list': () => listSuppliers(ctx),
     'supplier.create': (p, s) => createSupplier(ctx, userId(s), p),
     'customer.find': (p) => findCustomers(ctx, p.text),

@@ -1,15 +1,29 @@
 import { z } from 'zod';
 import { appendAudit } from './audit';
+import { getProduct, type Product } from './catalog';
 import { DomainError, type Ctx } from './context';
+import { getCustomer, type Customer } from './parties';
 import { requirePermission } from './users';
 
 // A held bill is a parked cart, not a sale: no invoice number, stock or ledger effect.
 // Recalling deletes the hold; prices are re-read from the catalog when the bill is finally paid.
-const payloadSchema = z.object({
-  lines: z.array(z.object({ productId: z.number().int().positive(), qty: z.number().int().positive() })).min(1).max(500),
+// PINs and approvers are never kept: a restored discount is approved again at payment.
+export const TYPED_MONEY = /^\d{0,9}(\.\d{0,2})?$/;
+export const payloadSchema = z.object({
+  lines: z.array(z.object({
+    productId: z.number().int().positive(),
+    qty: z.number().int().positive(),
+    /** The unit price when held, to warn if it has changed by the time the bill comes back. */
+    seenPrice: z.number().int().nonnegative().optional(),
+    discount: z.number().int().nonnegative().optional(),
+    scanCode: z.string().max(64).optional(),
+  })).min(1).max(500),
   customerId: z.number().int().positive().optional(),
   /** The bill's key, kept so a recalled bill finishes under the same key and removals stay linked to it. */
   billKey: z.string().regex(/^[\w-]{8,64}$/).optional(),
+  /** What was typed on the payment step. */
+  cash: z.string().regex(TYPED_MONEY).optional(),
+  card: z.string().regex(TYPED_MONEY).optional(),
 });
 export type HeldPayload = z.infer<typeof payloadSchema>;
 
@@ -48,6 +62,42 @@ export function recallBill(ctx: Ctx, userId: number, id: number): HeldPayload {
     ctx.db.prepare('DELETE FROM held_bills WHERE id = ?').run(id);
     appendAudit(ctx, { userId, action: 'bill.recall', entity: 'held_bill', entityId: id });
     return payloadSchema.parse(JSON.parse(row.payload_json));
+  })();
+}
+
+export interface HydratedBill {
+  customer: Customer | null;
+  billKey?: string;
+  lines: { product: Product; qty: number; discount: number; scanCode?: string; seenPrice?: number }[];
+  /** Names of items no longer sold, left off the bill. */
+  dropped: string[];
+  cash: string;
+  card: string;
+}
+
+/** A parked bill with today's product data: prices are the live ones, as for any new bill. */
+export function hydrateBill(ctx: Ctx, p: HeldPayload): HydratedBill {
+  const lines: HydratedBill['lines'] = [];
+  const dropped: string[] = [];
+  for (const l of p.lines) {
+    const product = getProduct(ctx, l.productId);
+    if (!product?.active) {
+      if (product) dropped.push(product.nameEn);
+      continue;
+    }
+    lines.push({ product, qty: l.qty, discount: l.discount ?? 0, ...(l.scanCode ? { scanCode: l.scanCode } : {}), ...(l.seenPrice !== undefined ? { seenPrice: l.seenPrice } : {}) });
+  }
+  return { customer: p.customerId ? getCustomer(ctx, p.customerId) : null, ...(p.billKey ? { billKey: p.billKey } : {}), lines, dropped, cash: p.cash ?? '', card: p.card ?? '' };
+}
+
+export function cancelHeldBill(ctx: Ctx, userId: number, id: number, reason: string): void {
+  requirePermission(ctx, userId, 'sale.create');
+  if (!reason.trim()) throw new DomainError('VALIDATION', 'A reason is required');
+  ctx.db.transaction(() => {
+    const row = ctx.db.prepare('SELECT label FROM held_bills WHERE id = ?').get(id) as { label: string } | undefined;
+    if (!row) throw new DomainError('NOT_FOUND', 'Held bill not found (maybe already recalled)');
+    ctx.db.prepare('DELETE FROM held_bills WHERE id = ?').run(id);
+    appendAudit(ctx, { userId, action: 'bill.cancel', entity: 'held_bill', entityId: id, details: { label: row.label, reason: reason.trim() } });
   })();
 }
 

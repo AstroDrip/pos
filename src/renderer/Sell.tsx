@@ -4,7 +4,7 @@ import { ScanBuffer } from '../core/scan-buffer';
 import { decrementLine, incrementLine, reductionOf, restoreLine, setLineQty, type CartLine, type QtyChange, type Removed } from '../core/cart';
 import { computeInvoice } from '../core/vat';
 import type { LookupResult, Product } from '../services/catalog';
-import type { HeldBill } from '../services/held-bills';
+import type { HeldBill, HydratedBill } from '../services/held-bills';
 import type { SearchHit } from '../services/search';
 import type { Customer } from '../services/parties';
 import type { SaleResult } from '../services/sales';
@@ -48,6 +48,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   const [msg, setMsg] = useState<Msg>(null);
   const [lastSaleId, setLastSaleId] = useState<number | null>(null);
   const [held, setHeld] = useState<HeldBill[]>([]);
+  const [cancelling, setCancelling] = useState<{ id: number; reason: string } | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [custSearch, setCustSearch] = useState('');
   const [approver, setApprover] = useState({ username: '', pin: '' });
@@ -382,10 +383,43 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
 
   const hold = async () => {
     const label = customer?.name ?? `Bill ${new Date().toLocaleTimeString()}`;
+    const typed = (s: string) => (/^\d{0,9}(\.\d{0,2})?$/.test(s.trim()) ? s.trim() : ''); // anything else is not worth keeping
     try {
-      await call('hold.create', { label, lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty })), customerId: customer?.id, billKey: billKey.current });
+      await call('hold.create', {
+        label,
+        lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty, seenPrice: l.product.priceIncl, discount: l.discount, ...(l.scanCode ? { scanCode: l.scanCode } : {}) })),
+        customerId: customer?.id,
+        billKey: billKey.current,
+        cash: typed(cash),
+        card: typed(cardPart),
+      });
       resetBill();
-      setMsg({ kind: 'ok', text: t('Held: {0}. Discounts are not kept on held bills.', label) });
+      setMsg({ kind: 'ok', text: t('Held: {0}.', label) });
+      void loadHeld();
+    } catch (e) {
+      setMsg({ kind: 'error', text: t((e as Error).message) });
+    }
+  };
+
+  /** Puts a held or left-open bill back on the screen and says what has changed since. */
+  const restoreBill = (r: HydratedBill) => {
+    if (r.billKey) billKey.current = r.billKey; // removals made before holding stay linked to this bill
+    setLines(r.lines.map((l) => ({ product: l.product, qty: l.qty, discount: l.discount, ...(l.scanCode ? { scanCode: l.scanCode } : {}), uid: crypto.randomUUID() })));
+    setCustomer(r.customer);
+    setCash(r.cash);
+    setCardPart(r.card);
+    const notes = [
+      ...r.lines.filter((l) => l.seenPrice !== undefined && l.seenPrice !== l.product.priceIncl).map((l) => t('The price of {0} changed from {1} to {2}.', l.product.nameEn, formatSar(l.seenPrice!), formatSar(l.product.priceIncl))),
+      ...r.dropped.map((name) => t('{0} is no longer sold and was left off.', name)),
+    ];
+    if (notes.length) setMsg({ kind: 'warn', text: notes.join(' ') });
+  };
+
+  const cancelHeld = async () => {
+    if (!cancelling || !cancelling.reason.trim()) return;
+    try {
+      await call('hold.cancel', { id: cancelling.id, reason: cancelling.reason.trim() });
+      setCancelling(null);
       void loadHeld();
     } catch (e) {
       setMsg({ kind: 'error', text: t((e as Error).message) });
@@ -395,9 +429,8 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   const recall = async (id: number) => {
     if (lines.length) return setMsg({ kind: 'warn', text: t('Finish or hold the current bill first.') });
     try {
-      const r = await call<{ billKey?: string; lines: { product: Product; qty: number }[] }>('hold.recall', { id });
-      if (r.billKey) billKey.current = r.billKey; // removals made before holding stay linked to this bill
-      setLines(r.lines.map((l) => ({ ...l, discount: 0, uid: crypto.randomUUID() })));
+      const r = await call<HydratedBill>('hold.recall', { id });
+      restoreBill(r);
       void loadHeld();
     } catch (e) {
       setMsg({ kind: 'error', text: t((e as Error).message) });
@@ -606,10 +639,18 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
           <div className="page">
             <strong>{t('Held bills:')}</strong>{' '}
             {held.map((h) => (
-              <button key={h.id} onClick={() => recall(h.id)} style={{ marginRight: 6 }}>
-                {h.label} ({h.lineCount})
-              </button>
+              <span key={h.id} style={{ marginRight: 6, display: 'inline-flex', gap: 2, alignItems: 'center' }}>
+                <button onClick={() => recall(h.id)}>{h.label} ({h.lineCount})</button>
+                <button aria-label={`cancel held bill ${h.id}`} title={t('Cancel this held bill')} onClick={() => setCancelling({ id: h.id, reason: '' })}>✕</button>
+              </span>
             ))}
+            {cancelling && (
+              <span className="row">
+                <input autoFocus aria-label="cancel reason" placeholder={t('Why is this held bill being cancelled?')} value={cancelling.reason} onChange={(e) => setCancelling({ ...cancelling, reason: e.target.value })} />
+                <button disabled={!cancelling.reason.trim()} onClick={() => void cancelHeld()}>{t('Confirm')}</button>
+                <button onClick={() => setCancelling(null)}>{t('Keep it')}</button>
+              </span>
+            )}
           </div>
         )}
       </div>
