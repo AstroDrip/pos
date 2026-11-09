@@ -7,6 +7,17 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type Lang = 'en' | 'ar';
 
 const AR: Record<string, string> = {
+  'Recognise prepaid expenses': 'إثبات المصروفات المدفوعة مقدمًا',
+  'Reports never post this for you. Read the list, then confirm.': 'التقارير لا ترحل هذا. راجع القائمة ثم أكد.',
+  'Prepaid expenses recognised.': 'تم إثبات المصروفات المدفوعة مقدمًا.',
+  'Month': 'الشهر',
+  'Original value': 'القيمة الأصلية',
+  'Service period': 'فترة الخدمة',
+  'Amount to recognise': 'المبلغ المراد إثباته',
+  'Remaining prepaid': 'المتبقي',
+  'Journal entry': 'قيد اليومية',
+  'Nothing is waiting for this month.': 'لا يوجد شيء لهذا الشهر.',
+  'Confirm and post {0}': 'تأكيد وترحيل {0}',
   'Proforma VAT': 'ضريبة الفاتورة الأولية',
   'Proforma VAT review': 'مراجعة ضريبة الفاتورة الأولية',
   'VAT on a proforma stays a cost until the final tax invoice is checked and your accountant approves it.': 'تبقى ضريبة الفاتورة الأولية تكلفة حتى تُراجع الفاتورة الضريبية ويوافق المحاسب.',

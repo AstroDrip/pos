@@ -21,7 +21,7 @@ import { createRefund, findSaleForRefund, recentSales, refundReceiptData } from 
 import { postStockCount, recordWastage } from '../services/adjustments';
 import {
   cancelDraft, categoryAccounts, createExpense, expensePayments, expenseSummary, generateRecurring, getExpense, listCategories, listExpenses,
-  listRecurring, payExpense, postExpense, reverseExpense, reversePayment, saveCategory, saveRecurring, updateDraft,
+  listRecurring, payExpense, postExpense, prepaidPreview, recognizePrepaidMonth, reverseExpense, reversePayment, saveCategory, saveRecurring, updateDraft,
 } from '../services/expenses';
 import { cashFlow, balanceSheet, datedTrialBalance, generalLedger, ownerKpis, profitAndLoss } from '../services/financials';
 import { syncHealth } from '../services/dashboard-sync';
@@ -66,7 +66,7 @@ type Payload<C extends Channel> = z.infer<(typeof schemas)[C]>;
 type Handler<C extends Channel> = (p: Payload<C>, s: Session) => unknown;
 
 /** Money and backup actions: a failure here is worth a line in the audit log, whatever the reason. */
-const FAILURE_LOGGED: ReadonlySet<Channel> = new Set(['sale.finalize', 'refund.create', 'credit.receipt', 'credit.writeOff', 'purchase.pay', 'expense.pay', 'vat.claim', 'vat.reverse', 'backup.run', 'restore.apply']);
+const FAILURE_LOGGED: ReadonlySet<Channel> = new Set(['sale.finalize', 'refund.create', 'credit.receipt', 'credit.writeOff', 'purchase.pay', 'expense.pay', 'vat.claim', 'vat.reverse', 'expense.prepaidRecognize', 'backup.run', 'restore.apply']);
 
 const PUBLIC: ReadonlySet<Channel> = new Set(['auth.status', 'auth.setupAdmin', 'auth.login', 'restore.prepare', 'restore.apply']);
 
@@ -144,6 +144,8 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       return null;
     },
     'bill.create': (p, s) => createSupplierBill(ctx, userId(s), p),
+    'expense.prepaidPreview': (p, s) => prepaidPreview(ctx, userId(s), p.month),
+    'expense.prepaidRecognize': (p, s) => recognizePrepaidMonth(ctx, userId(s), p),
     'vat.list': (_p, s) => listVatReviews(ctx, userId(s)),
     'vat.get': (p, s) => getVatReview(ctx, userId(s), p.billId),
     'vat.recordFinal': (p, s) => recordFinalInvoice(ctx, userId(s), p),

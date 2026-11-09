@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatSar, parseSar, roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
-import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, VatClass } from '../services/expenses';
+import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, PrepaidPreview, VatClass } from '../services/expenses';
 import { call } from './api';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
@@ -164,6 +164,7 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
 
       {editing && <ExpenseForm cats={cats.filter((c) => c.active)} can={can} initial={editing === 'new' ? null : editing} onClose={(m) => { setEditing(null); if (m) setMsg(m); reload(); }} />}
       {openId !== null && !editing && <ExpenseDetail id={openId} can={can} onEdit={(r) => setEditing(r)} onClose={() => { setOpenId(null); reload(); }} />}
+      {can('expense.view') && <PrepaidRun can={can} />}
       {can('expense.view') && <Recurring cats={cats} can={can} onChange={reload} />}
       {can('expense.approve') && <Categories cats={cats} onChange={reload} />}
     </div>
@@ -496,6 +497,44 @@ function Recurring({ cats, can, onChange }: { cats: ExpenseCategory[]; can: (p: 
           <p><button className="primary" disabled={!f.name.trim() || !f.categoryId || !(sarOrZero(f.expected) > 0)} onClick={save}>{f.id ? t('Update') : t('Add recurring expense')}</button></p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Prepaid months reach the accounts only when someone reads this list and confirms it. */
+export function PrepaidRun({ can }: { can: (p: string) => boolean }) {
+  const { t } = useI18n();
+  const [month, setMonth] = useState(storeDay(new Date().toISOString()).slice(0, 7));
+  const [preview, setPreview] = useState<PrepaidPreview | null>(null);
+  const [msg, setMsg] = useState<Msg>(null);
+  const load = () => void call<PrepaidPreview>('expense.prepaidPreview', { month }).then(setPreview, (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
+  useEffect(load, [month]);
+  const confirm = async () => {
+    if (!preview) return;
+    try {
+      await call('expense.prepaidRecognize', { month: preview.throughMonth, requestKey: `prepaid-${crypto.randomUUID()}`, expectedTotal: preview.total });
+      setMsg({ kind: 'ok', text: t('Prepaid expenses recognised.') });
+      load();
+    } catch (e) {
+      setMsg({ kind: 'error', text: t((e as Error).message) });
+    }
+  };
+  return (
+    <div className="card section" style={{ marginTop: 'var(--sp-4)' }}>
+      <h3>{t('Recognise prepaid expenses')}</h3>
+      <p className="hint">{t('Reports never post this for you. Read the list, then confirm.')}</p>
+      <div><label>{t('Month')}</label><input type="month" aria-label="prepaid month" value={month} onChange={(e) => setMonth(e.target.value)} /></div>
+      {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+      <table className="list" aria-label="prepaid preview">
+        <thead><tr><th>{t('Description')}</th><th className="num">{t('Original value')}</th><th>{t('Service period')}</th><th>{t('Month')}</th><th className="num">{t('Amount to recognise')}</th><th className="num">{t('Remaining prepaid')}</th><th>{t('Journal entry')}</th></tr></thead>
+        <tbody>
+          {preview?.lines.length === 0 && <EmptyRow cols={7} text={t('Nothing is waiting for this month.')} />}
+          {preview?.lines.map((l) => (
+            <tr key={`${l.expenseId}-${l.month}`}><td>{l.expenseNo} {l.description}</td><td className="num">{formatSar(l.original)}</td><td>{l.periodStart} – {l.periodEnd}</td><td>{l.month}</td><td className="num">{formatSar(l.amount)}</td><td className="num">{formatSar(l.remaining)}</td><td>Dr {l.debitAccount} / Cr {l.creditAccount}</td></tr>
+          ))}
+        </tbody>
+      </table>
+      {can('expense.approve') && <p><button className="primary" disabled={!preview || preview.lines.length === 0} onClick={() => void confirm()}>{t('Confirm and post {0}', formatSar(preview?.total ?? 0))}</button></p>}
     </div>
   );
 }

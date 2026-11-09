@@ -4,7 +4,7 @@ import { createProduct } from './catalog';
 import { DomainError, type Ctx } from './context';
 import {
   amortizationSchedule, cancelDraft, createExpense, expenseSummary, generateRecurring, getExpense, listCategories, listExpenses,
-  payExpense, postExpense, recurringPeriods, reverseExpense, reversePayment, saveCategory, saveRecurring, updateDraft, type ExpenseInput,
+  payExpense, postExpense, recognizePrepaidMonth, recurringPeriods, reverseExpense, reversePayment, saveCategory, saveRecurring, updateDraft, type ExpenseInput,
 } from './expenses';
 import { balanceSheet, datedTrialBalance, generalLedger, ownerKpis, profitAndLoss } from './financials';
 import { receiveGoods } from './inventory';
@@ -166,11 +166,13 @@ describe('expenses: prepaid, capital, till', () => {
   it('annual rent paid up front is spread over 12 months; only started months reach the P&L', () => {
     const id = draft({ description: 'Rent 2026-11..2027-10', gross: 1_200_001, periodStart: '2026-11', periodEnd: '2027-10' });
     postExpense(ctx, u.admin, id, { requestKey: key(), method: 'bank' });
+    recognizePrepaidMonth(ctx, u.admin, { month: '2026-11', requestKey: key(), expectedTotal: 100_001 });
     expect(acct('1300')).toBe(1_200_001 - 100_001); // November recognised (first month carries the extra halala)
     expect(profitAndLoss(ctx, u.admin, '2026-11-01', '2026-11-30').totalOperating).toBe(100_001);
     t.advance(31 * DAY); // December
+    recognizePrepaidMonth(ctx, u.admin, { month: '2026-12', requestKey: key(), expectedTotal: 100_000 });
     expect(profitAndLoss(ctx, u.admin, '2026-12-01', '2026-12-31').totalOperating).toBe(100_000);
-    profitAndLoss(ctx, u.admin, '2026-12-01', '2026-12-31'); // asking again never recognises a month twice
+    recognizePrepaidMonth(ctx, u.admin, { month: '2026-12', requestKey: key(), expectedTotal: 0 }); // running again never recognises a month twice
     expect(acct('1300')).toBe(1_200_001 - 100_001 - 100_000);
     expect(amortizationSchedule(1_200_001, Array.from({ length: 12 }, (_, i) => String(i))).reduce((s, m) => s + m.amount, 0)).toBe(1_200_001);
     books();

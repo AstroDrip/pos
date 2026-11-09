@@ -255,7 +255,6 @@ export function postExpense(ctx: Ctx, userId: number, id: number, payNow?: { req
       lines: [{ account: target, debit: cost }, { account: '2210', debit: vatToAsset }, { account: '2010', credit: e.gross }],
     });
     appendAudit(ctx, { userId, action: 'expense.post', entity: 'expense', entityId: id, details: { no: e.expenseNo, gross: e.gross, vat: e.vatAmount, recoverable: e.vatRecoverable, account: target } });
-    if (prepaid) recognizePrepaid(ctx, userId, id);
     if (payNow) payExpenseTx(ctx, userId, id, { requestKey: payNow.requestKey, amount: e.gross, method: payNow.method, paidOn: today(ctx), reference: payNow.reference });
   })();
 }
@@ -267,40 +266,94 @@ export function amortizationSchedule(cost: number, monthList: string[]): { month
   return monthList.map((month) => ({ month, amount: base + (extra-- > 0 ? 1 : 0) }));
 }
 
-/** Moves the due months of prepaid expenses from 1300 to the expense account. Each month at most once. */
-export function recognizePrepaid(ctx: Ctx, userId: number | null, onlyExpenseId?: number): number {
-  const thisMonth = today(ctx).slice(0, 7);
+export interface PrepaidLine {
+  expenseId: number;
+  expenseNo: string;
+  description: string;
+  original: number; // cost put in 1300 (excludes VAT that was claimed)
+  periodStart: string;
+  periodEnd: string;
+  month: string;
+  amount: number;
+  remaining: number; // still in 1300 after this month
+  debitAccount: string;
+  creditAccount: '1300';
+  entryDate: string;
+}
+
+export interface PrepaidPreview {
+  throughMonth: string;
+  lines: PrepaidLine[];
+  total: number;
+}
+
+/** Months of posted prepaid expenses up to and including this month that nobody has recognised yet. Reads only. */
+function prepaidDue(ctx: Ctx, throughMonth: string): PrepaidLine[] {
   const rows = ctx.db
     .prepare(
-      `SELECT e.id, e.expense_no, e.expense_date, e.gross, e.vat_amount, e.vat_recoverable, e.period_start, e.period_end, c.account_code
+      `SELECT e.id, e.expense_no, e.description, e.expense_date, e.gross, e.vat_amount, e.vat_recoverable, e.period_start, e.period_end, c.account_code
        FROM expenses e JOIN expense_categories c ON c.id = e.category_id
-       WHERE e.status = 'posted' AND e.period_start IS NOT NULL AND e.period_start <> e.period_end ${onlyExpenseId ? 'AND e.id = ?' : ''}`,
+       WHERE e.status = 'posted' AND e.period_start IS NOT NULL AND e.period_start <> e.period_end ORDER BY e.id`,
     )
-    .all(...(onlyExpenseId ? [onlyExpenseId] : [])) as { id: number; expense_no: string; expense_date: string; gross: number; vat_amount: number; vat_recoverable: number; period_start: string; period_end: string; account_code: string }[];
-  let posted = 0;
-  const run = () => {
-    for (const r of rows) {
-      const cost = r.gross - (r.vat_recoverable ? r.vat_amount : 0);
-      for (const m of amortizationSchedule(cost, months(r.period_start, r.period_end))) {
-        if (m.month > thisMonth) break;
-        const exists = ctx.db.prepare('SELECT 1 FROM expense_amortization WHERE expense_id = ? AND month = ?').get(r.id, m.month);
-        if (exists) continue;
-        const aid = Number(ctx.db.prepare('INSERT INTO expense_amortization (expense_id, month, amount, created_at) VALUES (?, ?, ?, ?)').run(r.id, m.month, m.amount, ctx.now()).lastInsertRowid);
-        postEntry(ctx, {
-          date: `${m.month}-01` < r.expense_date ? r.expense_date : `${m.month}-01`, // never before the expense was recognised
-          sourceType: 'expense_amort',
-          sourceId: aid,
-          memo: `Prepaid ${r.expense_no}: ${m.month}`,
-          lines: [{ account: r.account_code, debit: m.amount }, { account: '1300', credit: m.amount }],
-        });
-        posted++;
-      }
+    .all() as { id: number; expense_no: string; description: string; expense_date: string; gross: number; vat_amount: number; vat_recoverable: number; period_start: string; period_end: string; account_code: string }[];
+  const done = ctx.db.prepare('SELECT 1 FROM expense_amortization WHERE expense_id = ? AND month = ?');
+  const out: PrepaidLine[] = [];
+  for (const r of rows) {
+    const cost = r.gross - (r.vat_recoverable ? r.vat_amount : 0);
+    let left = cost;
+    for (const m of amortizationSchedule(cost, months(r.period_start, r.period_end))) {
+      left -= m.amount;
+      if (m.month > throughMonth) break;
+      if (done.get(r.id, m.month)) continue;
+      out.push({
+        expenseId: r.id, expenseNo: r.expense_no, description: r.description, original: cost, periodStart: r.period_start, periodEnd: r.period_end, month: m.month, amount: m.amount, remaining: left,
+        debitAccount: r.account_code, creditAccount: '1300', entryDate: `${m.month}-01` < r.expense_date ? r.expense_date : `${m.month}-01`, // never before the expense was recognised
+      });
     }
-  };
-  if (ctx.db.inTransaction) run();
-  else ctx.db.transaction(run)();
-  if (posted && userId !== null) appendAudit(ctx, { userId, action: 'expense.amortize', entity: 'expense', entityId: onlyExpenseId ?? null, details: { months: posted } });
-  return posted;
+  }
+  return out;
+}
+
+/** What would be recognised through a month. Changes nothing. */
+export function prepaidPreview(ctx: Ctx, userId: number, throughMonth: string): PrepaidPreview {
+  requirePermission(ctx, userId, 'expense.view');
+  if (!MONTH.test(throughMonth)) throw new DomainError('VALIDATION', 'Choose a month');
+  const lines = prepaidDue(ctx, throughMonth);
+  return { throughMonth, lines, total: lines.reduce((s, l) => s + l.amount, 0) };
+}
+
+/** Halalas of prepaid expense that have fallen due through a day's month and are not yet in the accounts. Reads only. */
+export function prepaidWaiting(ctx: Ctx, throughDay: string): number {
+  const now = today(ctx).slice(0, 7);
+  const month = throughDay.slice(0, 7) < now ? throughDay.slice(0, 7) : now;
+  return prepaidDue(ctx, month).reduce((s, l) => s + l.amount, 0);
+}
+
+/**
+ * The confirmed step: moves the due months from 1300 to the expense account, in one transaction.
+ * expectedTotal is the total the person saw. If the figures moved since, nothing is posted.
+ * Each expense and month can be posted only once (UNIQUE in expense_amortization and in the journal).
+ */
+export function recognizePrepaidMonth(ctx: Ctx, userId: number, input: { month: string; requestKey: string; expectedTotal: number }): { runId: number | null; posted: number; total: number; replayed: boolean } {
+  requirePermission(ctx, userId, 'expense.approve');
+  if (!/^[\w-]{8,64}$/.test(input.requestKey)) throw new DomainError('VALIDATION', 'Invalid request key');
+  if (!MONTH.test(input.month)) throw new DomainError('VALIDATION', 'Choose a month');
+  if (input.month > today(ctx).slice(0, 7)) throw new DomainError('VALIDATION', 'A month that has not started cannot be recognised');
+  return ctx.db.transaction(() => {
+    const done = ctx.db.prepare('SELECT id, lines, total FROM prepaid_runs WHERE request_key = ?').get(input.requestKey) as { id: number; lines: number; total: number } | undefined;
+    if (done) return { runId: done.id, posted: done.lines, total: done.total, replayed: true };
+    const lines = prepaidDue(ctx, input.month);
+    const total = lines.reduce((s, l) => s + l.amount, 0);
+    if (total !== input.expectedTotal) throw new DomainError('CONFLICT', 'The figures have changed. Look at the preview again.');
+    if (lines.length === 0) return { runId: null, posted: 0, total: 0, replayed: false };
+    for (const l of lines) {
+      const aid = Number(ctx.db.prepare('INSERT INTO expense_amortization (expense_id, month, amount, created_at) VALUES (?, ?, ?, ?)').run(l.expenseId, l.month, l.amount, ctx.now()).lastInsertRowid);
+      postEntry(ctx, { date: l.entryDate, sourceType: 'expense_amort', sourceId: aid, memo: `Prepaid ${l.expenseNo}: ${l.month}`, lines: [{ account: l.debitAccount, debit: l.amount }, { account: '1300', credit: l.amount }] });
+    }
+    const runId = Number(ctx.db.prepare('INSERT INTO prepaid_runs (request_key, month, total, lines, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(input.requestKey, input.month, total, lines.length, userId, ctx.now()).lastInsertRowid);
+    appendAudit(ctx, { userId, action: 'expense.amortize', entity: 'prepaid_run', entityId: runId, details: { month: input.month, months: lines.length, total } });
+    return { runId, posted: lines.length, total, replayed: false };
+  })();
 }
 
 export interface PaymentInput {

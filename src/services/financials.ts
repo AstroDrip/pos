@@ -2,7 +2,7 @@ import { roundDiv } from '../core/money';
 import { nextDay, storeDay, storeDayStartUtc } from '../core/store-time';
 import { DomainError, type Ctx } from './context';
 import { dueSoonDays, openCreditInvoicesAll as receivablesAgeingAll } from './credit';
-import { recognizePrepaid } from './expenses';
+import { prepaidWaiting } from './expenses';
 import { openSupplierItems, supplierControls } from './purchasing';
 import { requirePermission } from './users';
 
@@ -68,6 +68,7 @@ export interface ProfitAndLoss {
   netProfit: number;
   outputVat: number;
   inputVat: number;
+  prepaidWaiting: number; // due and not yet recognised, so not in the expenses above
   provisional: boolean;
   provisionalReasons: string[];
 }
@@ -76,7 +77,6 @@ export interface ProfitAndLoss {
 export function profitAndLoss(ctx: Ctx, userId: number | null, from: string, to: string): ProfitAndLoss {
   if (userId !== null) requirePermission(ctx, userId, 'finance.view');
   checkRange(from, to);
-  recognizePrepaid(ctx, null); // prepaid months that have started belong in this period's expenses
   const t = accountTotals(ctx, from, to);
   const net = (code: string, side: 'dr' | 'cr') => {
     const a = t.find((x) => x.code === code);
@@ -95,6 +95,8 @@ export function profitAndLoss(ctx: Ctx, userId: number | null, from: string, to:
   if (coa?.value !== 'approved') reasons.push('Chart of accounts not yet approved by the accountant');
   const drafts = (ctx.db.prepare("SELECT count(*) AS n FROM expenses WHERE status = 'draft' AND expense_date BETWEEN ? AND ?").get(from, to) as { n: number }).n;
   if (drafts > 0) reasons.push(`${drafts} draft expense(s) in this period are not posted yet`);
+  const waiting = prepaidWaiting(ctx, to);
+  if (waiting > 0) reasons.push('Some prepaid expenses that are due have not been recognised yet');
   reasons.push('No period close: later corrections can still change this period');
   return {
     fromDay: from,
@@ -112,6 +114,7 @@ export function profitAndLoss(ctx: Ctx, userId: number | null, from: string, to:
     netProfit: grossProfit - totalOperating,
     outputVat: net('2200', 'cr'),
     inputVat: net('2210', 'dr'),
+    prepaidWaiting: waiting,
     provisional: true,
     provisionalReasons: reasons,
   };
@@ -126,12 +129,12 @@ export interface BalanceSheet {
   totalAssets: number;
   totalLiabilitiesAndEquity: number;
   balanced: boolean;
+  prepaidWaiting: number;
 }
 
 export function balanceSheet(ctx: Ctx, userId: number, asOf: string): BalanceSheet {
   requirePermission(ctx, userId, 'finance.view');
   if (!DAY.test(asOf)) throw new DomainError('VALIDATION', 'Date must be YYYY-MM-DD');
-  recognizePrepaid(ctx, null);
   const t = accountTotals(ctx, null, asOf);
   const pick = (type: string, sign: 1 | -1) =>
     t.filter((a) => a.type === type).map((a) => ({ code: a.code, nameEn: a.nameEn, nameAr: a.nameAr, amount: sign * (a.debit - a.credit) })).filter((a) => a.amount !== 0);
@@ -142,7 +145,7 @@ export function balanceSheet(ctx: Ctx, userId: number, asOf: string): BalanceShe
   const expense = t.filter((a) => a.type === 'expense').reduce((s, a) => s + a.debit - a.credit, 0);
   const totalAssets = assets.reduce((s, a) => s + a.amount, 0);
   const tle = liabilities.reduce((s, a) => s + a.amount, 0) + equity.reduce((s, a) => s + a.amount, 0) + (income - expense);
-  return { asOf, assets, liabilities, equity, currentEarnings: income - expense, totalAssets, totalLiabilitiesAndEquity: tle, balanced: totalAssets === tle };
+  return { asOf, assets, liabilities, equity, currentEarnings: income - expense, totalAssets, totalLiabilitiesAndEquity: tle, balanced: totalAssets === tle, prepaidWaiting: prepaidWaiting(ctx, asOf) };
 }
 
 export function datedTrialBalance(ctx: Ctx, userId: number, from: string, to: string) {

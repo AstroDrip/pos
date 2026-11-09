@@ -71,6 +71,8 @@ export const schemas = {
   'bill.productCost': z.object({ productId: int.positive() }),
   'bill.item': z.object({ supplierId: int.positive(), code: z.string().min(1).max(40) }),
   'bill.items': z.object({ supplierId: int.positive() }),
+  'expense.prepaidPreview': z.object({ month }),
+  'expense.prepaidRecognize': z.object({ month, requestKey: key, expectedTotal: money }),
   'vat.list': z.null(),
   'vat.get': z.object({ billId: int.positive() }),
   'vat.recordFinal': z.object({ billId: int.positive(), invoiceNo: z.string().min(1).max(60), invoiceDate: z.iso.date(), net: money, vat: money, total: money, supplierVatNo: z.string().max(15).optional() }),

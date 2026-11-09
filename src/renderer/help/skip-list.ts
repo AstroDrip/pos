@@ -12,6 +12,7 @@ export const LABEL_SKIPS: { file: string; label: string; why: string }[] = [
   { file: 'Expenses.tsx', label: 'From', why: 'A date chooser for the list.' },
   { file: 'Expenses.tsx', label: 'To', why: 'A date chooser for the list.' },
   { file: 'Expenses.tsx', label: 'Period', why: 'A date chooser for the list.' },
+  { file: 'Expenses.tsx', label: 'Month', why: 'A month chooser for the preview.' },
   { file: 'Expenses.tsx', label: 'Status', why: 'A filter for the list.' },
   { file: 'Expenses.tsx', label: '{asking.q}', why: 'The text is the question itself.' },
   { file: 'Shift.tsx', label: 'Next cashier PIN', why: 'A PIN box. The login guide covers PINs.' },

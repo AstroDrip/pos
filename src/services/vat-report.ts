@@ -1,6 +1,5 @@
 import { nextDay, sqlStoreDay, storeDayStartUtc } from '../core/store-time';
 import { DomainError, type Ctx } from './context';
-import { recognizePrepaid } from './expenses';
 import { requirePermission } from './users';
 import { vatClaimsBetween, vatPendingBetween } from './vat-review';
 
@@ -43,7 +42,6 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export function vatSummary(ctx: Ctx, userId: number, from: string, to: string): VatSummary {
   requirePermission(ctx, userId, 'finance.view');
   if (!DAY.test(from) || !DAY.test(to) || to < from) throw new DomainError('VALIDATION', 'Check the dates');
-  recognizePrepaid(ctx, null);
   const f = storeDayStartUtc(from);
   const t = storeDayStartUtc(nextDay(to));
   const line = (sql: string, ...a: unknown[]): VatLine => {

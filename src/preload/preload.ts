@@ -23,6 +23,8 @@ const PRELOAD_CHANNELS = [
   'bill.productCost',
   'bill.item',
   'bill.items',
+  'expense.prepaidPreview',
+  'expense.prepaidRecognize',
   'vat.list',
   'vat.get',
   'vat.recordFinal',

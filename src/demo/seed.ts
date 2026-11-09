@@ -11,7 +11,7 @@ import { postStockCount, recordWastage } from '../services/adjustments';
 import { createProduct, setPrice, setProductActive } from '../services/catalog';
 import type { Ctx } from '../services/context';
 import { creditCheck, openInvoicesOf, recordCustomerReceipt, reverseCustomerReceipt, setInvoiceDispute, updateCustomerCredit, writeOffInvoice } from '../services/credit';
-import { createExpense, generateRecurring, listCategories, postExpense, reverseExpense, saveRecurring, type VatClass } from '../services/expenses';
+import { createExpense, generateRecurring, listCategories, postExpense, prepaidPreview, recognizePrepaidMonth, reverseExpense, saveRecurring, type VatClass } from '../services/expenses';
 import { holdBill, listHeldBills, recallBill, recordRemoval } from '../services/held-bills';
 import { postEntry } from '../services/ledger';
 import { createCustomer, createSupplier } from '../services/parties';
@@ -400,6 +400,8 @@ export function seedDemoShop(base: Ctx, nowIso: string, options: { days?: number
     if (k === -1) {
       expense(k, 'Bank charges', 'Card machine fees', 21_275, { vat: true, pay: 'bank', payee: 'Demo Bank' });
       expense(k, 'Software subscriptions', 'Yearly accounting software', 120_000, { vat: true, pay: 'bank', payee: 'Demo Software', period: [dayOf(k).slice(0, 7), dayOf(k + 330).slice(0, 7)] });
+      const due = prepaidPreview(ctx, owner, dayOf(k).slice(0, 7));
+      recognizePrepaidMonth(ctx, owner, { month: due.throughMonth, requestKey: key('prepaid'), expectedTotal: due.total });
       expense(k, 'Other operating expenses', 'Waiting for the receipt', 18_000, { draft: true });
       const open = creditTotals();
       const a = open[0];
