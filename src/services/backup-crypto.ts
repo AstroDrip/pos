@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 // Backup file format (plan §J):
 //   "POSBAK1\n" | uint32 BE manifest length | manifest JSON (UTF-8) | ciphertext
@@ -8,7 +9,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 const MAGIC = Buffer.from('POSBAK1\n', 'ascii');
 
 export interface BackupManifest {
-  format: 1;
+  format: 1 | 2; // 2 = the database was gzipped before encryption. plainSha256 and plainBytes are always of the database
   backupId: string;
   createdAt: string;
   appVersion: string;
@@ -28,13 +29,14 @@ export const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex'
 export const keyId = (masterKey: Buffer) => sha256(masterKey).slice(0, 16);
 
 export function encryptBackup(plain: Buffer, masterKey: Buffer, meta: Omit<BackupManifest, 'format' | 'plainSha256' | 'plainBytes' | 'keyId' | 'wrap' | 'data'>): { file: Buffer; manifest: BackupManifest } {
+  const inner = gzipSync(plain);
   if (masterKey.length !== 32) throw new Error('Master key must be 32 bytes');
   const dataKey = randomBytes(32);
   const wrapIv = randomBytes(12);
   const w = createCipheriv('aes-256-gcm', masterKey, wrapIv);
   const wrapped = Buffer.concat([w.update(dataKey), w.final()]);
   const manifest: BackupManifest = {
-    format: 1,
+    format: 2,
     ...meta,
     plainSha256: sha256(plain),
     plainBytes: plain.length,
@@ -45,7 +47,7 @@ export function encryptBackup(plain: Buffer, masterKey: Buffer, meta: Omit<Backu
   const header = Buffer.from(JSON.stringify(manifest), 'utf8');
   const c = createCipheriv('aes-256-gcm', dataKey, Buffer.from(manifest.data.iv, 'base64'));
   c.setAAD(header);
-  const body = Buffer.concat([c.update(plain), c.final(), c.getAuthTag()]);
+  const body = Buffer.concat([c.update(inner), c.final(), c.getAuthTag()]);
   const len = Buffer.alloc(4);
   len.writeUInt32BE(header.length);
   return { file: Buffer.concat([MAGIC, len, header, body]), manifest };
@@ -58,7 +60,7 @@ export function readManifest(file: Buffer): { manifest: BackupManifest; header: 
   if (len > 1_000_000 || start + len > file.length) throw new Error('Backup file is damaged (bad header)');
   const header = file.subarray(start, start + len);
   const manifest = JSON.parse(header.toString('utf8')) as BackupManifest;
-  if (manifest.format !== 1) throw new Error(`Unsupported backup format ${String(manifest.format)}`);
+  if (manifest.format !== 1 && manifest.format !== 2) throw new Error(`Unsupported backup format ${String(manifest.format)}`);
   return { manifest, header, body: file.subarray(start + len) };
 }
 
@@ -73,7 +75,8 @@ export function decryptBackup(file: Buffer, masterKey: Buffer): { plain: Buffer;
     const d = createDecipheriv('aes-256-gcm', dataKey, Buffer.from(manifest.data.iv, 'base64'));
     d.setAAD(header);
     d.setAuthTag(body.subarray(body.length - 16));
-    const plain = Buffer.concat([d.update(body.subarray(0, body.length - 16)), d.final()]);
+    const inner = Buffer.concat([d.update(body.subarray(0, body.length - 16)), d.final()]);
+    const plain = manifest.format === 2 ? gunzipSync(inner) : inner;
     if (sha256(plain) !== manifest.plainSha256) throw new Error('checksum');
     return { plain, manifest };
   } catch {

@@ -240,7 +240,16 @@ export const schemas = {
   'backup.setupKey': z.null(),
   'backup.run': z.null(),
   'restore.prepare': z.object({ recoveryCode: z.string().max(80).optional() }),
-  'restore.apply': z.null(),
+  'restore.apply': z.object({ acknowledgeOlder: z.boolean().optional() }).nullable(),
+  'cloud.status': z.null(),
+  'cloud.connect': z.object({ url: z.string().min(8).max(200), code: z.string().min(8).max(64), deviceName: z.string().min(1).max(80) }),
+  'cloud.disconnect': z.null(),
+  'cloud.backupNow': z.null(),
+  'cloud.verify': z.null(),
+  'cloud.list': z.null(),
+  'cloud.schedule': z.object({ hours: z.union([z.literal(6), z.literal(12), z.literal(24), z.literal(48)]) }),
+  'cloud.recover': z.object({ url: z.string().min(8).max(200), storeId: z.uuid(), recoveryCode: z.string().min(40).max(80), deviceName: z.string().min(1).max(80), revokeOthers: z.boolean() }),
+  'cloud.restorePrepare': z.object({ backupId: z.string().regex(/^[\w-]{8,64}$/), recoveryCode: z.string().max(80).optional() }),
 } as const;
 
 export type Channel = keyof typeof schemas;

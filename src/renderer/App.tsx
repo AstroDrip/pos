@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '../services/users';
 import { Admin, Restore, type FullBackupStatus } from './Admin';
+import { CloudRestoreNewComputer } from './CloudBackup';
 import { call } from './api';
 import { LangToggle, useI18n } from './i18n';
 import { Accounting } from './Accounting';
@@ -58,6 +59,7 @@ export function App() {
         <div className="card">
           <p>{t("Replacing a computer? Restore the store's data instead of starting fresh.")}</p>
           <Restore />
+          <CloudRestoreNewComputer />
         </div>
       </>
     );

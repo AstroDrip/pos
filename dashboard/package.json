@@ -1,0 +1,33 @@
+{
+  "name": "pos-owner-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only phone dashboard and device API for the store POS",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.ts",
+    "store:create": "node --env-file-if-exists=.env.local scripts/store-create.ts",
+    "owner:create": "node --env-file-if-exists=.env.local scripts/owner-create.ts",
+    "demo:seed": "node --env-file-if-exists=.env.local scripts/demo-seed.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.2.0",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

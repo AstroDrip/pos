@@ -1,6 +1,9 @@
 import type { z } from 'zod';
 import { schemas, type Channel, type IpcResult } from '../shared/ipc';
 import { backupStatus, createBackup, prepareRestore } from '../services/backup';
+import { cloudStatus, compareWithLive, fetchAndCheck, recoveryToken, recoveryVerifier, setBackupEveryHours, verifyCloudBackup } from '../services/cloud-backup';
+import { CloudError, enrollDevice, makeCloudApi, recoverDevice, type CloudApi, type CloudCreds, type FetchFn } from '../services/cloud-client';
+import { backupNow } from '../services/cloud-jobs';
 import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto';
 import { getShortcuts, saveShortcuts } from '../services/shortcuts';
 import { billProductCost, createSupplierBill, findSupplierItem, getBill, listBills, priceHistory, purchasesBySupplier, supplierItemsFor } from '../services/supplier-bills';
@@ -57,6 +60,14 @@ export interface BackupEnv {
   applyRestore(stagingPath: string, info: { backupId: string; manifestJson: string; userId: number | null }): void;
 }
 
+/** The device's cloud credential lives in Windows secure storage, outside the database and outside every backup. */
+export interface CloudEnv {
+  getCreds(): CloudCreds | null;
+  saveCreds(c: CloudCreds): void;
+  clearCreds(): void;
+  fetch: FetchFn;
+}
+
 /** Login state lives in the main process. The renderer never tells us who it is. */
 export interface Session {
   user: User | null;
@@ -66,13 +77,36 @@ type Payload<C extends Channel> = z.infer<(typeof schemas)[C]>;
 type Handler<C extends Channel> = (p: Payload<C>, s: Session) => unknown;
 
 /** Money and backup actions: a failure here is worth a line in the audit log, whatever the reason. */
-const FAILURE_LOGGED: ReadonlySet<Channel> = new Set(['sale.finalize', 'refund.create', 'credit.receipt', 'credit.writeOff', 'purchase.pay', 'expense.pay', 'vat.claim', 'vat.reverse', 'expense.prepaidRecognize', 'backup.run', 'restore.apply']);
+const FAILURE_LOGGED: ReadonlySet<Channel> = new Set(['sale.finalize', 'refund.create', 'credit.receipt', 'credit.writeOff', 'purchase.pay', 'expense.pay', 'vat.claim', 'vat.reverse', 'expense.prepaidRecognize', 'backup.run', 'restore.apply', 'cloud.backupNow', 'cloud.restorePrepare']);
 
-const PUBLIC: ReadonlySet<Channel> = new Set(['auth.status', 'auth.setupAdmin', 'auth.login', 'restore.prepare', 'restore.apply']);
+const PUBLIC: ReadonlySet<Channel> = new Set(['auth.status', 'auth.setupAdmin', 'auth.login', 'restore.prepare', 'restore.apply', 'cloud.recover', 'cloud.restorePrepare']);
 
-export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
+export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, cloud?: CloudEnv) {
   const userId = (s: Session) => s.user!.id;
-  let prepared: { stagingPath: string; backupId: string; manifestJson: string } | null = null;
+  let prepared: { stagingPath: string; backupId: string; manifestJson: string; newerLocal: boolean; cloudApi?: CloudApi } | null = null;
+
+  const needCloud = () => {
+    if (!cloud) throw new DomainError('VALIDATION', 'Cloud backup is not available here');
+    return cloud;
+  };
+  const needApi = (): CloudApi => {
+    const c = needCloud().getCreds();
+    if (!c) throw new DomainError('VALIDATION', 'Connect cloud backup first');
+    return makeCloudApi(c, needCloud().fetch, backup?.appVersion ?? 'unknown');
+  };
+  /** Turns a network or server refusal into a message staff can read. */
+  const cloudCall = async <T>(fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e instanceof CloudError) throw new DomainError('VALIDATION', e.message);
+      throw e;
+    }
+  };
+  const cloudJobEnv = () => {
+    const b = needBackup();
+    return { dir: b.dir, stagingPath: b.stagingPath, appVersion: b.appVersion, getKey: () => b.getKey(), api: needApi };
+  };
 
   const needBackup = () => {
     if (!backup) throw new DomainError('VALIDATION', 'Backup is not available in this mode');
@@ -368,23 +402,93 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       if (!key) throw new DomainError('VALIDATION', 'Enter the recovery code for this backup');
       try {
         const m = prepareRestore(file, key, b.stagingPath);
-        prepared = { stagingPath: b.stagingPath, backupId: m.backupId, manifestJson: JSON.stringify({ ...m, wrap: undefined }) };
+        const cmp = compareWithLive(ctx, m);
+        prepared = { stagingPath: b.stagingPath, backupId: m.backupId, manifestJson: JSON.stringify({ ...m, wrap: undefined }), newerLocal: cmp.newerLocal };
         if (p.recoveryCode && !b.getKey()) b.saveNewKey(key); // a replacement PC keeps using the same key
-        return { backupId: m.backupId, createdAt: m.createdAt, lastInvoiceNo: m.lastInvoiceNo, counts: m.verifiedCounts };
+        return { backupId: m.backupId, createdAt: m.createdAt, lastInvoiceNo: m.lastInvoiceNo, counts: m.verifiedCounts, ...cmp };
       } catch (e) {
         throw new DomainError('VALIDATION', (e as Error).message);
       }
     },
-    'restore.apply': (_p, s) => {
+    'cloud.status': (_p, s) => {
+      requirePermission(ctx, userId(s), 'backup.run');
+      const c = cloud?.getCreds() ?? null;
+      const keyConfigured = !!backup?.getKey();
+      return { ...cloudStatus(ctx, c !== null), configured: c !== null, url: c?.url ?? null, storeId: c?.storeId ?? null, deviceId: c?.deviceId ?? null, keyConfigured, recoveryReady: c !== null && keyConfigured, local: backupStatus(ctx), sync: syncHealth(ctx) };
+    },
+    'cloud.connect': async (p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      const b = needBackup();
+      const key = b.getKey();
+      if (!key) throw new DomainError('VALIDATION', 'Set up the backup key first');
+      const creds = await cloudCall(() => enrollDevice(needCloud().fetch, p.url, { code: p.code.trim(), deviceName: p.deviceName, appVersion: b.appVersion, recoveryVerifier: recoveryVerifier(key) }));
+      needCloud().saveCreds(creds);
+      ctx.db.prepare("UPDATE settings SET value = '1' WHERE key = 'dashboard_enabled'").run();
+      appendAudit(ctx, { userId: userId(s), action: 'cloud.connect', entity: 'device', entityId: creds.deviceId, details: { storeId: creds.storeId, url: creds.url } });
+      return null;
+    },
+    'cloud.disconnect': (_p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      needCloud().clearCreds();
+      ctx.db.prepare("UPDATE settings SET value = '0' WHERE key = 'dashboard_enabled'").run();
+      appendAudit(ctx, { userId: userId(s), action: 'cloud.disconnect', entity: 'device' });
+      return null;
+    },
+    'cloud.backupNow': async (_p, s) => {
+      requirePermission(ctx, userId(s), 'backup.run');
+      needApi();
+      return cloudCall(() => backupNow(ctx, cloudJobEnv(), userId(s)));
+    },
+    'cloud.verify': async (_p, s) => {
+      requirePermission(ctx, userId(s), 'backup.run');
+      const key = needBackup().getKey();
+      if (!key) throw new DomainError('VALIDATION', 'Set up the backup key first');
+      return cloudCall(() => verifyCloudBackup(ctx, needApi(), key, `${needBackup().stagingPath}.verify`));
+    },
+    'cloud.list': async (_p, s) => {
+      requirePermission(ctx, userId(s), 'backup.restore');
+      return cloudCall(() => needApi().list());
+    },
+    'cloud.schedule': (p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      setBackupEveryHours(ctx, userId(s), p.hours);
+      return null;
+    },
+    'cloud.recover': async (p, s) => {
+      if (!canRestore(s)) throw new DomainError('PERMISSION_DENIED', 'Not allowed: backup.restore'); // permission before anything else
+      const key = recoveryCodeToKeyOrFail(p.recoveryCode);
+      const creds = await cloudCall(() => recoverDevice(needCloud().fetch, p.url, { storeId: p.storeId, recoveryToken: recoveryToken(key), deviceName: p.deviceName, revokeOthers: p.revokeOthers }));
+      needCloud().saveCreds(creds);
+      appendAudit(ctx, { userId: s.user?.id ?? null, action: 'cloud.recover', entity: 'device', entityId: creds.deviceId, details: { storeId: creds.storeId, revokedOthers: p.revokeOthers } });
+      return cloudCall(() => needApi().list());
+    },
+    'cloud.restorePrepare': async (p, s) => {
+      if (!canRestore(s)) throw new DomainError('PERMISSION_DENIED', 'Not allowed: backup.restore'); // permission before anything else
+      const b = needBackup();
+      const key = p.recoveryCode ? recoveryCodeToKeyOrFail(p.recoveryCode) : b.getKey();
+      if (!key) throw new DomainError('VALIDATION', 'Enter the recovery code for this backup');
+      const api = needApi();
+      const row = (await cloudCall(() => api.list())).find((x) => x.backupId === p.backupId);
+      if (!row) throw new DomainError('NOT_FOUND', 'That backup is not in the cloud');
+      const m = await cloudCall(() => fetchAndCheck(api, row, key, b.stagingPath));
+      const cmp = compareWithLive(ctx, m);
+      prepared = { stagingPath: b.stagingPath, backupId: m.backupId, manifestJson: JSON.stringify({ ...m, wrap: undefined }), newerLocal: cmp.newerLocal, cloudApi: api };
+      if (p.recoveryCode && !b.getKey()) b.saveNewKey(key); // a replacement PC keeps using the same key
+      void api.restored(m.backupId, 'downloaded').catch(() => undefined);
+      return { backupId: m.backupId, createdAt: m.createdAt, lastInvoiceNo: m.lastInvoiceNo, counts: m.verifiedCounts, ...cmp };
+    },
+    'restore.apply': async (p, s) => {
       if (!canRestore(s)) throw new DomainError('PERMISSION_DENIED', 'Not allowed: backup.restore'); // permission before anything else
       const b = needBackup();
       if (!prepared) throw new DomainError('VALIDATION', 'Check a backup file first');
+      if (prepared.newerLocal && !p?.acknowledgeOlder) throw new DomainError('CONFLICT', 'This computer has newer data than the backup. Tick the box to confirm.');
       // Safety net: back up the current data before replacing it (if there is a key).
       const key = b.getKey();
       if (key && userCount(ctx) > 0) createBackup(ctx, { dir: b.dir, masterKey: key, appVersion: b.appVersion, trigger: 'pre_restore', userId: s.user?.id ?? null });
-      const p = prepared;
+      const p2 = prepared;
       prepared = null;
-      b.applyRestore(p.stagingPath, { backupId: p.backupId, manifestJson: p.manifestJson, userId: s.user?.id ?? null });
+      if (p2.cloudApi) await p2.cloudApi.restored(p2.backupId, 'restored').catch(() => undefined);
+      b.applyRestore(p2.stagingPath, { backupId: p2.backupId, manifestJson: p2.manifestJson, userId: s.user?.id ?? null });
       return null;
     },
   };

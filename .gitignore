@@ -12,3 +12,9 @@ coverage/
 demo-data*/
 ui-shots/
 ui-audit/
+dashboard/.next/
+dashboard/node_modules/
+dashboard/next-env.d.ts
+dashboard/*.tsbuildinfo
+.vercel/
+!dashboard/.env.example

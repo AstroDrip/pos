@@ -1,6 +1,6 @@
-import { BrowserWindow, app, dialog, ipcMain, safeStorage, session } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, net, safeStorage, session } from 'electron';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openDatabase } from '../db/connection';
@@ -8,7 +8,9 @@ import { makeCtx } from '../services/context';
 import { CHANNELS } from '../shared/ipc';
 import { appendAudit } from '../services/audit';
 import { backupStatus, createBackup, encryptedSnapshot, installRestore } from '../services/backup';
-import { createHandlers, type BackupEnv, type Printer, type Session } from './handlers';
+import { createHandlers, type BackupEnv, type CloudEnv, type Printer, type Session } from './handlers';
+import { makeCloudApi, type CloudCreds } from '../services/cloud-client';
+import { cloudTick } from '../services/cloud-jobs';
 import { getStoreDetails } from '../services/store-details';
 import { runUiAudit } from './ui-audit';
 import { demandScores } from '../services/demand';
@@ -111,6 +113,29 @@ function makeBackupEnv(dataDir: string, dbPath: string): BackupEnv {
   };
 }
 
+/** The device credential is protected by Windows and kept out of the database, so no backup ever contains it. */
+function makeCloudEnv(dataDir: string): CloudEnv {
+  const file = join(dataDir, 'cloud-device.bin');
+  return {
+    getCreds() {
+      if (!existsSync(file)) return null;
+      try {
+        return JSON.parse(safeStorage.decryptString(readFileSync(file))) as CloudCreds;
+      } catch {
+        return null; // from another Windows user or computer: this device has to connect again
+      }
+    },
+    saveCreds(c) {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows secure storage is not available');
+      writeFileSync(file, safeStorage.encryptString(JSON.stringify(c)));
+    },
+    clearCreds: () => rmSync(file, { force: true }),
+    fetch: (url, init) => net.fetch(url, init),
+  };
+}
+
+const CLOUD_ROUND_MS = 5 * 60 * 1000;
+
 app.whenReady().then(() => {
   const dataDir = app.getPath('userData');
   const dbPath = join(dataDir, 'pos.db');
@@ -125,7 +150,28 @@ app.whenReady().then(() => {
       },
     }),
   );
-  const dispatch = createHandlers(ctx, printer, backupEnv);
+  const cloudEnv = makeCloudEnv(dataDir);
+  const dispatch = createHandlers(ctx, printer, backupEnv, cloudEnv);
+  // Cloud round: never on the checkout path, and at most one at a time.
+  let cloudBusy = false;
+  const cloudRound = () => {
+    if (cloudBusy || !ctx.db.open) return;
+    cloudBusy = true;
+    void cloudTick(ctx, {
+      dir: backupEnv.dir,
+      stagingPath: backupEnv.stagingPath,
+      appVersion: backupEnv.appVersion,
+      getKey: () => backupEnv.getKey(),
+      api: () => {
+        const c = cloudEnv.getCreds();
+        return c ? makeCloudApi(c, cloudEnv.fetch, backupEnv.appVersion) : null;
+      },
+    })
+      .catch((e: unknown) => console.error('[cloud] round failed', (e as Error).name))
+      .finally(() => (cloudBusy = false));
+  };
+  setTimeout(cloudRound, 60_000);
+  setInterval(cloudRound, CLOUD_ROUND_MS);
   // Read 90 days of sales once now, so the first search does not pay for it (later updates are incremental).
   setTimeout(() => {
     try {

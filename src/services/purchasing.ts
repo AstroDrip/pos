@@ -586,6 +586,11 @@ export interface AgeingRow {
 export function supplierAgeing(ctx: Ctx, userId: number, asOf: string): AgeingRow[] {
   requirePermission(ctx, userId, 'purchase.view');
   if (!DAY.test(asOf)) throw new DomainError('VALIDATION', 'Date must be YYYY-MM-DD');
+  return supplierAgeingAll(ctx, asOf);
+}
+
+/** For internal jobs. Screens go through supplierAgeing, which checks permission. */
+export function supplierAgeingAll(ctx: Ctx, asOf: string): AgeingRow[] {
   const out: AgeingRow[] = [];
   for (const s of ctx.db.prepare('SELECT id, name FROM suppliers ORDER BY name').all() as { id: number; name: string }[]) {
     const row: AgeingRow = { supplierId: s.id, supplier: s.name, balance: 0, noDue: 0, notDue: 0, d1_30: 0, d31_60: 0, d61_90: 0, over90: 0, advance: supplierAdvanceOf(ctx, s.id), returnCredit: supplierReturnCreditOf(ctx, s.id), mostOverdue: null, lastPayment: null };

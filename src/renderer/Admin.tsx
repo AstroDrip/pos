@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CloudBackup } from './CloudBackup';
 import type { BackupStatus } from '../services/backup';
 import type { DryRun } from '../services/import';
 import type { LookupResult, ScaleLayoutRow } from '../services/catalog';
@@ -22,6 +23,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
       <PageHeader title={t('Admin')} desc={t('Backups, users, suppliers, imports and device settings.')} />
       <div className="grid-cards">
       {can('backup.run') && <Backup canSetup={can('settings.manage')} canRestore={can('backup.restore')} />}
+      {can('backup.run') && <CloudBackup can={can} />}
       {can('user.manage') && <Users />}
       {can('supplier.manage') && <Suppliers />}
       {(can('product.manage') || can('supplier.manage')) && <Import />}
@@ -89,7 +91,7 @@ function Backup({ canSetup, canRestore }: { canSetup: boolean; canRestore: boole
 export function Restore() {
   const { t } = useI18n();
   const [code, setCode] = useState('');
-  const [facts, setFacts] = useState<{ createdAt: string; lastInvoiceNo: string | null; counts: Record<string, number> } | null>(null);
+  const [facts, setFacts] = useState<{ createdAt: string; lastInvoiceNo: string | null; counts: Record<string, number>; newerLocal?: boolean } | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
 
   const check = async () => {
@@ -101,9 +103,10 @@ export function Restore() {
     }
   };
   const apply = async () => {
+    if (facts?.newerLocal && !window.confirm(t('This computer has sales that are not in this backup. They will leave the live data. Continue?'))) return;
     if (!window.confirm(t('Replace ALL current data with this backup? The current data is kept in a side file, not deleted. The app will restart.'))) return;
     try {
-      await call('restore.apply');
+      await call('restore.apply', { acknowledgeOlder: true });
     } catch (e) {
       setMsg({ kind: 'error', text: t((e as Error).message) });
     }

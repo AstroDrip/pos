@@ -215,7 +215,8 @@ export interface OwnerKpis {
 }
 
 /** Owner KPIs for store days from..to. Uses the same P&L as the Accounting tab. */
-export function ownerKpis(ctx: Ctx, userId: number | null, from: string, to: string): OwnerKpis {
+/** Figures for a period only. Cheap enough to run for each day of a month. */
+export function periodKpis(ctx: Ctx, userId: number | null, from: string, to: string) {
   const pl = profitAndLoss(ctx, userId, from, to);
   const f = storeDayStartUtc(from);
   const tt = storeDayStartUtc(nextDay(to));
@@ -225,7 +226,6 @@ export function ownerKpis(ctx: Ctx, userId: number | null, from: string, to: str
   const refundsInclVat = one('SELECT COALESCE(SUM(total_incl),0) AS v FROM refunds WHERE created_at >= ? AND created_at < ?', f, tt);
   const tendered = (k: string) => one('SELECT COALESCE(SUM(p.amount),0) AS v FROM payments p JOIN sales s ON s.id = p.sale_id WHERE p.tender = ? AND s.created_at >= ? AND s.created_at < ?', k, f, tt);
   const change = one('SELECT COALESCE(SUM(change_given),0) AS v FROM sales WHERE created_at >= ? AND created_at < ?', f, tt);
-  const ap = (ctx.db.prepare("SELECT COALESCE(SUM(l.credit) - SUM(l.debit),0) AS v FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '2010'").get() as { v: number }).v;
   return {
     fromDay: from,
     toDay: to,
@@ -242,8 +242,21 @@ export function ownerKpis(ctx: Ctx, userId: number | null, from: string, to: str
     grossProfit: pl.grossProfit,
     operatingExpenses: pl.totalOperating,
     netProfit: pl.netProfit,
-    netProfitProvisional: true,
+    netProfitProvisional: true as const,
     outputVat: pl.outputVat,
+    pl,
+  };
+}
+
+export function ownerKpis(ctx: Ctx, userId: number | null, from: string, to: string): OwnerKpis {
+  const { pl, ...period } = periodKpis(ctx, userId, from, to);
+  void pl;
+  const f = storeDayStartUtc(from);
+  const tt = storeDayStartUtc(nextDay(to));
+  const one = (sql: string, ...a: unknown[]) => (ctx.db.prepare(sql).get(...a) as { v: number }).v;
+  const ap = (ctx.db.prepare("SELECT COALESCE(SUM(l.credit) - SUM(l.debit),0) AS v FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '2010'").get() as { v: number }).v;
+  return {
+    ...period,
     // The Inventory account (1200) is the books' stock value. Quantity x average cost can differ from it by
     // rounding halalas, so the account balance is used.
     inventoryValue: (ctx.db.prepare("SELECT COALESCE(SUM(l.debit) - SUM(l.credit),0) AS v FROM journal_lines l JOIN accounts a ON a.id = l.account_id WHERE a.code = '1200'").get() as { v: number }).v,
