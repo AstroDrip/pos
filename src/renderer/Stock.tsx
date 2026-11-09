@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatQty, formatSar, parseQty, parseSar } from '../core/money';
+import { addDays, longDay, shortDay } from '../core/date-range';
+import { formatMoney, formatQty, formatSar, parseQty, parseSar } from '../core/money';
+import { storeDateTime, storeDay } from '../core/store-time';
 import type { Product } from '../services/catalog';
 import type { Supplier } from '../services/parties';
-import type { StockRow } from '../services/reports';
+import type { AdjustmentRow, StockRow } from '../services/reports';
+import type { MovementDay, MovementRow } from '../services/series';
 import { call } from './api';
+import { Chart } from './Chart';
+import { DateNavigator, useDateRange } from './DateNavigator';
+import { Kpi, Views } from './Figures';
 import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
-import { validBool, validText } from './remember';
+import { validBool, validOneOf, validText } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { HelpLink } from './HelpLink';
@@ -17,6 +23,9 @@ interface GrnLine {
   qty: string;
   cost: string;
 }
+
+const VIEWS = ['attention', 'all', 'movements', 'receive', 'wastage', 'count'] as const;
+type View = (typeof VIEWS)[number];
 
 export function Stock({ can }: { can: (p: string) => boolean }) {
   const back = useReturnTick();
@@ -31,6 +40,18 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   const [saving, setSaving] = useState(false);
   const requestKey = useRef(crypto.randomUUID());
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const canSee = can('reports.view');
+  const [view, setView] = useRemembered<View>('stock', 'view', canSee ? 'attention' : 'receive', validOneOf(VIEWS));
+  const [low, setLow] = useState<StockRow[]>([]);
+  const [changes, setChanges] = useState<AdjustmentRow[]>([]);
+  const [value, setValue] = useState<number | null>(null);
+  useEffect(() => {
+    if (!canSee) return;
+    const to = storeDay(new Date().toISOString());
+    void call<StockRow[]>('report.stock', { onlyLow: true }).then(setLow, () => setLow([]));
+    void call<AdjustmentRow[]>('report.adjustments', { fromDay: addDays(to, -30), toDay: to }).then(setChanges, () => setChanges([]));
+    if (can('finance.view')) void call<{ inventoryValue: number }>('finance.kpis', { fromDay: to, toDay: to }).then((k) => setValue(k.inventoryValue), () => setValue(null));
+  }, [back, msg, canSee]);
 
   useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), [back]);
   useEffect(() => {
@@ -64,9 +85,16 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   return (
     <div className="page">
       <PageHeader title={t('Stock')} desc={t('Receive deliveries, record wastage, count the shelves.')} actions={<HelpLink article="stock-overview" />} />
-      <div className="grid-cards">
+      <Views name="stock view" value={view} onChange={setView} options={[
+        ...(canSee ? [{ id: 'attention' as const, label: t('Needs attention') }, { id: 'all' as const, label: t('Stock on hand') }, { id: 'movements' as const, label: t('Movements') }] : []),
+        ...(can('stock.receive') ? [{ id: 'receive' as const, label: t('Receive goods') }] : []),
+        ...(can('stock.adjust') ? [{ id: 'wastage' as const, label: t('Record wastage') }, { id: 'count' as const, label: t('Stock count') }] : []),
+      ]} />
+      {view === 'attention' && canSee && <Attention low={low} changes={changes} value={value} />}
+      {view === 'movements' && canSee && <Movements tick={back} />}
+      {/* These stay mounted while hidden, so half-entered lines survive moving between views. */}
       {can('stock.receive') && (
-        <div className="card section">
+        <div className="card section" hidden={view !== 'receive'}>
           <h3>{t('Receive goods')}</h3>
           <label>{t('Supplier')} <InfoIcon id="field.grn.supplier" /></label>
           <select value={supplierId} onChange={(e) => setSupplierId(Number(e.target.value))}>
@@ -99,15 +127,10 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
           <p><button className="primary" disabled={saving || !supplierId || lines.length === 0} onClick={save}>{t('Save receipt')}</button></p>
         </div>
       )}
-      {can('stock.adjust') && (
+      {can('stock.adjust') && <div hidden={view !== 'wastage'}><AdjustCard kind="waste" onDone={() => setMsg(null)} /></div>}
+      {can('stock.adjust') && <div hidden={view !== 'count'}><AdjustCard kind="count" onDone={() => setMsg(null)} /></div>}
+      {view === 'all' && canSee && (
         <div>
-          <AdjustCard kind="waste" onDone={() => setMsg(null)} />
-          <AdjustCard kind="count" onDone={() => setMsg(null)} />
-        </div>
-      )}
-      {can('reports.view') && (
-        <div>
-          <h3>{t('Stock on hand')}</h3>
           <label><input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> {t('Only at or below reorder level')}</label>
           <table className="list">
             <thead><tr><th>SKU</th><th>{t('Product')}</th><th className="num">{t('Qty')} <InfoIcon id="metric.stock.qty" /></th><th className="num">{t('Reorder at')} <InfoIcon id="metric.stock.reorder" /></th><th className="num">{t('Avg cost')} <InfoIcon id="metric.stock.cost" /></th></tr></thead>
@@ -116,15 +139,78 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
               {rows.map((r) => (
                 <tr key={r.productId}>
                   <td>{r.sku}</td><td><ProductName en={r.nameEn} ar={r.nameAr} /></td>
-                  <td className={`num${r.qty < 0 ? ' neg' : ''}`}>{formatQty(r.qty)}</td><td className="num">{formatQty(r.reorderLevel)}</td><td className="num">{formatSar(r.avgCost)}</td>
+                  <td className={`num${r.qty < 0 ? ' neg' : ''}`}>{formatQty(r.qty, 0)}</td><td className="num">{formatQty(r.reorderLevel, 0)}</td><td className="num">{formatSar(r.avgCost)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      </div>
     </div>
+  );
+}
+
+const REASON: Record<string, string> = { sale: 'Sold', refund: 'Returned by customer', grn: 'Received', purchase_return: 'Returned to supplier', waste: 'Wastage', count_adj: 'Stock count' };
+
+/** What needs a decision today. It only lists: every number comes from the stock report. */
+function Attention({ low, changes, value }: { low: StockRow[]; changes: AdjustmentRow[]; value: number | null }) {
+  const { t } = useI18n();
+  const out = low.filter((r) => r.qty <= 0);
+  const running = low.filter((r) => r.qty > 0);
+  const list = (rows: StockRow[], empty: string, label: string) => (
+    <table className="list" aria-label={label}>
+      <thead><tr><th>{t('Product')}</th><th className="num">{t('Qty')}</th><th className="num">{t('Reorder at')}</th></tr></thead>
+      <tbody>{rows.length === 0 && <EmptyRow cols={3} text={empty} />}{rows.slice(0, 50).map((r) => <tr key={r.productId}><td><ProductName en={r.nameEn} ar={r.nameAr} /></td><td className={`num${r.qty < 0 ? ' neg' : ''}`}>{formatQty(r.qty, 0)}</td><td className="num">{formatQty(r.reorderLevel, 0)}</td></tr>)}</tbody>
+    </table>
+  );
+  return (
+    <>
+      <div className="kpis">
+        <Kpi lead l={t('Out of stock')} v={String(out.length)} bad={out.length > 0} />
+        <Kpi l={t('Running low')} v={String(running.length)} />
+        <Kpi l={t('Wastage and count changes, 30 days')} v={String(changes.length)} />
+        {value !== null && <Kpi info="metric.inventoryValue" l={t('Inventory value (at cost)')} v={formatMoney(value)} />}
+      </div>
+      <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-start', marginTop: 'var(--sp-3)' }}>
+        <div style={{ flex: '1 1 320px' }}><h4 style={{ marginTop: 0 }}>{t('Out of stock')}</h4>{list(out, t('Nothing is out of stock.'), 'out of stock')}</div>
+        <div style={{ flex: '1 1 320px' }}><h4 style={{ marginTop: 0 }}>{t('Running low')}</h4>{list(running, t('Nothing is running low.'), 'running low')}</div>
+      </div>
+      <h4>{t('Unusual changes in the last 30 days')}</h4>
+      <table className="list" aria-label="unusual changes">
+        <thead><tr><th>{t('Time')}</th><th>{t('Product')}</th><th>{t('Type')}</th><th>{t('Reason')}</th><th className="num">{t('Change')}</th><th className="num">{t('Value')}</th></tr></thead>
+        <tbody>{changes.length === 0 && <EmptyRow cols={6} text={t('No wastage or count differences in these dates.')} />}{changes.slice(0, 15).map((a, i) => <tr key={i}><td>{storeDateTime(a.at)}</td><td>{a.nameEn}</td><td>{a.kind === 'waste' ? t('Wastage') : t('Stock count')}</td><td>{t(a.reason)}</td><td className="num">{formatQty(a.qty, 0)}</td><td className={`num${a.value < 0 ? ' neg' : ''}`}>{formatSar(a.value)}</td></tr>)}</tbody>
+      </table>
+    </>
+  );
+}
+
+/** Everything that moved stock, in time order, with the same dates driving the chart and the list. */
+function Movements({ tick }: { tick: number }) {
+  const { t } = useI18n();
+  const [dates, setDates] = useDateRange('stock-movements', 'week');
+  const [data, setData] = useState<{ days: MovementDay[]; rows: MovementRow[]; more: boolean } | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => { setError(''); void call<{ days: MovementDay[]; rows: MovementRow[]; more: boolean }>('stock.movements', dates).then(setData, (e: Error) => setError(t(e.message))); }, [dates.from, dates.to, tick]);
+  return (
+    <>
+      <DateNavigator name="Stock movements" value={dates} onChange={setDates} />
+      {error && <p className="msg error">{error}</p>}
+      {data && (
+        <>
+          <section className="chart-card" aria-label="stock movements chart">
+            <div className="chart-head"><h4>{t('Records in and out')} <small>{t('Number of stock records each day')}</small></h4></div>
+            <Chart name={t('Records in and out')} kind="bar" info="metric.chart.movements" axisFormat={(v) => String(v)} series={[{ name: t('Stock in'), format: String }, { name: t('Stock out'), format: String }]}
+              points={data.days.map((d) => ({ key: d.day, axis: shortDay(d.day), title: longDay(d.day), values: [d.inLines, d.outLines] }))}
+              onPick={(p) => setDates({ from: p.key, to: p.key })} />
+          </section>
+          <table className="list" aria-label="stock movements">
+            <thead><tr><th>{t('Time')}</th><th>{t('Product')}</th><th>{t('What happened')}</th><th>{t('User')}</th><th className="num">{t('Change')}</th></tr></thead>
+            <tbody>{data.rows.length === 0 && <EmptyRow cols={5} text={t('Nothing moved in these dates.')} />}{data.rows.map((m) => <tr key={m.id}><td>{storeDateTime(m.at)}</td><td>{m.sku} {m.nameEn}</td><td>{t(REASON[m.reason] ?? m.reason)}</td><td>{m.user}</td><td className={`num${m.qty < 0 ? ' neg' : ''}`}>{formatQty(m.qty, 0)}</td></tr>)}</tbody>
+          </table>
+          {data.more && <p className="hint">{t('Showing the newest 300. Choose fewer dates to see the rest.')}</p>}
+        </>
+      )}
+    </>
   );
 }
 

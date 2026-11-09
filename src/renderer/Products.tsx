@@ -20,6 +20,7 @@ export function Products() {
   const [form, setForm] = useState(empty);
   const [search, setSearch] = useRemembered('products', 'search', '', validText);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const [status, setStatus] = useRemembered<Status>('products', 'status', 'active', validOneOf(['active', 'inactive', 'all']));
@@ -72,26 +73,36 @@ export function Products() {
 
   return (
     <div className="page">
-      <PageHeader title={t('Products')} desc={t('Add products, change prices, other names for search, deactivate.')} />
-      <div className="grid-cards">
-      <form className="card" onSubmit={save}>
+      <PageHeader title={t('Products')} desc={t('Add products, change prices, other names for search, deactivate.')} actions={<button className={adding ? undefined : 'primary'} onClick={() => setAdding(!adding)}>{adding ? t('Close') : t('New product')}</button>} />
+      {adding && (
+      <form className="card section" onSubmit={save} aria-label="new product form">
         <h3>{t('New product')}</h3>
-        <label>SKU <InfoIcon id="field.product.sku" /></label><input value={form.sku} onChange={set('sku')} />
-        <label>{t('Name (Arabic)')} <InfoIcon id="field.product.nameAr" /></label><input dir="rtl" value={form.nameAr} onChange={set('nameAr')} />
-        <label>{t('Name (English)')} <InfoIcon id="field.product.nameEn" /></label><input value={form.nameEn} onChange={set('nameEn')} />
-        <label>{t('Sold by')} <InfoIcon id="field.product.sellMode" /></label>
+        <h4 className="form-group">{t('What it is')}</h4>
+        <div className="form-grid">
+        <div><label>SKU <InfoIcon id="field.product.sku" /></label><input value={form.sku} onChange={set('sku')} /></div>
+        <div className="wide"><label>{t('Name (English)')} <InfoIcon id="field.product.nameEn" /></label><input value={form.nameEn} onChange={set('nameEn')} /></div>
+        <div className="wide"><label>{t('Name (Arabic)')} <InfoIcon id="field.product.nameAr" /></label><input dir="rtl" value={form.nameAr} onChange={set('nameAr')} /></div>
+        </div>
+        <h4 className="form-group">{t('Selling price and tax')}</h4>
+        <div className="form-grid">
+        <div><label>{t('Sold by')} <InfoIcon id="field.product.sellMode" /></label>
         <select value={form.sellMode} onChange={set('sellMode')}>
           <option value="unit">{t('Piece')}</option>
           <option value="weight">{t('Weight (kg)')}</option>
-        </select>
-        <label>{form.sellMode === 'weight' ? t('Shelf price incl. VAT (SAR per kg)') : t('Shelf price incl. VAT (SAR)')} <InfoIcon id="field.product.price" /></label>
-        <input value={form.price} onChange={set('price')} />
-        <label>{t('VAT %')} <InfoIcon id="field.product.vat" /></label><input value={form.vat} onChange={set('vat')} />
-        <label>{t('Barcode (optional)')} <InfoIcon id="field.product.barcode" /></label><input value={form.barcode} onChange={set('barcode')} />
-        <label>{t('PLU (optional, needed for scale labels)')} <InfoIcon id="field.product.plu" /></label><input value={form.plu} onChange={set('plu')} />
-        {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
+        </select></div>
+        <div className="wide"><label>{form.sellMode === 'weight' ? t('Shelf price incl. VAT (SAR per kg)') : t('Shelf price incl. VAT (SAR)')} <InfoIcon id="field.product.price" /></label>
+        <input value={form.price} onChange={set('price')} /></div>
+        <div><label>{t('VAT %')} <InfoIcon id="field.product.vat" /></label><input value={form.vat} onChange={set('vat')} /></div>
+        </div>
+        <h4 className="form-group">{t('Codes')}</h4>
+        <div className="form-grid">
+        <div className="wide"><label>{t('Barcode (optional)')} <InfoIcon id="field.product.barcode" /></label><input value={form.barcode} onChange={set('barcode')} /></div>
+        <div className="wide"><label>{t('PLU (optional, needed for scale labels)')} <InfoIcon id="field.product.plu" /></label><input value={form.plu} onChange={set('plu')} /></div>
+        </div>
         <p><button className="primary">{t('Save product')}</button></p>
       </form>
+      )}
+      {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       <div>
         <div className="row">
           <input data-kb-search="product" data-kb-suggest placeholder={t('Search products')} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -117,7 +128,6 @@ export function Products() {
         </table>
         {browsing && browse.items.length < browse.total && <p><button type="button" aria-label="show more products" onClick={() => void load(browse.items.length).catch(loadFailed)}>{t('Show more')}</button></p>}
         {editing && <EditProduct key={editing.id} product={editing} onDone={() => { setEditing(null); reload(); }} />}
-      </div>
       </div>
     </div>
   );

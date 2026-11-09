@@ -171,6 +171,37 @@ export function purchaseSeries(ctx: Ctx, userId: number, q: { from: string; to: 
   return out;
 }
 
+export interface MovementRow {
+  id: number;
+  at: string;
+  sku: string;
+  nameEn: string;
+  qty: number;
+  reason: string;
+  user: string;
+}
+
+export interface MovementDay {
+  day: string;
+  inLines: number | null;
+  outLines: number | null;
+}
+
+/** Stock movement records, and how many went in or out each day. Quantities of different goods are never added up. */
+export function stockMovementLog(ctx: Ctx, userId: number, q: { from: string; to: string }): { days: MovementDay[]; rows: MovementRow[]; more: boolean } {
+  requirePermission(ctx, userId, 'reports.view');
+  if (q.to < q.from) throw new DomainError('VALIDATION', 'Check the dates');
+  const LIMIT = 300;
+  const f = storeDayStartUtc(q.from);
+  const t = storeDayStartUtc(nextDay(q.to));
+  const first = firstDay(ctx);
+  const counts = new Map((ctx.db.prepare(`SELECT substr(datetime(at, '+180 minutes'), 1, 10) AS d, SUM(qty > 0) AS i, SUM(qty < 0) AS o FROM stock_movements WHERE at >= ? AND at < ? GROUP BY d`).all(f, t) as { d: string; i: number; o: number }[]).map((r) => [r.d, r]));
+  const days: MovementDay[] = [];
+  for (let d = q.from; d <= q.to; d = nextDay(d)) days.push(first === null || d < first ? { day: d, inLines: null, outLines: null } : { day: d, inLines: counts.get(d)?.i ?? 0, outLines: counts.get(d)?.o ?? 0 });
+  const rows = ctx.db.prepare('SELECT m.id, m.at, p.sku, p.name_en AS nameEn, m.qty, m.reason, u.display_name AS user FROM stock_movements m JOIN products p ON p.id = m.product_id JOIN users u ON u.id = m.user_id WHERE m.at >= ? AND m.at < ? ORDER BY m.id DESC LIMIT ?').all(f, t, LIMIT + 1) as MovementRow[];
+  return { days, rows: rows.slice(0, LIMIT), more: rows.length > LIMIT };
+}
+
 export interface FinancePoint {
   month: string;
   netSales: number | null;

@@ -8,7 +8,7 @@ import { createSupplier } from './parties';
 import { salesSummary } from './reports';
 import { finalizeSale } from './sales';
 import { createPurchaseInvoice } from './purchasing';
-import { financeSeries, purchaseSeries, salesList, salesSeries } from './series';
+import { financeSeries, purchaseSeries, salesList, salesSeries, stockMovementLog } from './series';
 import { closeShift, openShift, openShiftId } from './shifts';
 import { makeTestCtx, seedUsers } from './test-helpers';
 
@@ -130,6 +130,16 @@ describe('purchases over time', () => {
     createPurchaseInvoice(ctx, u.admin, { requestKey: 'series-pinv-0001', supplierId: sup, supplierInvoiceNo: 'A1', invoiceDate: '2026-11-05', dueDate: '2026-12-05', grnIds: [grn], invoiceNet: 1_000, vatAmount: 150, vatRecoverable: false });
     const pts = purchaseSeries(ctx, u.admin, { from: '2026-11-04', to: '2026-11-05' });
     expect(pts.map((p) => [p.gross, p.invoices])).toEqual([[null, null], [1_150, 1]]);
+  });
+});
+
+describe('stock movements', () => {
+  it('lists records, counts in and out per day, and needs report permission', () => {
+    sell();
+    const r = stockMovementLog(ctx, u.admin, { from: '2026-11-04', to: '2026-11-05' });
+    expect(r.days).toEqual([{ day: '2026-11-04', inLines: null, outLines: null }, { day: '2026-11-05', inLines: 1, outLines: 1 }]);
+    expect(r.rows.map((x) => x.reason)).toEqual(['sale', 'grn']);
+    expect(code(() => stockMovementLog(ctx, u.cashier, { from: '2026-11-05', to: '2026-11-05' }))).toBe('PERMISSION_DENIED');
   });
 });
 

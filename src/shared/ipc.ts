@@ -146,6 +146,7 @@ export const schemas = {
   'report.sales': z.object({ fromDay: z.iso.date(), toDay: z.iso.date() }),
   'report.series': z.object({ from: z.iso.date(), to: z.iso.date(), unit: z.enum(['hour', 'day', 'week', 'month']) }),
   'report.saleList': z.object({ from: z.iso.date(), to: z.iso.date(), hour: int.min(0).max(23).optional() }),
+  'stock.movements': z.object({ from: z.iso.date(), to: z.iso.date() }),
   'purchase.series': z.object({ from: z.iso.date(), to: z.iso.date() }),
   'finance.series': z.object({ toDay: z.iso.date(), months: int.min(1).max(36) }),
   'import.dryRun': z.object({ kind: z.enum(['products', 'suppliers']), csv: z.string().max(5_000_000) }),

@@ -41,6 +41,7 @@ const PRELOAD_CHANNELS = [
   'cloud.restorePrepare',
   'report.series',
   'report.saleList',
+  'stock.movements',
   'purchase.series',
   'finance.series',
   'vat.list',

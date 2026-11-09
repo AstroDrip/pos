@@ -459,3 +459,6 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
 .answer.bad { color: var(--danger); }
 .seg-groups { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-2); }
 .seg-groups small { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+
+.form-group { margin: var(--sp-4) 0 0; font-size: var(--fs-sm); color: var(--text-2); }
+[hidden] { display: none !important; }

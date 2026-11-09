@@ -33,7 +33,7 @@ import {
   createPurchaseInvoice, createPurchaseReturn, listPurchaseReturns, paySupplier, purchaseRegister, reverseSupplierPayment, setSupplierOpeningBalance,
   supplierAgeing, supplierBalances, supplierStatement, uninvoicedGrns,
 } from '../services/purchasing';
-import { financeSeries, purchaseSeries, salesList, salesSeries } from '../services/series';
+import { financeSeries, purchaseSeries, salesList, salesSeries, stockMovementLog } from '../services/series';
 import { vatSummary } from '../services/vat-report';
 import { attachFinalDocument, claimVat, decideVat, getVatReview, listVatReviews, markNotClaimed, recordFinalInvoice, reverseVatClaim, verifyFinalInvoice } from '../services/vat-review';
 import {
@@ -262,6 +262,7 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, c
     'report.sales': (p, s) => salesSummary(ctx, userId(s), p.fromDay, p.toDay),
     'report.series': (p, s) => salesSeries(ctx, userId(s), p),
     'report.saleList': (p, s) => salesList(ctx, userId(s), p),
+    'stock.movements': (p, s) => stockMovementLog(ctx, userId(s), p),
     'purchase.series': (p, s) => purchaseSeries(ctx, userId(s), p),
     'finance.series': (p, s) => financeSeries(ctx, userId(s), p.toDay, p.months),
     'import.dryRun': (p, s) => {
