@@ -7,18 +7,18 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 const TENDER: Record<string, string> = { cash: 'Cash / نقداً', card: 'Card / بطاقة', bank: 'Bank transfer / تحويل بنكي', account: 'On account / آجل' };
 
-const STYLE = `<style>
-  @page { size: 80mm auto; margin: 0 }
-  body { width: 72mm; margin: 0 auto; font: 12px Tahoma, Arial, sans-serif; color: #000 }
+const style = (mm: 58 | 80) => `<style>
+  @page { size: ${mm}mm auto; margin: 0 }
+  body { width: ${mm - 8}mm; margin: 0 auto; overflow-wrap: anywhere; font: 12px Tahoma, Arial, sans-serif; color: #000 }
   table { width: 100%; border-collapse: collapse } td { padding: 1px 0; vertical-align: top } .r { text-align: right }
   .c { text-align: center } hr { border: 0; border-top: 1px dashed #000 } .b { font-weight: bold; font-size: 14px }
   img { max-width: 40mm; max-height: 20mm }
 </style>`;
 
-function open(): string {
+function open(mm: 58 | 80 = 80): string {
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
-${STYLE}</head><body>`;
+${style(mm)}</head><body>`;
 }
 
 function line(cls: string, text: string, rtl = false): string {
@@ -53,11 +53,11 @@ const money = (label: string, amount: number, cls = '') => `<tr${cls ? ` class="
  * Chromium does the Arabic shaping, so the printer's code page does not matter (plan §L-8).
  * NOTE: no ZATCA QR yet; that comes with the ZATCA phase. The TEST BUILD line stays until then.
  */
-export function receiptHtml(r: ReceiptData, store: StoreDetails, copy: boolean): string {
-  if (r.kind === 'payment') return paymentReceiptHtml(r, store, copy);
+export function receiptHtml(r: ReceiptData, store: StoreDetails, copy: boolean, mm: 58 | 80 = 80): string {
+  if (r.kind === 'payment') return paymentReceiptHtml(r, store, copy, mm);
   const refund = r.kind === 'refund';
   const payType = r.payments.map((p) => esc(TENDER[p.tender] ?? p.tender)).join(' + ');
-  return `${open()}
+  return `${open(mm)}
 ${header(store)}
 ${copy ? '<div class="c b">COPY / نسخة</div>' : ''}
 ${refund ? '<div class="c b">REFUND — CREDIT NOTE<br><span dir="rtl">استرداد — إشعار دائن</span></div>' : '<div class="c b">Simplified Tax Invoice<br><span dir="rtl">فاتورة ضريبية مبسطة</span></div>'}
@@ -86,10 +86,10 @@ ${refund ? '' : `${line('c', store.footerAr || 'شكراً لتسوقكم معن
 </body></html>`;
 }
 
-function paymentReceiptHtml(r: ReceiptData, store: StoreDetails, copy: boolean): string {
+function paymentReceiptHtml(r: ReceiptData, store: StoreDetails, copy: boolean, mm: 58 | 80): string {
   const allocs = (r.allocations ?? []).map((a) => `<tr><td>${esc(a.invoiceNo)}</td><td class="r">${formatSar(a.amount)}</td></tr>`).join('');
   const applied = (r.allocations ?? []).reduce((s, a) => s + a.amount, 0);
-  return `${open()}
+  return `${open(mm)}
 ${header(store)}
 ${copy ? '<div class="c b">COPY / نسخة</div>' : ''}
 <div class="c b">PAYMENT RECEIPT / سند قبض</div><hr>

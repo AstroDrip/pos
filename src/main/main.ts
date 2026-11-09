@@ -11,6 +11,7 @@ import { backupStatus, createBackup, encryptedSnapshot, installRestore } from '.
 import { createHandlers, type BackupEnv, type CloudEnv, type Printer, type Session } from './handlers';
 import { makeCloudApi, type CloudCreds } from '../services/cloud-client';
 import { cloudTick } from '../services/cloud-jobs';
+import { paperWidth } from '../services/hardware';
 import { getStoreDetails } from '../services/store-details';
 import { runUiAudit } from './ui-audit';
 import { demandScores } from '../services/demand';
@@ -48,19 +49,29 @@ const RECEIPT_TO_FILE = process.env.POS_RECEIPT_TO_FILE;
 
 const printer: Printer = {
   async printReceipt(data, copy) {
-    const html = receiptHtml(data, getStoreDetails(ctx), copy);
-    if (RECEIPT_TO_FILE) return writeFileSync(RECEIPT_TO_FILE, html, 'utf8');
-    const win = new BrowserWindow({ show: false, webPreferences: { ...SECURE_PREFS, javascript: false } });
-    try {
-      await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-      await new Promise<void>((resolve, reject) =>
-        win.webContents.print({ silent: true, printBackground: false }, (ok, reason) => (ok ? resolve() : reject(new Error(reason)))),
-      );
-    } finally {
-      win.destroy();
-    }
+    await printHtml(receiptHtml(data, getStoreDetails(ctx), copy, paperWidth(ctx)));
+  },
+  listPrinters: async () => {
+    const list = (await mainWindow?.webContents.getPrintersAsync()) ?? [];
+    return list.map((p) => ({ name: p.name, isDefault: !!(p as { isDefault?: boolean }).isDefault }));
+  },
+  async printTest(data, device) {
+    await printHtml(receiptHtml(data, getStoreDetails(ctx), false, paperWidth(ctx)), device);
   },
 };
+
+async function printHtml(html: string, deviceName?: string): Promise<void> {
+  if (RECEIPT_TO_FILE) return writeFileSync(RECEIPT_TO_FILE, html, 'utf8');
+  const win = new BrowserWindow({ show: false, webPreferences: { ...SECURE_PREFS, javascript: false } });
+  try {
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    await new Promise<void>((resolve, reject) =>
+      win.webContents.print({ silent: true, printBackground: false, ...(deviceName ? { deviceName } : {}) }, (ok, reason) => (ok ? resolve() : reject(new Error(reason)))),
+    );
+  } finally {
+    win.destroy();
+  }
+}
 
 let ctx: ReturnType<typeof makeCtx>;
 let mainWindow: BrowserWindow | null = null;

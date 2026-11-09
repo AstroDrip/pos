@@ -4,6 +4,7 @@ import { backupStatus, createBackup, prepareRestore } from '../services/backup';
 import { cloudStatus, compareWithLive, fetchAndCheck, recoveryToken, recoveryVerifier, setBackupEveryHours, verifyCloudBackup } from '../services/cloud-backup';
 import { CloudError, enrollDevice, makeCloudApi, recoverDevice, type CloudApi, type CloudCreds, type FetchFn } from '../services/cloud-client';
 import { backupNow } from '../services/cloud-jobs';
+import { diagnoseLabel, drawerCheck, paperWidth, setPaperWidth, testReceiptData } from '../services/hardware';
 import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto';
 import { getShortcuts, saveShortcuts } from '../services/shortcuts';
 import { billProductCost, createSupplierBill, findSupplierItem, getBill, listBills, priceHistory, purchasesBySupplier, supplierItemsFor } from '../services/supplier-bills';
@@ -45,6 +46,8 @@ import { authenticate, createUser, hasPermission, listUsers, requirePermission, 
 
 export interface Printer {
   printReceipt(data: ReceiptData, copy: boolean): Promise<void>;
+  listPrinters?(): Promise<{ name: string; isDefault: boolean }[]>;
+  printTest?(data: ReceiptData, device?: string): Promise<void>;
 }
 
 /** Things only the Electron main process can do: key storage, file dialogs, swapping the database file. */
@@ -410,6 +413,23 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, c
         throw new DomainError('VALIDATION', (e as Error).message);
       }
     },
+    'hw.label': (p, s) => diagnoseLabel(ctx, userId(s), p.raw),
+    'hw.printers': async (_p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      return { printers: (await printer.listPrinters?.()) ?? [], paperMm: paperWidth(ctx) };
+    },
+    'hw.paper': (p, s) => setPaperWidth(ctx, userId(s), p.mm),
+    'hw.testReceipt': async (p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      if (!printer.printTest) throw new DomainError('VALIDATION', 'Printing is not available here');
+      try {
+        await printer.printTest(testReceiptData(ctx.now()), p.device);
+      } catch (e) {
+        throw new DomainError('VALIDATION', `The printer did not accept the test: ${(e as Error).message}`);
+      }
+      return null;
+    },
+    'hw.drawer': (_p, s) => drawerCheck(ctx, userId(s)),
     'cloud.status': (_p, s) => {
       requirePermission(ctx, userId(s), 'backup.run');
       const c = cloud?.getCreds() ?? null;

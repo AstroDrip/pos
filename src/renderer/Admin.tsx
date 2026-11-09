@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CloudBackup } from './CloudBackup';
+import { HardwareTest } from './HardwareTest';
 import type { BackupStatus } from '../services/backup';
 import type { DryRun } from '../services/import';
 import type { LookupResult, ScaleLayoutRow } from '../services/catalog';
@@ -24,6 +25,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
       <div className="grid-cards">
       {can('backup.run') && <Backup canSetup={can('settings.manage')} canRestore={can('backup.restore')} />}
       {can('backup.run') && <CloudBackup can={can} />}
+      {can('settings.manage') && <HardwareTest />}
       {can('user.manage') && <Users />}
       {can('supplier.manage') && <Suppliers />}
       {(can('product.manage') || can('supplier.manage')) && <Import />}
