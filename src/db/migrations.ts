@@ -12,6 +12,7 @@ import * as m009 from './migrations/009_purchasing';
 import * as m010 from './migrations/010_credit';
 import * as m011 from './migrations/011_supplier_bills';
 import * as m012 from './migrations/012_bill_drafts';
+import * as m013 from './migrations/013_audit_and_permissions';
 
 export interface Migration {
   version: number;
@@ -33,6 +34,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 10, name: 'credit', sql: m010.sql },
   { version: 11, name: 'supplier_bills', sql: m011.sql },
   { version: 12, name: 'bill_drafts', sql: m012.sql },
+  { version: 13, name: 'audit_and_permissions', sql: m013.sql },
 ];
 
 /** Versions not yet applied to this database (empty for a brand-new file before migrate()). */

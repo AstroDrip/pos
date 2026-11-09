@@ -270,6 +270,7 @@ export function createRefund(ctx: Ctx, userId: number, input: RefundInput): Refu
       entity: 'refund',
       entityId: refundId,
       details: { refundNo, invoiceNo: sale.invoiceNo, total: totalIncl, approver, reason, lines: priced.length, accountOffset },
+      related: { type: 'sale', id: sale.invoiceNo },
     });
 
     return { refundId, refundNo, totalIncl, cashOut: totalIncl - accountOffset, accountOffset, replayed: false };

@@ -7,13 +7,14 @@ import { useReturnTick } from './TabHost';
 import { useI18n } from './i18n';
 import { EmptyRow } from './PageHeader';
 
-export function Shift({ can }: { can: (p: string) => boolean }) {
+export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUserChange?: () => void }) {
   const back = useReturnTick();
   const { t } = useI18n();
   const [s, setS] = useState<ShiftSummary | null>(null);
   const [counted, setCounted] = useState('');
   const [move, setMove] = useState({ kind: 'out' as 'in' | 'out', amount: '', reason: '' });
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [hand, setHand] = useState({ counted: '', username: '', pin: '' });
 
   const load = () => call<ShiftSummary | null>('shift.current').then(setS);
   useEffect(() => void load(), [back]);
@@ -83,6 +84,28 @@ export function Shift({ can }: { can: (p: string) => boolean }) {
           }
         >
           {t('Close shift')}
+        </button>
+      </p>
+      <h4>{t('Hand over to the next cashier')}</h4>
+      <p className="hint">{t('Count the drawer, then the next cashier types their username and PIN. Your shift closes and theirs opens with this cash.')}</p>
+      <div className="row">
+        <div><label>{t('Counted cash in drawer (SAR)')}</label><input aria-label="handover counted cash" value={hand.counted} onChange={(e) => setHand({ ...hand, counted: e.target.value })} /></div>
+        <div><label>{t('Next cashier username')}</label><input aria-label="handover username" value={hand.username} onChange={(e) => setHand({ ...hand, username: e.target.value })} /></div>
+        <div><label>{t('Next cashier PIN')}</label><input aria-label="handover pin" type="password" inputMode="numeric" value={hand.pin} onChange={(e) => setHand({ ...hand, pin: e.target.value })} /></div>
+      </div>
+      <p>
+        <button
+          disabled={!hand.counted.trim() || !hand.username.trim() || !hand.pin}
+          onClick={() =>
+            run(async () => {
+              const r = await call<{ closed: ShiftSummary }>('shift.handover', { countedCash: parseSar(hand.counted), username: hand.username, pin: hand.pin });
+              setHand({ counted: '', username: '', pin: '' });
+              window.alert(t('Shift handed over. Expected {0}, counted {1}, difference {2}.', formatSar(r.closed.expectedCash), formatSar(r.closed.countedCash ?? 0), formatSar((r.closed.countedCash ?? 0) - r.closed.expectedCash)));
+              onUserChange?.();
+            }, t('Shift handed over'))
+          }
+        >
+          {t('Hand over')}
         </button>
       </p>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}

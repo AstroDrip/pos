@@ -166,6 +166,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
             await productListFlows();
             await emptySearchFlows();
             await reloadFlows();
+            await auditFlows();
           }
           await clearBill();
           for (const code of ['6281000000000', '6281000000077', '6281000000033']) await scan(code); // fake seed barcodes
@@ -915,6 +916,50 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await tabTo('Sell');
     await sleep(300);
     await tabTo('Sell');
+    await sleep(300);
+  }
+
+  /** The Audit tab for the owner, handing over a shift, and what a cashier then cannot see. */
+  async function auditFlows() {
+    const openNamed = async (name: string) => {
+      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await sleep(700);
+    };
+    await js(`window.pos.invoke('catalog.setPrice', { productId: 1, priceIncl: 4321 })`);
+    await openNamed('Audit');
+    await js(`(() => { const e = document.querySelector('select[aria-label="audit action"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, 'product.price'); e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await sleep(700);
+    await js(`document.querySelector('table[aria-label="audit log"] tbody tr')?.click()`);
+    await sleep(300);
+    const shown = await js<string>(`document.querySelector('[aria-label="audit details"]')?.textContent ?? ''`);
+    flow('audit-tab-lists-price-change', shown.includes('4321'), shown.slice(0, 120));
+
+    await openNamed('Shift');
+    await js('void (window.alert = () => undefined)');
+    await focus('input[aria-label="handover counted cash"]');
+    await type('100', 10);
+    await focus('input[aria-label="handover username"]');
+    await type("cashier", 10);
+    await focus('input[aria-label="handover pin"]');
+    await type("1111", 10);
+    await click('button', 'Hand over');
+    await sleep(1500);
+    const who = await js<string>(`document.querySelector('.who')?.textContent ?? ''`);
+    flow('shift-handover-switches-cashier', who !== '' && !who.toLowerCase().includes('owner'), `now ${who}`);
+    const hasAudit = await js<boolean>(`[...document.querySelectorAll('.top nav button')].some((b) => b.textContent.trim().endsWith('Audit'))`);
+    flow('audit-hidden-from-cashier', !hasAudit, `audit tab shown ${hasAudit}`);
+
+    await click('.utils button', 'Log out');
+    await waitFor(`document.querySelector('form input')`, 4000);
+    await focus('form input');
+    await type(hooks.login.username);
+    await focus('form input[type="password"]');
+    await type(hooks.login.pin);
+    key('Enter');
+    await waitFor(`document.querySelector('.top nav')`, 8000);
+    await sleep(800);
+    await openNamed('Sell');
+    await js(`document.querySelector('[aria-label="bill left open"] button:last-child')?.click()`);
     await sleep(300);
   }
 

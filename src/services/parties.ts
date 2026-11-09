@@ -75,11 +75,12 @@ export function updateSupplier(ctx: Ctx, userId: number, id: number, input: Supp
   const phone = cleanPhone(input.phone);
   const vat = cleanVat(input.vatNumber);
   ctx.db.transaction(() => {
-    if (!ctx.db.prepare('SELECT 1 FROM suppliers WHERE id = ?').get(id)) throw new DomainError('NOT_FOUND', 'Supplier not found');
+    const old = ctx.db.prepare('SELECT name, phone, vat_number AS vatNumber, payment_terms_days AS terms, address FROM suppliers WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    if (!old) throw new DomainError('NOT_FOUND', 'Supplier not found');
     ctx.db
       .prepare('UPDATE suppliers SET name = ?, phone = ?, vat_number = ?, payment_terms_days = ?, address = ?, cr_number = ?, our_customer_no = ?, salesman = ? WHERE id = ?')
       .run(input.name.trim(), phone, vat, terms, opt(input.address), opt(input.crNumber), opt(input.ourCustomerNo), opt(input.salesman), id);
-    appendAudit(ctx, { userId, action: 'supplier.update', entity: 'supplier', entityId: id, details: { name: input.name, vatNumber: vat, terms } });
+    appendAudit(ctx, { userId, action: 'supplier.update', entity: 'supplier', entityId: id, details: { name: input.name, vatNumber: vat, terms }, before: old, after: { name: input.name.trim(), phone, vatNumber: vat, terms, address: opt(input.address) } });
   })();
 }
 

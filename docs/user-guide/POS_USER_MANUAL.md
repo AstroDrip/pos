@@ -57,9 +57,11 @@ Names and numbers in the examples are made up.
   - [Pay an expense that is still owed](#expenses-pay)
   - [Set up recurring expenses (monthly rent, bills)](#expenses-recurring)
 - **Reports and the owner overview**
+  - [Read the audit log](#audit-log)
   - [View sales for a day or a month](#reports-sales)
   - [Read the owner overview, profit and balances](#reports-owner)
 - **Shifts and daily work**
+  - [Hand over to the next cashier](#shifts-handover)
   - [Start a shift](#shifts-open)
   - [Record cash put in or taken out of the drawer](#shifts-cash-in-out)
   - [Close a shift and check the cash](#shifts-close)
@@ -1049,6 +1051,28 @@ Names and numbers in the examples are made up.
 
 ## Reports and the owner overview
 
+<a id="audit-log"></a>
+
+### Read the audit log
+
+**What this does:** The audit log shows who did what and when. It is a record only. Nothing in it can be changed or removed.
+
+**Where:** Audit tab, for the administrator.
+
+**Steps**
+
+1. Open the Audit tab.
+2. To narrow the list, type in Search, or choose a User, Action, Record type or dates.
+3. Click a row to see the old and new values and the details.
+4. If the row belongs to a sale or customer, use its button to open that record.
+5. To keep a copy, press Export to CSV.
+
+**What you should see:** The newest records are at the top. Older records from before this screen existed show less detail. PINs and passwords are never written here.
+
+**If something goes wrong**
+
+- *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
+
 <a id="reports-sales"></a>
 
 ### View sales for a day or a month
@@ -1094,6 +1118,28 @@ Names and numbers in the examples are made up.
 - *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
 
 ## Shifts and daily work
+
+<a id="shifts-handover"></a>
+
+### Hand over to the next cashier
+
+**What this does:** Close your shift and open the next cashier's shift in one step.
+
+**Where:** Shift tab, Hand over to the next cashier.
+
+**Steps**
+
+1. Count the cash in the drawer.
+2. Type the amount in Counted cash in drawer.
+3. The next cashier types their username and PIN.
+4. Press Hand over.
+
+**What you should see:** A message shows the expected cash, the counted cash and any difference. The app is now logged in as the next cashier. Their shift starts with the cash you counted.
+
+**If something goes wrong**
+
+- *It says the PIN is wrong.* The next cashier should type it again. Your shift stays open until it works.
+- *There is a difference.* It is recorded in the shift and in the audit log. Tell a supervisor.
 
 <a id="shifts-open"></a>
 

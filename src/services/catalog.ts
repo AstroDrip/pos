@@ -132,7 +132,7 @@ export function setPrice(ctx: Ctx, userId: number, productId: number, priceIncl:
     const now = ctx.now();
     ctx.db.prepare('UPDATE products SET price_incl = ?, updated_at = ? WHERE id = ?').run(priceIncl, now, productId);
     ctx.db.prepare('INSERT INTO price_history (product_id, old_price, new_price, changed_by, changed_at) VALUES (?, ?, ?, ?, ?)').run(productId, p.priceIncl, priceIncl, userId, now);
-    appendAudit(ctx, { userId, action: 'product.price', entity: 'product', entityId: productId, details: { old: p.priceIncl, new: priceIncl } });
+    appendAudit(ctx, { userId, action: 'product.price', entity: 'product', entityId: productId, details: { old: p.priceIncl, new: priceIncl }, before: { price: p.priceIncl }, after: { price: priceIncl } });
   })();
 }
 

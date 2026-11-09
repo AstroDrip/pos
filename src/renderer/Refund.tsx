@@ -17,7 +17,7 @@ interface Pick {
   restock: boolean;
 }
 
-export function Refund({ canApprove }: { canApprove: boolean }) {
+export function Refund({ canApprove, request }: { canApprove: boolean; request?: { invoice?: string; n: number } }) {
   const back = useReturnTick();
   const { t } = useI18n();
   const [invoiceNo, setInvoiceNo] = useState('');
@@ -50,6 +50,12 @@ export function Refund({ canApprove }: { canApprove: boolean }) {
       setMsg({ kind: 'error', text: t((err as Error).message) });
     }
   };
+
+  useEffect(() => {
+    if (!request?.n || !request.invoice) return;
+    setInvoiceNo(request.invoice);
+    void find(undefined, request.invoice);
+  }, [request]);
 
   const qtyOf = (lineNo: number) => {
     try {

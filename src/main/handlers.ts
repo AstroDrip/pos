@@ -8,7 +8,8 @@ import { getStoreDetails, saveStoreDetails } from '../services/store-details';
 import { createProduct, getAliases, itemInfo, listProducts, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
-import { appendAudit, verifyAuditChain } from '../services/audit';
+import { appendAudit, appendFailure, verifyAuditChain } from '../services/audit';
+import { auditFilters, exportAudit, listAudit } from '../services/audit-view';
 import { clearDraft, discardDraft, loadDraft, markDraftRestored, saveDraft } from '../services/drafts';
 import { cancelHeldBill, holdBill, hydrateBill, listHeldBills, payloadSchema, recallBill, recordRemoval } from '../services/held-bills';
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from '../services/import';
@@ -34,7 +35,7 @@ import {
 } from '../services/credit';
 import { applySupplierAdvance, setSupplierNotes, supplierAccount, supplierControls } from '../services/purchasing';
 import { finalizeSale, receiptData, type ReceiptData } from '../services/sales';
-import { closeShift, listShifts, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
+import { closeShift, handOverShift, listShifts, openShift, openShiftId, recordCashMovement, shiftSummary } from '../services/shifts';
 import { authenticate, createUser, hasPermission, listUsers, requirePermission, setUserActive, userCount, type User } from '../services/users';
 
 export interface Printer {
@@ -62,6 +63,9 @@ export interface Session {
 type Payload<C extends Channel> = z.infer<(typeof schemas)[C]>;
 type Handler<C extends Channel> = (p: Payload<C>, s: Session) => unknown;
 
+/** Money and backup actions: a failure here is worth a line in the audit log, whatever the reason. */
+const FAILURE_LOGGED: ReadonlySet<Channel> = new Set(['sale.finalize', 'refund.create', 'credit.receipt', 'credit.writeOff', 'purchase.pay', 'expense.pay', 'backup.run', 'restore.apply']);
+
 const PUBLIC: ReadonlySet<Channel> = new Set(['auth.status', 'auth.setupAdmin', 'auth.login', 'restore.prepare', 'restore.apply']);
 
 export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
@@ -74,6 +78,18 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
   };
   /** Restore is allowed for users with backup.restore, or on a fresh install before any user exists. */
   const canRestore = (s: Session) => userCount(ctx) === 0 || (s.user !== null && hasPermission(ctx, s.user.id, 'backup.restore'));
+
+  /** Day-end backup. The shift is already closed; a failure here only shows in backup status. */
+  const dayEndBackup = (actor: number) => {
+    const key = backup?.getKey();
+    if (backup && key) {
+      try {
+        createBackup(ctx, { dir: backup.dir, masterKey: key, appVersion: backup.appVersion, trigger: 'shift_close', userId: actor });
+      } catch (e) {
+        console.error('[backup] shift-close backup failed', e);
+      }
+    }
+  };
 
   const handlers: { [C in Channel]: Handler<C> } = {
     'auth.status': (_p, s) => ({ needsSetup: userCount(ctx) === 0, user: s.user }),
@@ -95,17 +111,20 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       return id === null ? null : shiftSummary(ctx, id);
     },
     'shift.open': (p, s) => shiftSummary(ctx, openShift(ctx, userId(s), p.openingFloat)),
+    'shift.handover': (p, s) => {
+      const incoming = authenticate(ctx, p.username, p.pin); // wrong PINs and lockout work as at login
+      const r = handOverShift(ctx, userId(s), incoming.id, p.countedCash);
+      s.user = incoming;
+      dayEndBackup(incoming.id);
+      return r;
+    },
+    'audit.list': (p, s) => listAudit(ctx, userId(s), p),
+    'audit.filters': (_p, s) => auditFilters(ctx, userId(s)),
+    'audit.export': (p, s) => exportAudit(ctx, userId(s), p),
     'shift.close': (p, s) => {
       const summary = closeShift(ctx, userId(s), p.countedCash);
       // Day-end backup (plan §J). The shift is already closed; a backup failure only shows in backup status.
-      const key = backup?.getKey();
-      if (backup && key) {
-        try {
-          createBackup(ctx, { dir: backup.dir, masterKey: key, appVersion: backup.appVersion, trigger: 'shift_close', userId: userId(s) });
-        } catch (e) {
-          console.error('[backup] shift-close backup failed', e);
-        }
-      }
+      dayEndBackup(userId(s));
       return summary;
     },
     'cash.move': (p, s) => recordCashMovement(ctx, userId(s), p.kind, p.amount, p.reason),
@@ -165,6 +184,10 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'hold.create': (p, s) => holdBill(ctx, userId(s), p.label, { lines: p.lines, customerId: p.customerId, billKey: p.billKey, cash: p.cash, card: p.card }),
     'hold.list': () => listHeldBills(ctx),
     'hold.recall': (p, s) => hydrateBill(ctx, recallBill(ctx, userId(s), p.id)),
+    'ui.screen': (p) => {
+      ctx.screen = p.screen;
+      return null;
+    },
     'hold.cancel': (p, s) => cancelHeldBill(ctx, userId(s), p.id, p.reason),
     'draft.get': (p, s) => {
       const d = loadDraft(ctx, userId(s), p.kind);
@@ -359,7 +382,11 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     try {
       return { ok: true, data: await (handlers[c] as Handler<Channel>)(parsed.data as never, session) };
     } catch (e) {
-      if (e instanceof DomainError) return { ok: false, code: e.code, message: e.message };
+      if (e instanceof DomainError) {
+        if (e.code === 'PERMISSION_DENIED' || FAILURE_LOGGED.has(c)) appendFailure(ctx, session.user?.id ?? null, c, e.code);
+        return { ok: false, code: e.code, message: e.message };
+      }
+      if (FAILURE_LOGGED.has(c)) appendFailure(ctx, session.user?.id ?? null, c, 'INTERNAL');
       console.error(`[ipc] ${c} failed`, e);
       // Sale finalization is one transaction, so an unexpected error means nothing was saved.
       return {

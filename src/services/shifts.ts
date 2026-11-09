@@ -67,6 +67,25 @@ export function recordCashMovement(ctx: Ctx, userId: number, kind: 'in' | 'out',
   })();
 }
 
+/** One step: counts and closes this cashier's shift and opens the next cashier's, with the counted cash as its float. */
+export function handOverShift(ctx: Ctx, outgoingId: number, incomingId: number, countedCash: number): { closed: ShiftSummary; newShiftId: number } {
+  if (outgoingId === incomingId) throw new DomainError('VALIDATION', 'Hand over to a different cashier');
+  return ctx.db.transaction(() => {
+    const closed = closeShift(ctx, outgoingId, countedCash);
+    const newShiftId = openShift(ctx, incomingId, countedCash);
+    const nameOf = (id: number) => (ctx.db.prepare('SELECT display_name AS n FROM users WHERE id = ?').get(id) as { n: string }).n;
+    appendAudit(ctx, {
+      userId: outgoingId,
+      action: 'shift.handover',
+      entity: 'shift',
+      entityId: closed.shiftId,
+      details: { from: nameOf(outgoingId), to: nameOf(incomingId), expected: closed.expectedCash, counted: countedCash, difference: countedCash - closed.expectedCash, newShiftId },
+      related: { type: 'shift', id: newShiftId },
+    });
+    return { closed, newShiftId };
+  })();
+}
+
 export function shiftSummary(ctx: Ctx, shiftId: number): ShiftSummary {
   const s = ctx.db.prepare('SELECT id, status, opening_float, counted_cash FROM register_shifts WHERE id = ?').get(shiftId) as
     | { id: number; status: 'open' | 'closed'; opening_float: number; counted_cash: number | null }
@@ -159,6 +178,7 @@ export function closeShift(ctx: Ctx, userId: number, countedCash: number): Shift
       });
     }
     appendAudit(ctx, { userId, action: 'shift.close', entity: 'shift', entityId: shiftId, details: { expected: summary.expectedCash, counted: countedCash, diff } });
+    if (diff !== 0) appendAudit(ctx, { userId, action: 'shift.cash_difference', entity: 'shift', entityId: shiftId, details: { expected: summary.expectedCash, counted: countedCash, difference: diff } });
     return shiftSummary(ctx, shiftId);
   })();
 }

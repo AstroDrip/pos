@@ -66,7 +66,9 @@ export function saveStoreDetails(ctx: Ctx, userId: number, details: StoreDetails
   if (!logoOk(clean.logo)) throw new DomainError('VALIDATION', 'The logo must be a PNG or JPEG file of 200 KB or less');
   const write = ctx.db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
   ctx.db.transaction(() => {
+    const old = Object.fromEntries(FIELDS.map((f) => [f, (ctx.db.prepare('SELECT value FROM settings WHERE key = ?').get(KEYS[f]) as { value: string } | undefined)?.value ?? '']));
+    const before = { ...old, logo: old.logo ? '(logo)' : '' };
     for (const f of FIELDS) write.run(KEYS[f], clean[f]);
-    appendAudit(ctx, { userId, action: 'settings.store_details', entity: 'settings', entityId: 0, details: { ...clean, logo: clean.logo ? 'set' : '' } });
+    appendAudit(ctx, { userId, action: 'settings.store_details', entity: 'settings', entityId: 0, details: { ...clean, logo: clean.logo ? 'set' : '' } , before, after: { ...clean, logo: clean.logo ? '(logo)' : '' } });
   })();
 }

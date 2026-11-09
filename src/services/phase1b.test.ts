@@ -227,6 +227,10 @@ describe('CSV import', () => {
 /** Makes a fresh database look like one created by schema v1 (undoes migrations 2 and 3). */
 function rollBackToV1(db: ReturnType<typeof openDatabase>) {
   db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
+  db.exec(`DROP INDEX ix_audit_at; DROP INDEX ix_audit_action; DROP INDEX ix_audit_entity; DROP INDEX ix_audit_user;
+    DELETE FROM role_permissions WHERE permission_code IN ('audit.view', 'audit.export', 'integrity.view');
+    DELETE FROM permissions WHERE code IN ('audit.view', 'audit.export', 'integrity.view');
+    DELETE FROM settings WHERE key = 'device_id';`); // undo migration 13
   db.exec('DROP TABLE bill_drafts;'); // undo migration 12
   // undo migration 11
   db.exec(`DROP TABLE supplier_bill_lines; DROP TABLE supplier_bills; DROP TABLE supplier_items;

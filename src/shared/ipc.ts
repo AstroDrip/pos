@@ -3,6 +3,16 @@ import { z } from 'zod';
 // The only operations the renderer can ask for. Every payload is validated in the main process.
 const int = z.number().int().safe();
 const money = int.nonnegative();
+const auditQuery = z.object({
+  text: z.string().max(100).optional(),
+  userId: int.positive().optional(),
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+  action: z.string().max(60).optional(),
+  entity: z.string().max(60).optional(),
+  offset: int.nonnegative(),
+  limit: int.min(1).max(50_000),
+});
 const key = z.string().regex(/^[\w-]{8,64}$/);
 const vatClass = z.enum(['standard', 'zero', 'exempt', 'out_of_scope']);
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
@@ -103,6 +113,11 @@ export const schemas = {
   'draft.clear': z.object({ kind: z.enum(['sale', 'supplier_bill']) }),
   'draft.discard': z.object({ kind: z.enum(['sale', 'supplier_bill']) }),
   'draft.restored': z.object({ kind: z.enum(['sale', 'supplier_bill']) }),
+  'ui.screen': z.object({ screen: z.string().max(20) }),
+  'shift.handover': z.object({ countedCash: money, username: z.string().min(1).max(40), pin: z.string().max(8) }),
+  'audit.list': auditQuery,
+  'audit.filters': z.null(),
+  'audit.export': auditQuery,
   'hold.list': z.null(),
   'hold.recall': z.object({ id: int.positive() }),
   'hold.cancel': z.object({ id: int.positive(), reason: z.string().min(1).max(200) }),

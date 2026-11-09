@@ -4,6 +4,7 @@ import { Admin, Restore, type FullBackupStatus } from './Admin';
 import { call } from './api';
 import { LangToggle, useI18n } from './i18n';
 import { Accounting } from './Accounting';
+import { Audit } from './Audit';
 import { Expenses } from './Expenses';
 import { Help } from './Help';
 import { HelpContext } from './help/HelpContext';
@@ -21,7 +22,7 @@ import { Stock } from './Stock';
 import { ThemeSelect } from './theme';
 
 type Status = { needsSetup: boolean; user: User | null };
-type Tab = 'sell' | 'refund' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin' | 'help';
+type Tab = 'sell' | 'refund' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin' | 'audit' | 'help';
 
 // Grouped by workflow: till · goods · money · day and settings. A thin separator is drawn between groups.
 const TABS: { id: Tab; label: string; perm?: string; group: number }[] = [
@@ -36,6 +37,7 @@ const TABS: { id: Tab; label: string; perm?: string; group: number }[] = [
   { id: 'reports', label: 'Reports', perm: 'reports.view', group: 3 },
   { id: 'shift', label: 'Shift', group: 4 },
   { id: 'admin', label: 'Admin', perm: 'backup.run', group: 4 },
+  { id: 'audit', label: 'Audit', perm: 'audit.view', group: 4 },
   { id: 'help', label: 'Help', group: 4 }, // every role
 ];
 
@@ -102,6 +104,7 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
     requestAnimationFrame(() => focusEl(el)); // back to the box the cashier was in
   }, []);
   const [customerRequest, setCustomerRequest] = useState<{ id?: number; n: number }>({ n: 0 });
+  const [refundRequest, setRefundRequest] = useState<{ invoice?: string; n: number }>({ n: 0 });
   const openCustomers = useCallback((id?: number) => {
     setCustomerRequest((r) => ({ id, n: r.n + 1 }));
     show('customers');
@@ -110,6 +113,7 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
     setCustomerRequest({ n: 0 });
     show(screen);
   }, [show]);
+  useEffect(() => void call('ui.screen', { screen: tab }).catch(() => undefined), [tab]); // noted on audit records
   const can = (p: string) => user.permissions.includes(p);
   const pane = (id: Tab, node: React.ReactNode) => {
     const perm = TABS.find((x) => x.id === id)?.perm;
@@ -138,7 +142,7 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
       </TopBar>
       {can('reports.view') && <HealthBanner />}
       {pane('sell', <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} canCreateCustomer={can('customer.manage')} />)}
-      {pane('refund', <Refund canApprove={can('sale.refund')} />)}
+      {pane('refund', <Refund canApprove={can('sale.refund')} request={refundRequest} />)}
       {pane('stock', <Stock can={can} />)}
       {pane('products', <Products />)}
       {pane('reports', <Reports />)}
@@ -146,8 +150,9 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
       {pane('purchases', <Purchases can={can} />)}
       {pane('expenses', <Expenses can={can} />)}
       {pane('accounting', <Accounting />)}
-      {pane('shift', <Shift can={can} />)}
+      {pane('shift', <Shift can={can} onUserChange={onAuthChange} />)}
       {pane('admin', <Admin can={can} />)}
+      {pane('audit', <Audit can={can} openCustomer={(id) => openCustomers(id)} openSale={(invoice) => { setRefundRequest((r) => ({ invoice, n: r.n + 1 })); show('refund'); }} />)}
       {pane('help', <Help />)}
       {helpAt && <HelpOverlay article={helpAt} onClose={closeHelp} />}
       </KeyboardProvider>

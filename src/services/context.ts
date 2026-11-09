@@ -6,6 +6,8 @@ export interface Ctx {
   db: Db;
   now: () => string;
   uuid: () => string;
+  /** The tab on screen, noted on audit records. */
+  screen?: string | null;
 }
 
 export function makeCtx(db: Db): Ctx {
