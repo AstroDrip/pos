@@ -3,7 +3,8 @@ import { formatQty, formatSar } from '../core/money';
 import { storeDateTime, storeDay } from '../core/store-time';
 import type { AdjustmentRow, CashierActivity, RefundRow, SalesSummary, VoidRow } from '../services/reports';
 import { call } from './api';
-import { useReturnTick } from './TabHost';
+import { useRemembered, useReturnTick } from './TabHost';
+import { validDay } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 
@@ -12,8 +13,8 @@ const today = () => storeDay(new Date().toISOString());
 export function Reports() {
   const back = useReturnTick();
   const { t } = useI18n();
-  const [from, setFrom] = useState(today());
-  const [to, setTo] = useState(today());
+  const [from, setFrom] = useRemembered('reports', 'from', today(), validDay);
+  const [to, setTo] = useRemembered('reports', 'to', today(), validDay);
   const [r, setR] = useState<SalesSummary | null>(null);
   const [voids, setVoids] = useState<VoidRow[]>([]);
   const [cashiers, setCashiers] = useState<CashierActivity[]>([]);

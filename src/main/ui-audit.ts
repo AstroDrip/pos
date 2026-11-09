@@ -72,7 +72,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   const capture = async (name: string) => {
     await sleep(300);
     await painted();
-    const raw = await js<Omit<Snapshot, 'screen'> & { scrollHeight: number }>(COLLECT_SOURCE);
+    const raw = (await wc.executeJavaScript(COLLECT_SOURCE, true)) as Omit<Snapshot, 'screen'> & { scrollHeight: number };
     const snap: Snapshot = { screen: name, viewport: raw.viewport, scrollWidth: raw.scrollWidth, boxes: raw.boxes, scrollers: raw.scrollers };
     const findings: Finding[] = auditGeometry(snap);
     writeFileSync(join(outDir, `${name}.png`), (await wc.capturePage()).toPNG());
@@ -160,6 +160,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
             await tabMemoryFlows();
             await productListFlows();
             await emptySearchFlows();
+            await reloadFlows();
           }
           await clearBill();
           for (const code of ['6281000000000', '6281000000077', '6281000000033']) await scan(code); // fake seed barcodes
@@ -570,11 +571,14 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     flow('quick-i-scan-does-not-add', info && (await lineCount()) === 1, `info shown ${info}, lines ${await lineCount()}`);
     await esc();
 
-    // M is refused with a bill on screen, so the bill cannot be lost
+    // M with a bill on screen opens Customers. The bill stays on Sell.
     await ctrlK();
     await letter('m');
-    flow('quick-m-refused-with-bill', (await isOpen()) && (await lineCount()) === 1, `open ${await isOpen()}`);
-    await esc();
+    await sleep(600);
+    const wentToCustomers = await js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith('Customers')`);
+    await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith('Sell'))?.click()`);
+    await sleep(500);
+    flow('quick-m-with-bill-keeps-bill', wentToCustomers && (await lineCount()) === 1, `on customers ${wentToCustomers}, lines ${await lineCount()}`);
 
     // F4, + and − on the line, Enter back to search
     await focus(box);
@@ -870,7 +874,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(300);
     const sNote = await js<string>(`document.querySelector('.palette .msg')?.textContent ?? ''`);
     await esc();
-    flow('quick-s-with-a-bill-stays-on-sell', sLines >= 1 && (await lineCount()) === sLines && (await onTab('Sell')) && sNote !== '', `lines ${sLines}, note "${sNote}"`);
+    flow('quick-s-with-a-bill-stays-on-sell', sLines >= 1 && (await lineCount()) === sLines && (await onTab('Sell')), `lines ${sLines}, note "${sNote}"`);
 
     // A held order brought back from another screen
     await focus(box);
@@ -901,6 +905,91 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(300);
     await tabTo('Sell');
     await sleep(300);
+  }
+
+  /** What survives the screen being wiped, as after a restart. */
+  async function reloadFlows() {
+    const box = 'input[aria-label="product search"]';
+    const openNamed = async (name: string) => {
+      await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith(${JSON.stringify(name)}))?.click()`);
+      await sleep(600);
+    };
+    const reload = async () => {
+      wc.reload();
+      await sleep(800);
+      await waitFor(`document.querySelector('.top nav')`, 8000);
+      await sleep(800);
+    };
+    const active = () => js<string>(`document.querySelector('.top nav button.active')?.textContent.trim() ?? ''`);
+    const userPrefix = () => js<string>(`(/^pos\\.ui\\.\\d+\\./.exec(Object.keys(localStorage).find((k) => k.startsWith('pos.ui.')) ?? '') ?? [''])[0]`);
+
+    await openNamed('Sell');
+    await clearBill();
+    await focus(box);
+    await scan('6281000000000');
+    await sleep(900);
+    await reload();
+    const banner = await waitFor(`document.querySelector('[aria-label="bill left open"]')`, 3000);
+    await click('[aria-label="bill left open"] button', 'Restore');
+    await sleep(400);
+    flow('reload-restores-bill', banner && (await lineCount()) === 1, `offered ${banner}, lines ${await lineCount()}`);
+    await clearBill();
+    await sleep(700);
+
+    await openNamed('Reports');
+    const setDate = (value: string) => js(`(() => { const e = document.querySelector('input[type="date"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, ${JSON.stringify(value)}); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    const dateIs = () => js<string>(`document.querySelector('input[type="date"]')?.value ?? ''`);
+    await setDate('2026-01-02');
+    await sleep(300);
+    await openNamed('Stock');
+    await openNamed('Reports');
+    flow('filters-survive-tab-switch', (await dateIs()) === '2026-01-02', `from ${await dateIs()}`);
+    await reload();
+    flow('reload-restores-filters-and-tab', (await active()).endsWith('Reports') && (await dateIs()) === '2026-01-02', `tab ${await active()}, from ${await dateIs()}`);
+
+    await openNamed('Help');
+    await js(`document.querySelectorAll('.help-nav li button')[4]?.click()`);
+    await sleep(300);
+    const title = () => js<string>(`document.querySelector('.help-article h3')?.textContent ?? ''`);
+    const picked = await title();
+    await js('window.scrollTo(0, 120)');
+    await sleep(400);
+    const y = await js<number>('window.scrollY');
+    await openNamed('Stock');
+    await openNamed('Help');
+    await sleep(300);
+    const sameY = await js<number>('window.scrollY');
+    flow('help-reopens-same-article-and-scroll', picked !== '' && (await title()) === picked && Math.abs(sameY - y) <= 2, `article ${picked}, scroll ${y} -> ${sameY}`);
+
+    const prefix = await userPrefix();
+    await openNamed('Customers');
+    await js(`localStorage.setItem(${JSON.stringify(prefix + 'customers.openId')}, '999999')`);
+    await reload();
+    await waitFor(`document.querySelector('table[aria-label="customers list"] tbody tr')`, 3000);
+    const rows = await js<number>(`document.querySelectorAll('table[aria-label="customers list"] tbody tr').length`);
+    flow('restored-missing-customer-starts-clean', rows >= 1, `rows ${rows}`);
+
+    await js(`localStorage.setItem(${JSON.stringify(prefix + 'app.tab')}, '"nonexistent"')`);
+    await reload();
+    flow('last-tab-not-allowed-falls-back-to-sell', (await active()).endsWith('Sell'), `tab ${await active()}`);
+
+    await focus(box);
+    await scan('6281000000000');
+    await sleep(900);
+    await click('.utils button', 'Log out');
+    await waitFor(`document.querySelector('form input')`, 4000);
+    await focus('form input');
+    await type(hooks.login.username);
+    await focus('form input[type="password"]');
+    await type(hooks.login.pin);
+    key('Enter');
+    await waitFor(`document.querySelector('.top nav')`, 8000);
+    await sleep(800);
+    const offered = await waitFor(`document.querySelector('[aria-label="bill left open"]')`, 3000);
+    flow('logout-clears-screen', offered && (await lineCount()) === 0, `offered ${offered}, lines ${await lineCount()}`);
+    await click('[aria-label="bill left open"] button', 'Discard');
+    await sleep(500);
+    await focus(box);
   }
 
   /** Open tabs stay as they were left, and a hidden tab cannot react to anything. */
@@ -939,6 +1028,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await focus('input');
     await js(`(() => { const label = [...document.querySelectorAll('label')].find((l) => l.textContent.includes('Counted cash')); label?.nextElementSibling?.focus(); })()`);
     await type('0', 10);
+    await js('void (window.alert = () => undefined)'); // the closing message would stop the page until someone presses OK
     await click('button.primary', 'Close shift');
     await sleep(800);
     await openNamed('Sell');

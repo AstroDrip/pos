@@ -51,6 +51,8 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
   const [lastSaleId, setLastSaleId] = useState<number | null>(null);
   const [held, setHeld] = useState<HeldBill[]>([]);
   const [cancelling, setCancelling] = useState<{ id: number; reason: string } | null>(null);
+  const [leftOpen, setLeftOpen] = useState<HydratedBill | null>(null); // a bill from before the app stopped
+  const draftChecked = useRef(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [approver, setApprover] = useState({ username: '', pin: '' });
   const [creditApprover, setCreditApprover] = useState({ username: '', pin: '' });
@@ -118,6 +120,20 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
     void call<ShiftSummary | null>('shift.current').then(setShift);
     void loadHeld();
   }, []);
+  useEffect(() => void call<{ bill: HydratedBill } | null>('draft.get', { kind: 'sale' }).then((d) => { draftChecked.current = true; setLeftOpen(d?.bill ?? null); }, () => { draftChecked.current = true; }), []);
+  // Keeps the bill in the database shortly after each change, so a crash or restart cannot lose it.
+  useEffect(() => {
+    if (leftOpen || !draftChecked.current) return undefined; // do not overwrite it before the cashier has chosen
+    const h = setTimeout(() => {
+      if (lines.length === 0) return void call('draft.clear', { kind: 'sale' }).catch(() => undefined);
+      const typed = (s: string) => (/^\d{0,9}(\.\d{0,2})?$/.test(s.trim()) ? s.trim() : '');
+      void call('draft.save', {
+        kind: 'sale',
+        json: JSON.stringify({ lines: lines.map((l) => ({ productId: l.product.id, qty: l.qty, seenPrice: l.product.priceIncl, discount: l.discount, ...(l.scanCode ? { scanCode: l.scanCode } : {}) })), customerId: customer?.id, billKey: billKey.current, cash: typed(cash), card: typed(cardPart) }),
+      }).catch(() => undefined); // only a safety net: the bill on screen is unaffected
+    }, 400);
+    return () => clearTimeout(h);
+  }, [lines, customer, cash, cardPart, leftOpen]);
   useOnReturn(() => {
     void call<ShiftSummary | null>('shift.current').then(setShift); // the shift may have been closed on the Shift tab
     void loadHeld();
@@ -626,6 +642,25 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
           <div className="undo-bar" role="status">
             <span>{t('{0} removed from the bill.', lang === 'ar' ? undo.removed.line.product.nameAr : undo.removed.line.product.nameEn)}</span>
             <button type="button" onClick={undoRemoval}>{t('Undo')}</button>
+          </div>
+        )}
+        {leftOpen && (
+          <div className="msg warn" role="group" aria-label="bill left open">
+            {t('A bill was left open.')}{' '}
+            <button
+              disabled={lines.length > 0}
+              onClick={() => {
+                restoreBill(leftOpen);
+                setLeftOpen(null);
+                void call('draft.restored', { kind: 'sale' }).catch(() => undefined);
+              }}
+            >{t('Restore')}</button>{' '}
+            <button
+              onClick={() => {
+                setLeftOpen(null);
+                void call('draft.discard', { kind: 'sale' }).catch(() => undefined);
+              }}
+            >{t('Discard')}</button>
           </div>
         )}
         {held.length > 0 && (

@@ -28,7 +28,7 @@ const child = spawn(electronBin, ['.'], {
   stdio: 'inherit',
   env: { ...process.env, POS_USER_DATA: dir, POS_RECEIPT_TO_FILE: join(dir, 'r.html'), POS_UI_AUDIT: out, POS_UI_AUDIT_LOGIN: 'owner:4321', POS_NO_RELAUNCH: '1', ...(demo ? { POS_UI_AUDIT_DEMO: '1' } : {}) },
 });
-const timer = setTimeout(() => { console.error('ui-audit: timed out after 10 minutes'); child.kill(); }, 600_000);
+const timer = setTimeout(() => { console.error('ui-audit: timed out after 20 minutes'); child.kill(); }, 1_200_000);
 child.on('exit', (code) => {
   clearTimeout(timer);
   rmSync(dir, { recursive: true, force: true });

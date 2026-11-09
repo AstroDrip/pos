@@ -3,8 +3,9 @@ import { formatSar, parseSar } from '../core/money';
 import { storeDateTime } from '../core/store-time';
 import type { FinStatus } from '../core/status';
 import type { ArAgeingRow, CreditInvoice, CustomerAccount, StatementLine } from '../services/credit';
-import { call } from './api';
-import { useReturnTick } from './TabHost';
+import { call, type ApiError } from './api';
+import { useRemembered, useReturnTick } from './TabHost';
+import { validId, validOneOf, validText } from './remember';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { useSuggest } from './useSuggest';
@@ -28,9 +29,9 @@ const FILTERS: (FinStatus | 'all' | 'open')[] = ['all', 'open', 'paid', 'partial
 export function Customers({ can, request }: { can: (p: string) => boolean; request?: { id?: number; n: number } }) {
   const back = useReturnTick();
   const { t } = useI18n();
-  const [text, setText] = useState('');
-  const [openId, setOpenId] = useState<number | null>(null);
-  const [view, setView] = useState<'accounts' | 'ageing'>('accounts');
+  const [text, setText] = useRemembered('customers', 'search', '', validText);
+  const [openId, setOpenId] = useRemembered<number | null>('customers', 'openId', null, validId);
+  const [view, setView] = useRemembered<'accounts' | 'ageing'>('customers', 'view', 'accounts', validOneOf(['accounts', 'ageing']));
   const [newCust, setNewCust] = useState({ name: '', phone: '' });
   const [msg, setMsg] = useState<Msg>(null);
   useEffect(() => {
@@ -120,7 +121,7 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
   const [st, setSt] = useState<{ lines: StatementLine[]; balance: number } | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
-  const load = () => call<CustomerAccount>('credit.account', { customerId: id }).then(setA, (e: Error) => setMsg({ kind: 'error', text: t(e.message) }));
+  const load = () => call<CustomerAccount>('credit.account', { customerId: id }).then(setA, (e: ApiError) => (e.code === 'NOT_FOUND' || e.code === 'PERMISSION_DENIED') ? onClose() : setMsg({ kind: 'error', text: t(e.message) }));
   useEffect(() => void load(), [id, back]);
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     if (busy) return;

@@ -3,7 +3,8 @@ import { formatSar, parseSar, roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, VatClass } from '../services/expenses';
 import { call } from './api';
-import { useReturnTick } from './TabHost';
+import { useRemembered, useReturnTick } from './TabHost';
+import { validDay, validOneOf, validText } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 import { HelpLink } from './HelpLink';
@@ -30,12 +31,18 @@ const STATES = ['draft', 'unpaid', 'partial', 'overdue', 'paid', 'cancelled', 'r
 const VAT: VatClass[] = ['standard', 'zero', 'exempt', 'out_of_scope'];
 const VAT_LABEL: Record<VatClass, string> = { standard: 'Standard-rated (15%)', zero: 'Zero-rated', exempt: 'Exempt', out_of_scope: 'Out of scope / no VAT' };
 
+const validRange = (v: unknown): v is [string, string] => Array.isArray(v) && v.length === 2 && validDay(v[0]) && validDay(v[1]);
+const validFilter = (v: unknown): v is { categoryId: number; payState: string; payee: string } => {
+  const f = v as { categoryId?: unknown; payState?: unknown; payee?: unknown } | null;
+  return !!f && Number.isInteger(f.categoryId) && validText(f.payState) && validText(f.payee);
+};
+
 export function Expenses({ can }: { can: (p: string) => boolean }) {
   const back = useReturnTick();
   const { t, lang } = useI18n();
-  const [range, setRange] = useState<[string, string]>(monthRange(0));
-  const [preset, setPreset] = useState<'this' | 'prev' | 'custom'>('this');
-  const [filter, setFilter] = useState({ categoryId: 0, payState: '', payee: '' });
+  const [range, setRange] = useRemembered<[string, string]>('expenses', 'range', monthRange(0), validRange);
+  const [preset, setPreset] = useRemembered<'this' | 'prev' | 'custom'>('expenses', 'preset', 'this', validOneOf(['this', 'prev', 'custom']));
+  const [filter, setFilter] = useRemembered('expenses', 'filter', { categoryId: 0, payState: '', payee: '' }, validFilter);
   const [cats, setCats] = useState<ExpenseCategory[]>([]);
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [sum, setSum] = useState<ExpenseSummary | null>(null);

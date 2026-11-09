@@ -9,7 +9,8 @@ import { createProduct, getAliases, itemInfo, listProducts, lookup, saveScaleLay
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit, verifyAuditChain } from '../services/audit';
-import { cancelHeldBill, holdBill, hydrateBill, listHeldBills, recallBill, recordRemoval } from '../services/held-bills';
+import { clearDraft, discardDraft, loadDraft, markDraftRestored, saveDraft } from '../services/drafts';
+import { cancelHeldBill, holdBill, hydrateBill, listHeldBills, payloadSchema, recallBill, recordRemoval } from '../services/held-bills';
 import { dryRunProducts, dryRunSuppliers, importProducts, importSuppliers } from '../services/import';
 import { receiveGoods } from '../services/inventory';
 import { createCustomer, createSupplier, findCustomers, listSuppliers, updateSupplier } from '../services/parties';
@@ -165,6 +166,15 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
     'hold.list': () => listHeldBills(ctx),
     'hold.recall': (p, s) => hydrateBill(ctx, recallBill(ctx, userId(s), p.id)),
     'hold.cancel': (p, s) => cancelHeldBill(ctx, userId(s), p.id, p.reason),
+    'draft.get': (p, s) => {
+      const d = loadDraft(ctx, userId(s), p.kind);
+      if (!d) return null;
+      return p.kind === 'sale' ? { bill: hydrateBill(ctx, payloadSchema.parse(JSON.parse(d.json))) } : { json: d.json };
+    },
+    'draft.save': (p, s) => saveDraft(ctx, userId(s), p.kind, p.json),
+    'draft.clear': (p, s) => clearDraft(ctx, userId(s), p.kind),
+    'draft.discard': (p, s) => discardDraft(ctx, userId(s), p.kind),
+    'draft.restored': (p, s) => markDraftRestored(ctx, userId(s), p.kind),
     'supplier.list': () => listSuppliers(ctx),
     'supplier.create': (p, s) => createSupplier(ctx, userId(s), p),
     'customer.find': (p) => findCustomers(ctx, p.text),

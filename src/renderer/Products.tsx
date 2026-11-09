@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { formatSar, parseSar } from '../core/money';
 import type { Product } from '../services/catalog';
 import { call } from './api';
-import { useReturnTick } from './TabHost';
+import { useRemembered, useReturnTick } from './TabHost';
+import { validOneOf, validText } from './remember';
 import { PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { ProductName, useI18n } from './i18n';
@@ -16,11 +17,11 @@ export function Products() {
   const back = useReturnTick();
   const { t } = useI18n();
   const [form, setForm] = useState(empty);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useRemembered('products', 'search', '', validText);
   const [editing, setEditing] = useState<Product | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  const [status, setStatus] = useState<Status>('active');
+  const [status, setStatus] = useRemembered<Status>('products', 'status', 'active', validOneOf(['active', 'inactive', 'all']));
   const [browse, setBrowse] = useState<{ items: Product[]; total: number }>({ items: [], total: 0 });
   const seq = useRef(0);
   const { items: found, refresh } = useSuggest<Product>(status === 'active' ? search : '', (q) => call<Product[]>('catalog.search', { text: q }));

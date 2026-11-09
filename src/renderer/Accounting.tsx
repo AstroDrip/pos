@@ -4,7 +4,8 @@ import { storeDay } from '../core/store-time';
 import type { BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
 import type { VatSummary } from '../services/vat-report';
 import { call } from './api';
-import { useReturnTick } from './TabHost';
+import { useRemembered, useReturnTick } from './TabHost';
+import { validDay, validText } from './remember';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
 
@@ -16,13 +17,13 @@ type Gl = { account: { code: string; nameEn: string }; opening: number; closing:
 export function Accounting() {
   const back = useReturnTick();
   const { t, lang } = useI18n();
-  const [from, setFrom] = useState(`${todayDay().slice(0, 7)}-01`);
-  const [to, setTo] = useState(todayDay());
+  const [from, setFrom] = useRemembered('accounting', 'from', `${todayDay().slice(0, 7)}-01`, validDay);
+  const [to, setTo] = useRemembered('accounting', 'to', todayDay(), validDay);
   const [k, setK] = useState<OwnerKpis | null>(null);
   const [pl, setPl] = useState<ProfitAndLoss | null>(null);
   const [bs, setBs] = useState<BalanceSheet | null>(null);
   const [tb, setTb] = useState<Tb | null>(null);
-  const [glCode, setGlCode] = useState('1010');
+  const [glCode, setGlCode] = useRemembered('accounting', 'account', '1010', validText);
   const [gl, setGl] = useState<Gl | null>(null);
   const [vat, setVat] = useState<VatSummary | null>(null);
   const [error, setError] = useState('');

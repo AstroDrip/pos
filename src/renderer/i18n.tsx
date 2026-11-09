@@ -150,6 +150,10 @@ const AR: Record<string, string> = {
   "No matching customers": "لا يوجد عملاء مطابقون",
   "Add new customer": "إضافة عميل جديد",
   "{0} = customer": "{0} = العميل",
+  // master prompt A
+  "A bill was left open.": "توجد فاتورة تُركت مفتوحة.",
+  "Restore": "استعادة",
+  "Discard": "تجاهل",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

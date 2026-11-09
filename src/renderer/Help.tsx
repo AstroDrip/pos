@@ -5,6 +5,8 @@ import { DIRECT_SHORTCUTS, QUICK_ACTIONS } from './keyboard-registry';
 import { useBindings, useShortcuts } from './Keyboard';
 import { useI18n } from './i18n';
 import { PageHeader } from './PageHeader';
+import { validOneOf, validText } from './remember';
+import { useRemembered } from './TabHost';
 
 const SIZE_KEY = 'pos.helpSize';
 const readSize = () => {
@@ -19,11 +21,22 @@ const readSize = () => {
 /** Help Centre: step-by-step guides for every feature (English for now), searchable from the first letter. */
 export function Help({ initial }: { initial?: string }) {
   const { t, lang } = useI18n();
-  const [text, setText] = useState('');
-  const [current, setCurrent] = useState<string>(initial ?? HELP_ARTICLES[0]!.id);
+  // The Help tab remembers its place. Help opened over a screen (F1 or a "?" link) always shows what was asked for.
+  const [savedText, saveText] = useRemembered('help', 'search', '', validText);
+  const [savedArticle, saveArticle] = useRemembered('help', 'article', HELP_ARTICLES[0]!.id, validOneOf(HELP_ARTICLES.map((a) => a.id)));
+  const [text, setTextState] = useState(initial ? '' : savedText);
+  const [current, setCurrentState] = useState<string>(initial ?? savedArticle);
+  const setText = (v: string) => {
+    setTextState(v);
+    if (!initial) saveText(v);
+  };
+  const setCurrent = (id: string) => {
+    setCurrentState(id);
+    if (!initial) saveArticle(id);
+  };
   const [size, setSize] = useState(readSize);
   useEffect(() => {
-    if (initial) setCurrent(initial);
+    if (initial) setCurrentState(initial);
   }, [initial]);
   useEffect(() => {
     try {
@@ -53,7 +66,7 @@ export function Help({ initial }: { initial?: string }) {
       />
       {lang === 'ar' && <p className="msg warn">{t('Help is available in English for now.')}</p>}
       <div className="help-layout" lang="en" dir="ltr">
-        <nav className="help-nav" aria-label="help topics">
+        <nav className="help-nav" aria-label="help topics" data-keep-scroll="nav">
           <input data-kb-search="help" aria-label="help search" placeholder="Search help" value={text} onChange={(e) => setText(e.target.value)} />
           {text.trim() ? (
             <ul>
@@ -71,7 +84,7 @@ export function Help({ initial }: { initial?: string }) {
             ))
           )}
         </nav>
-        <article className="help-article">
+        <article className="help-article" data-keep-scroll="article">
           <p className="help-section">{HELP_SECTIONS.find((s) => s.id === article.section)?.title}</p>
           <h3>{article.title}</h3>
           <p><strong>What this does.</strong> {article.what}</p>

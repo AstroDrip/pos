@@ -6,7 +6,8 @@ import type { Supplier } from '../services/parties';
 import type { AgeingRow, PastReturn, StatementLine, SupplierAccount, UninvoicedGrn } from '../services/purchasing';
 import { StatusBadge, StatusLegend } from './StatusBadge';
 import { call } from './api';
-import { useReturnTick } from './TabHost';
+import { useRemembered, useReturnTick } from './TabHost';
+import { validOneOf, validSupplierId } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { focusWhenReady, useScreenKeys } from './Keyboard';
@@ -24,13 +25,14 @@ const sar = (s: string) => {
     return NaN;
   }
 };
-type Section = 'bill' | 'invoice' | 'return' | 'pay' | 'ageing' | 'register' | 'saved' | 'reports';
+const SECTIONS_ALL = ['bill', 'invoice', 'return', 'pay', 'ageing', 'register', 'saved', 'reports'] as const;
+type Section = (typeof SECTIONS_ALL)[number];
 
 /** Purchasing (plan Phase 4). Posting rules are provisional until the accountant approves. */
 export function Purchases({ can }: { can: (p: string) => boolean }) {
   const back = useReturnTick();
   const { t } = useI18n();
-  const [section, setSection] = useState<Section>(can('purchase.manage') ? 'bill' : 'pay');
+  const [section, setSection] = useRemembered<Section>('purchases', 'section', can('purchase.manage') ? 'bill' : 'pay', validOneOf(SECTIONS_ALL));
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   useEffect(() => void call<Supplier[]>('supplier.list').then(setSuppliers), [back]);
   const [supplierRequest, setSupplierRequest] = useState<{ id: number; n: number }>({ id: 0, n: 0 });
@@ -60,6 +62,9 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
     { id: 'saved', label: 'Saved bills', show: true },
     { id: 'reports', label: 'Purchase reports', show: true },
   ];
+  useEffect(() => {
+    if (!tabs.some((x) => x.id === section && x.show)) setSection(can('purchase.manage') ? 'bill' : 'pay'); // a remembered section this user cannot open
+  }, []);
   return (
     <div className="page">
       <PageHeader
@@ -99,7 +104,7 @@ function SupplierSelect({ suppliers, value, onChange }: { suppliers: Supplier[];
 function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
   const back = useReturnTick();
   const { t } = useI18n();
-  const [supplierId, setSupplierId] = useState(0);
+  const [supplierId, setSupplierId] = useRemembered('purchases', 'invoiceSupplier', 0, validSupplierId);
   const [grns, setGrns] = useState<UninvoicedGrn[]>([]);
   const [picked, setPicked] = useState<number[]>([]);
   const [f, setF] = useState({ no: '', vatNo: '', date: todayDay(), due: '', net: '', vat: '', recoverable: true, reason: '', notes: '', noDue: false, arrangement: '', payNow: '', payMethod: 'bank' as 'bank' | 'till' });
@@ -113,7 +118,13 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
     const s = suppliers.find((x) => x.id === supplierId);
     setF((p) => ({ ...p, vatNo: s?.vatNumber ?? '' }));
     void load(supplierId); // no supplier chosen: everything still waiting for an invoice
-  }, [supplierId, back]);
+  }, [supplierId]);
+  useEffect(() => {
+    if (back) void load(supplierId); // shown again: the list may have changed, but what was ticked stays
+  }, [back]);
+  useEffect(() => {
+    if (supplierId && suppliers.length && !suppliers.some((s) => s.id === supplierId)) setSupplierId(0); // a remembered supplier that no longer exists
+  }, [suppliers, supplierId]);
   // A delivery note was typed in full: its net and VAT fill the invoice boxes. They can still be changed.
   useEffect(() => {
     const chosen = grns.filter((g) => picked.includes(g.grnId));

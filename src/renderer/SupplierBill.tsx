@@ -92,11 +92,34 @@ function toLine(r: Row): BillLineInput | null {
 
 export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (p: string) => boolean }) {
   const { t, lang } = useI18n();
-  const draft = useRef(readDraft());
-  const [head, setHead] = useState<Head>(draft.current?.head ?? blankHead());
-  const [paper, setPaper] = useState<Paper>(draft.current?.paper ?? blankPaper());
-  const [rows, setRows] = useState<Row[]>(draft.current?.rows ?? []);
-  const requestKey = useRef(draft.current?.key ?? crypto.randomUUID());
+  const [head, setHead] = useState<Head>(blankHead());
+  const [paper, setPaper] = useState<Paper>(blankPaper());
+  const [rows, setRows] = useState<Row[]>([]);
+  const requestKey = useRef<string>(crypto.randomUUID());
+  const draftLoaded = useRef(false);
+  useEffect(() => {
+    void (async () => {
+      let d: Draft | null;
+      try {
+        const saved = await call<{ json: string } | null>('draft.get', { kind: 'supplier_bill' });
+        d = saved ? (JSON.parse(saved.json) as Draft) : readDraft(); // a draft from before drafts were kept per user
+      } catch {
+        d = readDraft();
+      }
+      try {
+        localStorage.removeItem(DRAFT);
+      } catch {
+        // nothing to clear
+      }
+      if (d) {
+        setHead(d.head);
+        setPaper(d.paper);
+        setRows(d.rows);
+        requestKey.current = d.key;
+      }
+      draftLoaded.current = true;
+    })();
+  }, []);
   const [items, setItems] = useState<SupplierItem[]>([]);
   const [search, setSearch] = useState('');
   const [msg, setMsg] = useState<Msg>(null);
@@ -115,12 +138,12 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
   }, [head.supplierId]);
 
   useEffect(() => {
-    try {
-      if (head.docNo || rows.length) localStorage.setItem(DRAFT, JSON.stringify({ key: requestKey.current, head, paper, rows }));
-      else localStorage.removeItem(DRAFT);
-    } catch {
-      // the draft is only a convenience
-    }
+    if (!draftLoaded.current) return undefined;
+    const h = setTimeout(() => {
+      if (head.docNo || rows.length) void call('draft.save', { kind: 'supplier_bill', json: JSON.stringify({ key: requestKey.current, head, paper, rows }) }).catch(() => undefined);
+      else void call('draft.clear', { kind: 'supplier_bill' }).catch(() => undefined);
+    }, 400);
+    return () => clearTimeout(h);
   }, [head, paper, rows]);
 
   const addRow = async (product: Product, known?: SupplierItem, code = '') => {
@@ -207,11 +230,7 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
 
   const startOver = () => {
     if (!window.confirm(t('Clear this bill and start over?'))) return;
-    try {
-      localStorage.removeItem(DRAFT);
-    } catch {
-      // nothing to clear
-    }
+    void call('draft.clear', { kind: 'supplier_bill' }).catch(() => undefined);
     requestKey.current = crypto.randomUUID();
     setHead(blankHead());
     setPaper(blankPaper());
@@ -235,11 +254,7 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
         lines: rows.map((row) => ({ ...(toLine(row) as BillLineInput), productId: row.product.id, supplierCode: row.code || undefined, billText: row.billText || undefined, tariffCode: row.tariff || undefined, packName: row.packName, pageNo: Math.max(1, Number(row.page) || 1) })),
       });
       setMsg({ kind: 'ok', text: r.pinvNo ? t('Saved. Goods receipt {0}, invoice {1}.', r.grnNo, r.pinvNo) : t('Saved. Goods receipt {0}. Nothing is owed until the invoice comes.', r.grnNo) });
-      try {
-        localStorage.removeItem(DRAFT);
-      } catch {
-        // nothing to clear
-      }
+      void call('draft.clear', { kind: 'supplier_bill' }).catch(() => undefined);
       requestKey.current = crypto.randomUUID();
       setHead(blankHead());
       setPaper(blankPaper());

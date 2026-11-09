@@ -8,7 +8,8 @@ import { Expenses } from './Expenses';
 import { Help } from './Help';
 import { HelpContext } from './help/HelpContext';
 import { KeyboardProvider, focusEl } from './Keyboard';
-import { TabPane, UserProvider } from './TabHost';
+import { validOneOf } from './remember';
+import { TabPane, UserProvider, useRemembered } from './TabHost';
 import { Customers } from './Customers';
 import { Products } from './Products';
 import { Purchases } from './Purchases';
@@ -77,12 +78,16 @@ export function App() {
 /** Everything a logged-in user sees. Keyed by user: logging out or changing cashier destroys all of it. */
 function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => void }) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<Tab>('sell');
-  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>(['sell']));
+  const allowed = TABS.filter((x) => !x.perm || user.permissions.includes(x.perm)).map((x) => x.id);
+  const [lastTab, saveTab] = useRemembered<Tab>('app', 'tab', 'sell', validOneOf(allowed)); // only a tab this user may open
+  const [tab, setTab] = useState<Tab>(lastTab);
+  // Sell is always open underneath, so it can offer a bill that was left open.
+  const [visited, setVisited] = useState<ReadonlySet<Tab>>(() => new Set<Tab>(['sell', lastTab]));
   const show = useCallback((screen: Tab) => {
     setVisited((v) => (v.has(screen) ? v : new Set(v).add(screen)));
     setTab(screen);
-  }, []);
+    saveTab(screen);
+  }, [saveTab]);
   // A "?" link opens help OVER the current screen, so a bill or a half-filled form is never lost.
   const [helpAt, setHelpAt] = useState<string | null>(null);
   const helpReturn = useRef<HTMLElement | null>(null);

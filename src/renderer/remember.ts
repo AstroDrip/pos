@@ -29,3 +29,15 @@ export function writeMemory(store: StorageLike, k: string, v: unknown): void {
     // only a convenience: a full or blocked store must never stop the till
   }
 }
+
+export const validText = (v: unknown): v is string => typeof v === 'string' && v.length <= 200;
+export const validBool = (v: unknown): v is boolean => typeof v === 'boolean';
+export const validId = (v: unknown): v is number | null => v === null || (Number.isInteger(v) && (v as number) > 0);
+export const validSupplierId = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0;
+export function validDay(v: unknown): v is string {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === v;
+}
+export const validOneOf = <T extends string>(allowed: readonly T[]) => (v: unknown): v is T => typeof v === 'string' && (allowed as readonly string[]).includes(v);
+export const validPositions = (v: unknown): v is Record<string, number> => typeof v === 'object' && v !== null && Object.values(v).every((n) => typeof n === 'number');
