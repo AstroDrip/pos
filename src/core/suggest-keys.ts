@@ -28,3 +28,8 @@ export function enterAction(s: { text: string; itemsFor: string; loading: boolea
   const codeLike = /\d/.test(q) && /^[0-9A-Za-z-]+$/.test(q);
   return codeLike && !s.navigated ? 'code' : 'pick';
 }
+
+/** Enter in a customer box: only a row the cashier highlighted, from the list that answers exactly this text. */
+export function customerEnter(s: { text: string; itemsFor: string; loading: boolean; open: boolean; active: number }): boolean {
+  return s.open && s.active >= 0 && !s.loading && s.itemsFor === s.text.trim();
+}

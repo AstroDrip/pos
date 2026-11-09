@@ -141,6 +141,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
             await shortcutFlows();
             await rebindFlows();
             await billFlows();
+            await sellStepFlows();
             await productListFlows();
             await emptySearchFlows();
           }
@@ -884,6 +885,85 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(300);
     await tabTo('Sell');
     await sleep(300);
+  }
+
+  /** Z on the payment step, F2, and the customer list on Sell. */
+  async function sellStepFlows() {
+    const box = 'input[aria-label="product search"]';
+    const cust = '#customer-phone';
+    const cashBox = 'input[aria-label="cash received"]';
+    const code = '6281000000000';
+    const held = () => js<number>(`document.querySelectorAll('button[aria-label^="cancel held bill"]').length`);
+    const toPay = async () => {
+      await focus(box);
+      await sleep(450);
+      key('Enter', ['shift']);
+      await sleep(500);
+    };
+    await clearBill();
+    await focus(box);
+    await scan(code);
+    await sleep(300);
+    key('F2');
+    await sleep(200);
+    const onCust = (await js<string>('document.activeElement?.id ?? ""')) === 'customer-phone';
+    flow('f2-keeps-bill', onCust && (await lineCount()) === 1, `focus on customer box ${onCust}, lines ${await lineCount()}`);
+
+    await type('A', 20);
+    await sleep(500);
+    const rows = await js<number>(`document.querySelectorAll('[aria-label="customer suggestions"] li[role="option"]:not(.add-new)').length`);
+    flow('customer-list-appears-first-letter', rows >= 1, `rows ${rows}`);
+    await type('hmed', 20);
+    await sleep(500);
+    key('Enter');
+    await sleep(250);
+    const notPicked = await js<boolean>(`!!document.querySelector('#customer-phone')`);
+    flow('customer-one-match-not-picked', notPicked, `box still open ${notPicked}`);
+    key('Down');
+    await sleep(100);
+    key('Enter');
+    await sleep(400);
+    const picked = await js<boolean>(`!document.querySelector('#customer-phone') && document.body.textContent.includes('Ahmed Al-Ghamdi')`);
+    flow('customer-arrow-enter-picks', picked, `customer on bill ${picked}`);
+
+    await focus('input[aria-label="discount"]');
+    await type('1', 20);
+    await focus(box);
+    await sleep(200);
+    await toPay();
+    await focus(cashBox);
+    await type('5', 20);
+    await sleep(100);
+    const sales = hooks.salesCount();
+    const heldBefore = await held();
+    key('z');
+    await sleep(600);
+    flow('z-holds-on-payment', (await lineCount()) === 0 && (await held()) === heldBefore + 1, `lines ${await lineCount()}, held ${heldBefore} -> ${await held()}`);
+    flow('z-no-sale-created', hooks.salesCount() === sales, `sales ${sales} -> ${hooks.salesCount()}`);
+
+    await js(`[...document.querySelectorAll('button[aria-label^="cancel held bill"]')].at(-1).previousElementSibling.click()`);
+    await sleep(500);
+    const back = await js<{ lines: number; discount: string; customer: boolean; cash: string }>(`({ lines: document.querySelectorAll('.cart tbody tr').length, discount: document.querySelector('input[aria-label="discount"]')?.value ?? '', customer: document.body.textContent.includes('Ahmed Al-Ghamdi'), cash: document.querySelector('input[aria-label="cash received"]')?.value ?? '' })`);
+    flow('held-bill-restores-discount-and-customer', back.lines === 1 && back.discount !== '' && back.customer && back.cash === '5', JSON.stringify(back));
+
+    await js(`[...document.querySelectorAll('span')].find((s) => s.textContent.startsWith('Customer:'))?.querySelector('button')?.click()`);
+    await sleep(200);
+    await toPay();
+    await focus(cust);
+    await sleep(100);
+    key('z');
+    await sleep(300);
+    const typed = await js<string>(`document.querySelector('#customer-phone')?.value ?? ''`);
+    flow('z-types-in-other-box', typed === 'z' && (await lineCount()) === 1, `box "${typed}", lines ${await lineCount()}`);
+    key('Backspace');
+    await js(`document.querySelector('input[aria-label="cash received"]')?.select()`);
+    await focus(cashBox);
+    await js(`document.querySelector('input[aria-label="cash received"]')?.select()`);
+    key('Backspace');
+    await sleep(100);
+    await clearBill();
+    await focus(box);
+    await sleep(100);
   }
 
   async function keyFlows() {

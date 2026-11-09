@@ -13,6 +13,7 @@ import { call, type ApiError } from './api';
 import { SearchBox } from './SearchBox';
 import { decideKey, decrementQtyText, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
 import { HelpLink } from './HelpLink';
+import { CustomerBox } from './CustomerBox';
 import { useBindings, useOpenCustomers, useScanner, useScreenKeys } from './Keyboard';
 import { canonicalize, checkoutActive, commandLetter, keyLike, lineQtyKey, type ActionId } from './keyboard-registry';
 import { ProductName, useI18n } from './i18n';
@@ -35,7 +36,7 @@ function removeScannedText(el: HTMLInputElement, code: string) {
 
 type CreditInfo = { id: number; creditEnabled: boolean; limit: number | null; outstanding: number; advance: number; available: number | null };
 
-export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean; canCredit?: boolean }) {
+export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false }: { canDiscount: boolean; canCredit?: boolean; canCreateCustomer?: boolean }) {
   const { t, lang } = useI18n();
   const bindings = useBindings();
   const keys = bindings.direct;
@@ -50,7 +51,6 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
   const [held, setHeld] = useState<HeldBill[]>([]);
   const [cancelling, setCancelling] = useState<{ id: number; reason: string } | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [custSearch, setCustSearch] = useState('');
   const [approver, setApprover] = useState({ username: '', pin: '' });
   const [creditApprover, setCreditApprover] = useState({ username: '', pin: '' });
   const [credit, setCredit] = useState<CreditInfo | null>(null);
@@ -472,6 +472,11 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
         void recall(arg).finally(() => goStep('search'));
       }
     },
+    focusCustomer: () => {
+      if (customer) return setMsg({ kind: 'warn', text: t('A customer is already on this bill.') });
+      if (step !== 'search') goStep('search', false);
+      document.getElementById('customer-phone')?.focus();
+    },
     focusQty: () => {
       if (step === 'qty') {
         qtyRef.current?.focus();
@@ -486,23 +491,6 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
     },
     notify: (text) => setMsg({ kind: 'warn', text }),
   }));
-
-  const findCustomer = async () => {
-    try {
-      const found = await call<Customer[]>('customer.find', { text: custSearch });
-      if (found.length === 1) setCustomer(found[0]!);
-      else if (found.length === 0) {
-        const name = custSearch.trim();
-        if (window.confirm(`No customer found. Create "${name}" as a new customer with this as phone?`)) {
-          const id = await call<number>('customer.create', { name, phone: /^\+?\d+$/.test(name) ? name : undefined });
-          setCustomer({ id, name, phone: name, vatNumber: null });
-        }
-      } else setMsg({ kind: 'warn', text: `${found.length} customers match. Type more of the phone number.` });
-      setCustSearch('');
-    } catch (e) {
-      setMsg({ kind: 'error', text: t((e as Error).message) });
-    }
-  };
 
   if (shift === undefined) return null;
   if (shift === null) {
@@ -667,7 +655,7 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
             onFocusBox={() => goStep('search', false)}
           />
           <small className="hint">{t('Empty box: Enter or {0} = payment · {1} / {2} = one more / one less of the last item', keys['checkout.open'], keys['qty.inc'], keys['qty.dec'])}</small>
-          <small className="hint">{t('{0} = quick actions · {1} = quantity · {2} = help', keys['palette.open'], keys['qty.focus'], keys['help.open'])}</small>
+          <small className="hint">{t('{0} = quick actions · {1} = quantity · {2} = help', keys['palette.open'], keys['qty.focus'], keys['help.open'])} · {t('{0} = customer', keys['customer.focus'])}</small>
         </div>
         {step === 'qty' && pending && (
           <div className="step current" role="group" aria-label="quantity step">
@@ -696,12 +684,17 @@ export function Sell({ canDiscount, canCredit = false }: { canDiscount: boolean;
           {customer ? (
             <span>{t('Customer:')} <strong>{customer.name}</strong> <button onClick={() => setCustomer(null)}>✕</button></span>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); if (custSearch.trim()) void findCustomer(); }} className="row">
-              <div style={{ width: '100%' }}>
-                <label htmlFor="customer-phone" style={{ marginTop: 0 }}>{t('Customer (optional)')}</label>
-                <input id="customer-phone" placeholder={t('Customer phone (optional)')} value={custSearch} onChange={(e) => setCustSearch(e.target.value)} />
-              </div>
-            </form>
+            <CustomerBox
+              canCreate={canCreateCustomer}
+              onPick={(c) => {
+                setCustomer(c);
+                goStep('search');
+              }}
+              onKey={(e, empty) => onStepKey('customer', e, empty)}
+              onFocusBox={() => goStep('search', false)}
+              onLeave={() => goStep('search')}
+              onError={(text) => setMsg({ kind: 'error', text })}
+            />
           )}
         </div>
         <div>

@@ -120,7 +120,7 @@ export function App() {
         </div>
       </TopBar>
       {can('reports.view') && <HealthBanner />}
-      {tab === 'sell' && <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} />}
+      {tab === 'sell' && <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} canCreateCustomer={can('customer.manage')} />}
       {tab === 'refund' && <Refund canApprove={can('sale.refund')} />}
       {tab === 'stock' && <Stock can={can} />}
       {tab === 'products' && <Products />}

@@ -1,3 +1,4 @@
+import { customerEnter } from './suggest-keys';
 import { describe, expect, it } from 'vitest';
 import { enterAction, moveActive, shouldQuery, singleMatch } from './suggest-keys';
 
@@ -60,4 +61,14 @@ describe('enterAction', () => {
     expect(enterAction({ ...base, hasActive: false })).toBe('code');
     expect(enterAction({ ...base, open: false })).toBe('code');
   });
+});
+
+describe('customerEnter', () => {
+  const ok = { text: 'am', itemsFor: 'am', loading: false, open: true, active: 0 };
+  it('picks a highlighted row from the list for this text', () => expect(customerEnter(ok)).toBe(true));
+  it('never picks with nothing highlighted, even with one match', () => expect(customerEnter({ ...ok, active: -1 })).toBe(false));
+  it('never picks from a closed list', () => expect(customerEnter({ ...ok, open: false })).toBe(false));
+  it('never picks while an answer is on its way', () => expect(customerEnter({ ...ok, loading: true })).toBe(false));
+  it('never picks from a list for older text', () => expect(customerEnter({ ...ok, text: 'ama' })).toBe(false));
+  it('ignores spaces around the text', () => expect(customerEnter({ ...ok, text: ' am ' })).toBe(true));
 });

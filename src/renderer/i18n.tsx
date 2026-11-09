@@ -144,6 +144,12 @@ const AR: Record<string, string> = {
   // master prompt A
   "Go to the customer box": "الانتقال إلى خانة العميل",
   "Finish choosing the customer first, or clear the box.": "أكمل اختيار العميل أولاً أو امسح الخانة.",
+  // master prompt A
+  "Phone (optional)": "الهاتف (اختياري)",
+  "Name or phone": "الاسم أو الهاتف",
+  "No matching customers": "لا يوجد عملاء مطابقون",
+  "Add new customer": "إضافة عميل جديد",
+  "{0} = customer": "{0} = العميل",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

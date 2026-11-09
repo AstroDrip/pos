@@ -367,17 +367,20 @@ Names and numbers in the examples are made up.
 
 **Steps**
 
-1. Press Hold bill. The bill is saved and the screen is empty.
+1. Press Hold bill. The bill is saved and the screen is empty. On the payment step you can press Z instead, while you are in Cash received or the card box.
 2. Serve the next customer.
 3. When the first customer is back, find their bill under "Held bills" above the cart.
-4. Press it to bring the items back.
+4. Press it to bring the bill back.
+5. To throw a held bill away, press the ✕ beside it and type why.
 
-**What you should see:** The held bill returns with its items. The current bill must be empty first.
+**What you should see:** The held bill returns with its items, discounts, customer and any amounts you typed. The current bill must be empty first. Holding is not a sale: no money is taken and no stock moves.
 
 **If something goes wrong**
 
 - *"Finish or hold the current bill first."* Finish or hold the bill on screen, then bring back the held one.
-- *The discount is gone after bringing the bill back.* Discounts are not kept on held bills. Enter the discount again.
+- *"The price of ... changed".* The price changed while the bill was held. The bill uses the new price. Tell the customer.
+- *"... is no longer sold and was left off."* That item was turned off while the bill was held. Ask a supervisor if it should still be sold.
+- *It asks for a supervisor again.* A discount from a cashier needs approval each time the bill is paid. Ask a supervisor to type their PIN.
 
 <a id="selling-customer"></a>
 
@@ -389,16 +392,18 @@ Names and numbers in the examples are made up.
 
 **Steps**
 
-1. Type the customer's phone number in the Customer box.
-2. Press Enter.
-3. If one customer matches, their name appears.
-4. If no one matches, the app asks whether to create a new customer with this phone. Press OK to create.
+1. Press F2, or click the Customer box. Your bill stays as it is.
+2. Type part of the name, phone number or VAT number. Matching customers appear as you type.
+3. Press the down arrow to highlight the right customer, then press Enter. You can also click the name.
+4. If the customer is new, choose Add new customer at the bottom of the list, type the name, and press Enter.
+5. Press Esc to go back to scanning, or Shift+Enter with the box empty to go to payment.
 
-**What you should see:** The line "Customer: name" is shown next to the bill.
+**What you should see:** The line "Customer: name" is shown next to the bill. Nobody is chosen until you choose them, even when only one name matches.
 
 **If something goes wrong**
 
-- *Several customers match.* Type more of the phone number and press Enter again.
+- *Enter does nothing.* Press the down arrow first to highlight a name.
+- *I cannot see Add new customer.* Your user cannot add customers. Ask a supervisor.
 
 ## Taking payments
 
