@@ -162,3 +162,14 @@ describe('books check', () => {
     for (const text of [f.problem, f.explanation, f.suggestion, f.entityId]) expect(text.length).toBeGreaterThan(0);
   });
 });
+
+describe('rounding is not a fault', () => {
+  it('average cost held to the halala is not flagged', () => {
+    ctx.db.prepare('UPDATE stock_balances SET avg_cost = avg_cost').run();
+    const units = (ctx.db.prepare('SELECT SUM(ABS(qty)) AS n FROM stock_balances').get() as { n: number }).n;
+    expect(units).toBeGreaterThan(0);
+    const small = Math.floor(units / 2000) - 1;
+    shift(firstEntry('sale').id, '1200', '2900', small, 'debit');
+    expect(found()).not.toContain('inventory_value');
+  });
+});

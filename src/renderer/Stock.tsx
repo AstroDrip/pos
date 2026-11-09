@@ -4,6 +4,7 @@ import type { Product } from '../services/catalog';
 import type { Supplier } from '../services/parties';
 import type { StockRow } from '../services/reports';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validBool, validText } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
@@ -67,12 +68,12 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
       {can('stock.receive') && (
         <div className="card section">
           <h3>{t('Receive goods')}</h3>
-          <label>{t('Supplier')}</label>
+          <label>{t('Supplier')} <InfoIcon id="field.grn.supplier" /></label>
           <select value={supplierId} onChange={(e) => setSupplierId(Number(e.target.value))}>
             <option value={0}>{t('— choose —')}</option>
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <label>{t('Supplier invoice / delivery note no.')}</label>
+          <label>{t('Supplier invoice / delivery note no.')} <InfoIcon id="field.grn.reference" /></label>
           <input value={reference} onChange={(e) => setReference(e.target.value)} />
           <label>{t('Add product')}</label>
           <input data-kb-search="product" data-kb-suggest placeholder={t('Search name or SKU')} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -109,7 +110,7 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
           <h3>{t('Stock on hand')}</h3>
           <label><input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> {t('Only at or below reorder level')}</label>
           <table className="list">
-            <thead><tr><th>SKU</th><th>{t('Product')}</th><th className="num">{t('Qty')}</th><th className="num">{t('Reorder at')}</th><th className="num">{t('Avg cost')}</th></tr></thead>
+            <thead><tr><th>SKU</th><th>{t('Product')}</th><th className="num">{t('Qty')} <InfoIcon id="metric.stock.qty" /></th><th className="num">{t('Reorder at')} <InfoIcon id="metric.stock.reorder" /></th><th className="num">{t('Avg cost')} <InfoIcon id="metric.stock.cost" /></th></tr></thead>
             <tbody>
               {rows.length === 0 && <EmptyRow cols={5} text={onlyLow ? t('Nothing is at or below its reorder level.') : t('No products yet.')} />}
               {rows.map((r) => (
@@ -184,7 +185,7 @@ function AdjustCard({ kind, onDone }: { kind: 'waste' | 'count'; onDone: () => v
     <div className="card section">
       <h3>{kind === 'waste' ? t('Record wastage') : t('Stock count')}</h3>
       {kind === 'count' && <p style={{ opacity: 0.8 }}>{t('Count when the shop is closed. Enter what is on the shelf; stock is set to it.')}</p>}
-      <label>{t('Reason')}</label>
+      <label>{t('Reason')} <InfoIcon id="field.stock.reason" /></label>
       {kind === 'waste' ? (
         <>
           <select value={reason} onChange={(e) => setReason(e.target.value)}>

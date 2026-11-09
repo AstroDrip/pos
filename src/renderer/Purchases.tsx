@@ -6,6 +6,7 @@ import type { Supplier } from '../services/parties';
 import type { AgeingRow, PastReturn, StatementLine, SupplierAccount, UninvoicedGrn } from '../services/purchasing';
 import { StatusBadge, StatusLegend } from './StatusBadge';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validOneOf, validSupplierId } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
@@ -164,7 +165,7 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
     <div className="card section">
       <h3>{t('Enter a supplier invoice')}</h3>
       <p className="hint">{t('Receive the goods first (Stock tab), then match the receipts to the supplier invoice here.')}</p>
-      <label>{t('Supplier')}</label>
+      <label>{t('Supplier')} <InfoIcon id="field.purchase.supplier" /></label>
       <SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} />
       {supplierId === 0 && (
         <>
@@ -194,30 +195,30 @@ function InvoiceForm({ suppliers }: { suppliers: Supplier[] }) {
             ))}</tbody></table>
           )}
           <div className="row" style={{ flexWrap: 'wrap' }}>
-            <div><label>{t("Supplier's invoice no.")}</label><input aria-label="supplier invoice no" value={f.no} onChange={(e) => setF({ ...f, no: e.target.value })} /></div>
-            <div><label>{t('Supplier VAT no.')}</label><input value={f.vatNo} onChange={(e) => setF({ ...f, vatNo: e.target.value })} /></div>
-            <div><label>{t('Invoice date')}</label><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
-            <div><label>{t('Due date (blank = payment terms)')}</label><input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} /></div>
+            <div><label>{t("Supplier's invoice no.")} <InfoIcon id="field.purchase.invoiceNo" /></label><input aria-label="supplier invoice no" value={f.no} onChange={(e) => setF({ ...f, no: e.target.value })} /></div>
+            <div><label>{t('Supplier VAT no.')} <InfoIcon id="field.purchase.vatNo" /></label><input value={f.vatNo} onChange={(e) => setF({ ...f, vatNo: e.target.value })} /></div>
+            <div><label>{t('Invoice date')} <InfoIcon id="field.purchase.invoiceDate" /></label><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
+            <div><label>{t('Due date (blank = payment terms)')} <InfoIcon id="field.purchase.due" /></label><input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} /></div>
           </div>
           <div className="row" style={{ flexWrap: 'wrap' }}>
-            <div><label>{t('Net on invoice, excl. VAT (SAR)')}</label><input aria-label="invoice net" value={f.net} onChange={(e) => setF({ ...f, net: e.target.value })} /></div>
+            <div><label>{t('Net on invoice, excl. VAT (SAR)')} <InfoIcon id="field.purchase.net" /></label><input aria-label="invoice net" value={f.net} onChange={(e) => setF({ ...f, net: e.target.value })} /></div>
             <div>
-              <label>{t('VAT on invoice (SAR)')}</label>
+              <label>{t('VAT on invoice (SAR)')} <InfoIcon id="field.purchase.vat" /></label>
               <div className="row">
                 <input aria-label="invoice vat" value={f.vat} onChange={(e) => setF({ ...f, vat: e.target.value })} />
                 <button type="button" disabled={!(net > 0)} title={t('Suggests 15% of the net. Check it against the invoice.')} onClick={() => setF({ ...f, vat: formatSar(roundDiv(net * 15, 100)) })}>15%</button>
               </div>
             </div>
           </div>
-          <label><input type="checkbox" checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('Input VAT is recoverable (tax invoice with supplier VAT number)')}</label>
+          <label><input type="checkbox" checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('Input VAT is recoverable (tax invoice with supplier VAT number)')} <InfoIcon id="field.vat.recoverable" /></label>
           <p>{t('Goods received (cost): {0} · Invoice net: {1} · Difference: {2}', formatSar(goods), Number.isNaN(net) ? '—' : formatSar(net), formatSar(diff))}</p>
-          {diff !== 0 && <><label>{t('Reason for the difference')}</label><input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></>}
+          {diff !== 0 && <><label>{t('Reason for the difference')} <InfoIcon id="field.purchase.diffReason" /></label><input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></>}
           <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noDue} onChange={(e) => setF({ ...f, noDue: e.target.checked })} /> {t('No due date (informal credit)')}</label>
-            <div style={{ flex: 2 }}><label>{t('Arrangement (e.g. supplier collects at the next delivery)')}</label><input value={f.arrangement} onChange={(e) => setF({ ...f, arrangement: e.target.value })} /></div>
+            <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noDue} onChange={(e) => setF({ ...f, noDue: e.target.checked })} /> {t('No due date (informal credit)')} <InfoIcon id="field.purchase.noDue" /></label>
+            <div style={{ flex: 2 }}><label>{t('Arrangement (e.g. supplier collects at the next delivery)')} <InfoIcon id="field.purchase.arrangement" /></label><input value={f.arrangement} onChange={(e) => setF({ ...f, arrangement: e.target.value })} /></div>
           </div>
           <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div><label>{t('Paid now (SAR, blank = all on credit)')}</label><input aria-label="paid now" value={f.payNow} onChange={(e) => setF({ ...f, payNow: e.target.value })} /></div>
+            <div><label>{t('Paid now (SAR, blank = all on credit)')} <InfoIcon id="field.purchase.paidNow" /></label><input aria-label="paid now" value={f.payNow} onChange={(e) => setF({ ...f, payNow: e.target.value })} /></div>
             <div><label>{t('From')}</label><select value={f.payMethod} onChange={(e) => setF({ ...f, payMethod: e.target.value as 'bank' | 'till' })}><option value="bank">{t('Bank')}</option><option value="till">{t('Till cash (open shift)')}</option></select></div>
           </div>
           {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
@@ -263,7 +264,7 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
   return (
     <div className="card section">
       <h3>{t('Return goods to a supplier')}</h3>
-      <label>{t('Supplier')}</label>
+      <label>{t('Supplier')} <InfoIcon id="field.purchase.supplier" /></label>
       <SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} />
       <label>{t('Add product')}</label>
       <input data-kb-search="product" data-kb-suggest placeholder={t('Search name or SKU')} aria-label="return product search" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -278,15 +279,15 @@ function ReturnForm({ suppliers }: { suppliers: Supplier[] }) {
         </tr>
       ))}</tbody></table>
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        <div><label>{t("Supplier's credit note no.")}</label><input value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} /></div>
-        <div><label>{t('Return date')}</label><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
-        <div><label>{t('Reason')}</label><input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></div>
+        <div><label>{t("Supplier's credit note no.")} <InfoIcon id="field.purchase.creditNote" /></label><input value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} /></div>
+        <div><label>{t('Return date')} <InfoIcon id="field.purchase.returnDate" /></label><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
+        <div><label>{t('Reason')} <InfoIcon id="field.purchase.reason" /></label><input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></div>
       </div>
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        <div><label>{t('Credit net, excl. VAT (SAR)')}</label><input value={f.net} onChange={(e) => setF({ ...f, net: e.target.value })} /></div>
-        <div><label>{t('VAT on the credit (SAR)')}</label><input value={f.vat} onChange={(e) => setF({ ...f, vat: e.target.value })} /></div>
+        <div><label>{t('Credit net, excl. VAT (SAR)')} <InfoIcon id="field.purchase.creditNet" /></label><input value={f.net} onChange={(e) => setF({ ...f, net: e.target.value })} /></div>
+        <div><label>{t('VAT on the credit (SAR)')} <InfoIcon id="field.purchase.vatCredit" /></label><input value={f.vat} onChange={(e) => setF({ ...f, vat: e.target.value })} /></div>
       </div>
-      <label><input type="checkbox" checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('The VAT was claimed as input VAT (reverse it)')}</label>
+      <label><input type="checkbox" checked={f.recoverable} onChange={(e) => setF({ ...f, recoverable: e.target.checked })} /> {t('The VAT was claimed as input VAT (reverse it)')} <InfoIcon id="field.purchase.reverseVat" /></label>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       <p><button className="primary" disabled={busy || !supplierId || lines.length === 0 || lines.some((l) => !l.qty.trim()) || !f.reason.trim()} onClick={save}>{t('Save return')}</button></p>
       <h4>{t('Past returns')}</h4>
@@ -360,10 +361,10 @@ function Balances({ suppliers, can, request }: { suppliers: Supplier[]; can: (p:
         <div className="card section">
           <h4>{t('Opening balance (what you owed on day one)')}</h4>
           <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div><label>{t('Supplier')}</label><SupplierSelect suppliers={suppliers} value={ob.supplierId} onChange={(id) => setOb({ ...ob, supplierId: id })} /></div>
-            <div><label>{t('Amount (SAR)')}</label><input value={ob.amount} onChange={(e) => setOb({ ...ob, amount: e.target.value })} /></div>
-            <div><label>{t('As of')}</label><input type="date" value={ob.date} onChange={(e) => setOb({ ...ob, date: e.target.value })} /></div>
-            <div><label>{t('Reference')}</label><input value={ob.ref} onChange={(e) => setOb({ ...ob, ref: e.target.value })} /></div>
+            <div><label>{t('Supplier')} <InfoIcon id="field.purchase.supplier" /></label><SupplierSelect suppliers={suppliers} value={ob.supplierId} onChange={(id) => setOb({ ...ob, supplierId: id })} /></div>
+            <div><label>{t('Amount (SAR)')} <InfoIcon id="field.purchase.amount" /></label><input value={ob.amount} onChange={(e) => setOb({ ...ob, amount: e.target.value })} /></div>
+            <div><label>{t('As of')} <InfoIcon id="field.purchase.asOf" /></label><input type="date" value={ob.date} onChange={(e) => setOb({ ...ob, date: e.target.value })} /></div>
+            <div><label>{t('Reference')} <InfoIcon id="field.purchase.reference" /></label><input value={ob.ref} onChange={(e) => setOb({ ...ob, ref: e.target.value })} /></div>
             <button disabled={busy || !ob.supplierId || !(sar(ob.amount) > 0)}
               onClick={() => act(() => call('purchase.opening', { supplierId: ob.supplierId, amount: sar(ob.amount), asOf: ob.date, reference: ob.ref || undefined }), t('Opening balance saved'))}>
               {t('Save opening balance')}
@@ -386,7 +387,7 @@ function Ageing() {
   const cols: [keyof AgeingRow, string][] = [['notDue', 'Not due'], ['d1_30', '1–30 days late'], ['d31_60', '31–60'], ['d61_90', '61–90'], ['over90', 'Over 90'], ['noDue', 'No due date'], ['balance', 'Total'], ['advance', 'Advance'], ['returnCredit', 'Return credit']];
   return (
     <div style={{ maxWidth: 900 }}>
-      <div style={{ maxWidth: 220 }}><label>{t('As of')}</label><input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></div>
+      <div style={{ maxWidth: 220 }}><label>{t('As of')} <InfoIcon id="field.purchase.asOf" /></label><input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></div>
       <p className="hint">{t('Payments and returns settle the oldest invoices first.')}</p>
       <table className="list">
         <thead><tr><th>{t('Supplier')}</th>{cols.map(([k, l]) => <th key={k} className="num">{t(l)}</th>)}</tr></thead>
@@ -539,11 +540,11 @@ function SupplierPay({ suppliers, onDone }: { suppliers: Supplier[]; onDone: (m:
     <div className="card section" role="group" aria-label="pay supplier" style={{ marginTop: 'var(--sp-4)' }}>
       <h4>{t('Pay a supplier')} <HelpLink article="suppliers-pay" /></h4>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div data-kb-settle><label>{t('Supplier')}</label><SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} /></div>
-        <div><label>{t('Amount (SAR)')}</label><input aria-label="supplier pay amount" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></div>
+        <div data-kb-settle><label>{t('Supplier')} <InfoIcon id="field.purchase.supplier" /></label><SupplierSelect suppliers={suppliers} value={supplierId} onChange={setSupplierId} /></div>
+        <div><label>{t('Amount (SAR)')} <InfoIcon id="field.purchase.amount" /></label><input aria-label="supplier pay amount" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></div>
         <div><label>{t('From')}</label><select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value as 'bank' | 'till' })}><option value="bank">{t('Bank')}</option><option value="till">{t('Till cash (open shift)')}</option></select></div>
-        <div><label>{t('Payment date')}</label><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
-        <div><label>{t('Reference')}</label><input value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} /></div>
+        <div><label>{t('Payment date')} <InfoIcon id="field.purchase.payDate" /></label><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
+        <div><label>{t('Reference')} <InfoIcon id="field.purchase.reference" /></label><input value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} /></div>
         <button disabled={!(amt > 0) || open.length === 0} onClick={suggest}>{t('Suggest: oldest first')}</button>
       </div>
       {open.length > 0 && (
@@ -556,7 +557,7 @@ function SupplierPay({ suppliers, onDone }: { suppliers: Supplier[]; onDone: (m:
         </table>
       )}
       <p>{t('Applied to invoices: {0} · Not applied: {1}', formatSar(allocated), formatSar(Math.max(leftover, 0)))}</p>
-      {leftover > 0 && <label><input type="checkbox" checked={f.advance} onChange={(e) => setF({ ...f, advance: e.target.checked })} /> {t('Record the rest as an advance to this supplier')}</label>}
+      {leftover > 0 && <label><input type="checkbox" checked={f.advance} onChange={(e) => setF({ ...f, advance: e.target.checked })} /> {t('Record the rest as an advance to this supplier')} <InfoIcon id="field.purchase.advance" /></label>}
       {err && <p className="msg error">{err}</p>}
       <p><button className="primary" disabled={busy || !supplierId || !(amt > 0) || bad} onClick={save}>{t('Record payment')}</button></p>
     </div>

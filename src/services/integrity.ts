@@ -129,9 +129,12 @@ const stockMovements: Check = (ctx) =>
   }));
 
 const inventoryValue: Check = (ctx) => {
-  const atCost = all<{ qty: number; cost: number }>(ctx, 'SELECT qty, avg_cost AS cost FROM stock_balances').reduce((s, r) => s + lineCost(r.qty, r.cost), 0);
+  const stock = all<{ qty: number; cost: number }>(ctx, 'SELECT qty, avg_cost AS cost FROM stock_balances');
+  const atCost = stock.reduce((s, r) => s + lineCost(r.qty, r.cost), 0);
   const booked = balance(ctx, '1200');
-  const limit = one(ctx, 'SELECT count(*) AS v FROM stock_movements'); // each movement can round by up to one halala
+  // Each movement can round by a halala, and the average cost per unit is held to the nearest halala, so up to half a
+  // halala per unit on hand can also be out.
+  const limit = one(ctx, 'SELECT count(*) AS v FROM stock_movements') + stock.reduce((s, r) => s + Math.ceil(Math.abs(r.qty) / 2000), 0);
   return Math.abs(booked - atCost) <= limit ? [] : [{
     checkId: 'inventory_value', severity: 'warning', entityType: 'ledger', entityId: '1200',
     problem: 'Inventory in the accounts differs from stock at cost.',

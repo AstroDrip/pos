@@ -10,6 +10,7 @@ import type { Customer } from '../services/parties';
 import type { SaleResult } from '../services/sales';
 import type { ShiftSummary } from '../services/shifts';
 import { call, type ApiError } from './api';
+import { InfoIcon } from './InfoIcon';
 import { SearchBox } from './SearchBox';
 import { decideKey, decrementQtyText, incrementQtyText, parseStepQty, type CheckoutStep, type KeyContext } from './checkout-keys';
 import { HelpLink } from './HelpLink';
@@ -527,7 +528,7 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
         }}
       >
         <h2>{t('Open shift')}</h2>
-        <label>{t('Opening cash float (SAR)')}</label>
+        <label>{t('Opening cash float (SAR)')} <InfoIcon id="field.shift.float" /></label>
         <input value={float} onChange={(e) => setFloat(e.target.value)} />
         {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
         <p><button className="primary">{t('Open shift')}</button></p>
@@ -739,8 +740,8 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
         <div>
           {totals ? (
             <>
-              <div className="totals-line"><span>{t('Excl. VAT')}</span><span className="num">{formatSar(totals.totalExcl)}</span></div>
-              <div className="totals-line"><span>{t('VAT')}</span><span className="num">{formatSar(totals.totalVat)}</span></div>
+              <div className="totals-line"><span>{t('Excl. VAT')} <InfoIcon id="metric.sell.excl" /></span><span className="num">{formatSar(totals.totalExcl)}</span></div>
+              <div className="totals-line"><span>{t('VAT')} <InfoIcon id="metric.sell.vat" /></span><span className="num">{formatSar(totals.totalVat)}</span></div>
               {hasDiscount && <div className="row"><span>{t('Discount')}</span><span className="num">-{formatSar(totals.totalDiscount)}</span></div>}
               <div className="total">{formatSar(totals.totalIncl)} {t('SAR')}</div>
             </>
@@ -759,7 +760,7 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
         )}
         <div className={`step${step === 'pay' ? ' current' : ''}`} role="group" aria-label="payment step">
           <div className="step-label">{t('Payment')} <HelpLink article="payments-take-payment" /></div>
-          <label>{t('Cash received (blank = exact)')}</label>
+          <label>{t('Cash received (blank = exact)')} <InfoIcon id="field.pay.cash" /></label>
           <input
             ref={cashRef}
             aria-label="cash received"
@@ -771,7 +772,7 @@ export function Sell({ canDiscount, canCredit = false, canCreateCustomer = false
             }}
             onKeyDown={(e) => onStepKey('cash', e)}
           />
-          <label>{t('Card part of a split payment (optional)')}</label>
+          <label>{t('Card part of a split payment (optional)')} <InfoIcon id="field.pay.card" /></label>
           <input
             aria-label="card part"
             value={cardPart}

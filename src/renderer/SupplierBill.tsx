@@ -9,6 +9,7 @@ import type { Supplier } from '../services/parties';
 import type { DocType, SupplierItem } from '../services/supplier-bills';
 import { singleMatch } from '../core/suggest-keys';
 import { call, type ApiError } from './api';
+import { InfoIcon } from './InfoIcon';
 import { HelpLink } from './HelpLink';
 import { ProductName, useI18n } from './i18n';
 import { useSuggest } from './useSuggest';
@@ -270,7 +271,7 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
   };
 
   const num = (label: string, aria: string, value: string, onChange: (v: string) => void, width = 76) => (
-    <div style={{ width }}><label>{label}</label><input aria-label={aria} inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} /></div>
+    <div style={{ width }}><label>{label} <InfoIcon id={`field.bill.line.${aria.split(' ').slice(0, -1).join('')}`} /></label><input aria-label={aria} inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} /></div>
   );
 
   return (
@@ -278,7 +279,7 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
       <div className="card section bill-card">
         <h3>{t('Enter supplier bill')} <HelpLink article="suppliers-enter-bill" /></h3>
         <div className="bill-fields">
-          <div><label>{t('Supplier')}</label>
+          <div><label>{t('Supplier')} <InfoIcon id="field.purchase.supplier" /></label>
             <select aria-label="bill supplier" value={head.supplierId} onChange={(e) => {
               const s = suppliers.find((x) => x.id === Number(e.target.value));
               set({ supplierId: Number(e.target.value), salesAgent: s?.salesman ?? '', vatNo: '' });
@@ -287,7 +288,7 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
-          <div><label>{t('Paper type')}</label>
+          <div><label>{t('Paper type')} <InfoIcon id="field.bill.type" /></label>
             <select aria-label="paper type" value={head.docType} onChange={(e) => set({ docType: e.target.value as DocType, claim: null })}>
               <option value="tax_invoice">{t('Tax invoice')}</option>
               <option value="delivery_note">{t('Delivery note')}</option>
@@ -295,46 +296,46 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
               <option value="other">{t('Other paper')}</option>
             </select>
           </div>
-          <div><label>{t('Number on the paper')}</label><input aria-label="paper number" value={head.docNo} onChange={(e) => set({ docNo: e.target.value })} /></div>
-          <div><label>{t('Paper date')}</label><input type="date" aria-label="paper date" value={head.docDate} onChange={(e) => set({ docDate: e.target.value })} /></div>
-          <div><label>{t('Delivery date')}</label><input type="date" value={head.deliveryDate} onChange={(e) => set({ deliveryDate: e.target.value })} /></div>
-          <div><label>{t('Sales agent')}</label><input value={head.salesAgent} onChange={(e) => set({ salesAgent: e.target.value })} /></div>
-          <div><label>{t('Pages')}</label><input aria-label="pages" inputMode="numeric" value={head.pages} onChange={(e) => set({ pages: e.target.value })} /></div>
-          {!delivery && <div><label>{t('Supplier VAT number')}</label><input aria-label="supplier vat" placeholder={supplier?.vatNumber ?? ''} value={head.vatNo} onChange={(e) => set({ vatNo: e.target.value })} /></div>}
+          <div><label>{t('Number on the paper')} <InfoIcon id="field.bill.number" /></label><input aria-label="paper number" value={head.docNo} onChange={(e) => set({ docNo: e.target.value })} /></div>
+          <div><label>{t('Paper date')} <InfoIcon id="field.bill.date" /></label><input type="date" aria-label="paper date" value={head.docDate} onChange={(e) => set({ docDate: e.target.value })} /></div>
+          <div><label>{t('Delivery date')} <InfoIcon id="field.bill.delivery" /></label><input type="date" value={head.deliveryDate} onChange={(e) => set({ deliveryDate: e.target.value })} /></div>
+          <div><label>{t('Sales agent')} <InfoIcon id="field.bill.agent" /></label><input value={head.salesAgent} onChange={(e) => set({ salesAgent: e.target.value })} /></div>
+          <div><label>{t('Pages')} <InfoIcon id="field.bill.pages" /></label><input aria-label="pages" inputMode="numeric" value={head.pages} onChange={(e) => set({ pages: e.target.value })} /></div>
+          {!delivery && <div><label>{t('Supplier VAT number')} <InfoIcon id="field.bill.vatNo" /></label><input aria-label="supplier vat" placeholder={supplier?.vatNumber ?? ''} value={head.vatNo} onChange={(e) => set({ vatNo: e.target.value })} /></div>}
         </div>
         {delivery ? <p className="msg warn">{t('A delivery note brings the goods in. Nothing is owed until the invoice comes.')}</p> : (
           <>
             <div className="bill-fields" role="group" aria-label="paid or credit">
-              <div><label>{t('The paper says')}</label>
+              <div><label>{t('The paper says')} <InfoIcon id="field.bill.says" /></label>
                 <div className="seg">
                   <button type="button" aria-label="mark paid" className={head.payType === 'paid' ? 'on' : ''} onClick={() => set({ payType: 'paid' })}>{t('Paid')}</button>
                   <button type="button" aria-label="mark credit" className={head.payType === 'credit' ? 'on' : ''} onClick={() => set({ payType: 'credit' })}>{t('Credit')}</button>
                 </div>
               </div>
-              {head.payType === 'paid' && <div><label>{t('Paid from')}</label>
+              {head.payType === 'paid' && <div><label>{t('Paid from')} <InfoIcon id="field.bill.paidFrom" /></label>
                 <select aria-label="paid from" value={head.payMethod} onChange={(e) => set({ payMethod: e.target.value as 'till' | 'bank' })}>
                   <option value="till">{t('Till cash (open shift)')}</option><option value="bank">{t('Bank')}</option>
                 </select></div>}
               {head.payType === 'credit' && (
                 <>
-                  <div><label>{t('Due date (blank = supplier terms)')}</label><input type="date" value={head.dueDate} disabled={head.noDue} onChange={(e) => set({ dueDate: e.target.value })} /></div>
-                  <div><label>{t('Part paid now (SAR)')}</label><input aria-label="part paid" value={head.paidNow} onChange={(e) => set({ paidNow: e.target.value })} /></div>
-                  {sarOf(head.paidNow) > 0 && <div><label>{t('Paid from')}</label>
+                  <div><label>{t('Due date (blank = supplier terms)')} <InfoIcon id="field.bill.due" /></label><input type="date" value={head.dueDate} disabled={head.noDue} onChange={(e) => set({ dueDate: e.target.value })} /></div>
+                  <div><label>{t('Part paid now (SAR)')} <InfoIcon id="field.bill.partPaid" /></label><input aria-label="part paid" value={head.paidNow} onChange={(e) => set({ paidNow: e.target.value })} /></div>
+                  {sarOf(head.paidNow) > 0 && <div><label>{t('Paid from')} <InfoIcon id="field.bill.paidFrom" /></label>
                     <select value={head.payMethod} onChange={(e) => set({ payMethod: e.target.value as 'till' | 'bank' })}>
                       <option value="till">{t('Till cash (open shift)')}</option><option value="bank">{t('Bank')}</option>
                     </select></div>}
-                  <label className="bill-check"><input type="checkbox" checked={head.noDue} onChange={(e) => set({ noDue: e.target.checked })} /> {t('No due date (informal credit)')}</label>
+                  <label className="bill-check"><input type="checkbox" checked={head.noDue} onChange={(e) => set({ noDue: e.target.checked })} /> {t('No due date (informal credit)')} <InfoIcon id="field.purchase.noDue" /></label>
                 </>
               )}
             </div>
-            <label className="bill-check"><input type="checkbox" aria-label="claim vat" checked={claim} onChange={(e) => set({ claim: e.target.checked })} /> {t('Claim this VAT back (needs a real tax invoice)')}</label>
+            <label className="bill-check"><input type="checkbox" aria-label="claim vat" checked={claim} onChange={(e) => set({ claim: e.target.checked })} /> {t('Claim this VAT back (needs a real tax invoice)')} <InfoIcon id="field.vat.recoverable" /></label>
           </>
         )}
       </div>
 
       <div className="card section bill-card">
         <h3>{t('Lines')}</h3>
-        <label>{t('Add a line: supplier code, barcode or name, then Enter')}</label>
+        <label>{t('Add a line: supplier code, barcode or name, then Enter')} <InfoIcon id="field.bill.add" /></label>
         <input data-kb-search="product" data-kb-suggest aria-label="bill product search" value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -347,12 +348,12 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
         </div>
         {creating && (
           <div className="subpanel bill-fields" role="group" aria-label="new product">
-            <div><label>{t('Name (Arabic)')}</label><input aria-label="new product arabic" value={creating.nameAr} onChange={(e) => setCreating({ ...creating, nameAr: e.target.value })} /></div>
-            <div><label>{t('Name (English)')}</label><input aria-label="new product english" value={creating.nameEn} onChange={(e) => setCreating({ ...creating, nameEn: e.target.value })} /></div>
-            <div><label>{t('SKU')}</label><input aria-label="new product sku" value={creating.sku} onChange={(e) => setCreating({ ...creating, sku: e.target.value })} /></div>
-            <div><label>{t('Barcode')}</label><input value={creating.barcode} onChange={(e) => setCreating({ ...creating, barcode: e.target.value })} /></div>
-            <div><label>{t('Sold by')}</label><select value={creating.unit} onChange={(e) => setCreating({ ...creating, unit: e.target.value as 'PCS' | 'KG' })}><option value="PCS">{t('Piece')}</option><option value="KG">{t('kg')}</option></select></div>
-            <div><label>{t('Shelf price incl. VAT (SAR)')}</label><input aria-label="new product price" value={creating.price} onChange={(e) => setCreating({ ...creating, price: e.target.value })} /></div>
+            <div><label>{t('Name (Arabic)')} <InfoIcon id="field.product.nameAr" /></label><input aria-label="new product arabic" value={creating.nameAr} onChange={(e) => setCreating({ ...creating, nameAr: e.target.value })} /></div>
+            <div><label>{t('Name (English)')} <InfoIcon id="field.product.nameEn" /></label><input aria-label="new product english" value={creating.nameEn} onChange={(e) => setCreating({ ...creating, nameEn: e.target.value })} /></div>
+            <div><label>{t('SKU')} <InfoIcon id="field.bill.sku" /></label><input aria-label="new product sku" value={creating.sku} onChange={(e) => setCreating({ ...creating, sku: e.target.value })} /></div>
+            <div><label>{t('Barcode')} <InfoIcon id="field.bill.barcode" /></label><input value={creating.barcode} onChange={(e) => setCreating({ ...creating, barcode: e.target.value })} /></div>
+            <div><label>{t('Sold by')} <InfoIcon id="field.product.sellMode" /></label><select value={creating.unit} onChange={(e) => setCreating({ ...creating, unit: e.target.value as 'PCS' | 'KG' })}><option value="PCS">{t('Piece')}</option><option value="KG">{t('kg')}</option></select></div>
+            <div><label>{t('Shelf price incl. VAT (SAR)')} <InfoIcon id="field.product.price" /></label><input aria-label="new product price" value={creating.price} onChange={(e) => setCreating({ ...creating, price: e.target.value })} /></div>
             <button type="button" className="primary" disabled={!creating.nameAr.trim() || !creating.nameEn.trim() || !creating.sku.trim() || Number.isNaN(sarOf(creating.price))} onClick={() => void createProduct()}>{t('Add product')}</button>
             <button type="button" onClick={() => setCreating(null)}>{t('Cancel')}</button>
           </div>
@@ -374,12 +375,12 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
                 {num(t('Loose'), `loose ${i + 1}`, r.loose, (v) => edit(r.uid, { loose: v }))}
                 {num(t('Free'), `free ${i + 1}`, r.free, (v) => edit(r.uid, { free: v }))}
                 {num(t('Received'), `received ${i + 1}`, r.received, (v) => edit(r.uid, { received: v }))}
-                <div style={{ width: 96 }}><label>{t('Price per')}</label>
+                <div style={{ width: 96 }}><label>{t('Price per')} <InfoIcon id="field.bill.priceIs" /></label>
                   <select aria-label={`price basis ${i + 1}`} value={r.basis} onChange={(e) => edit(r.uid, { basis: e.target.value as 'pack' | 'unit' })}><option value="pack">{t('Pack')}</option><option value="unit">{t('Piece')}</option></select>
                 </div>
                 {num(t('Price'), `price ${i + 1}`, r.price, (v) => edit(r.uid, { price: v }), 88)}
                 {num(t('Discount'), `discount ${i + 1}`, r.discount, (v) => edit(r.uid, { discount: v }))}
-                <div style={{ width: 64 }}><label>{t('As')}</label>
+                <div style={{ width: 64 }}><label>{t('As')} <InfoIcon id="field.bill.taxAs" /></label>
                   <select aria-label={`discount type ${i + 1}`} value={r.discountIsPct ? 'pct' : 'sar'} onChange={(e) => edit(r.uid, { discountIsPct: e.target.value === 'pct' })}><option value="sar">{t('SAR')}</option><option value="pct">%</option></select>
                 </div>
                 {num(t('VAT %'), `vat percent ${i + 1}`, r.vatPct, (v) => edit(r.uid, { vatPct: v }), 60)}
@@ -395,8 +396,8 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
           );
         })}
         <div className="bill-fields">
-          <div><label>{t('Discount on the whole bill (SAR)')}</label><input aria-label="bill discount" value={head.billDiscount} onChange={(e) => set({ billDiscount: e.target.value })} /></div>
-          <div><label>{t('Delivery or other charge (SAR)')}</label><input aria-label="bill charge" value={head.billCharge} onChange={(e) => set({ billCharge: e.target.value })} /></div>
+          <div><label>{t('Discount on the whole bill (SAR)')} <InfoIcon id="field.bill.discount" /></label><input aria-label="bill discount" value={head.billDiscount} onChange={(e) => set({ billDiscount: e.target.value })} /></div>
+          <div><label>{t('Delivery or other charge (SAR)')} <InfoIcon id="field.bill.charge" /></label><input aria-label="bill charge" value={head.billCharge} onChange={(e) => set({ billCharge: e.target.value })} /></div>
         </div>
       </div>
 
@@ -416,8 +417,8 @@ export function SupplierBill({ suppliers, can }: { suppliers: Supplier[]; can: (
             ))}
           </tbody>
         </table>
-        {short && <><label>{t('Reason for the difference')}</label><input aria-label="difference reason" value={head.reason} placeholder={t('Short delivery')} onChange={(e) => set({ reason: e.target.value })} /></>}
-        <label>{t('Notes')}</label><input value={head.notes} onChange={(e) => set({ notes: e.target.value })} />
+        {short && <><label>{t('Reason for the difference')} <InfoIcon id="field.bill.reason" /></label><input aria-label="difference reason" value={head.reason} placeholder={t('Short delivery')} onChange={(e) => set({ reason: e.target.value })} /></>}
+        <label>{t('Notes')} <InfoIcon id="field.bill.notes" /></label><input value={head.notes} onChange={(e) => set({ notes: e.target.value })} />
         {anyWarning && <label className="bill-check"><input type="checkbox" aria-label="costs checked" checked={checked} onChange={(e) => setChecked(e.target.checked)} /> {t('I checked the costs marked above')}</label>}
         {msg && <p className={`msg ${msg.kind}`} role="status">{msg.text}</p>}
         {needConfirm && <label className="bill-check"><input type="checkbox" aria-label="different goods" checked={head.notSame} onChange={(e) => set({ notSame: e.target.checked })} /> {t('I checked: these are different goods')}</label>}

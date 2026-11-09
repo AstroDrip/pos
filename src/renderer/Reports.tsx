@@ -3,6 +3,7 @@ import { formatQty, formatSar } from '../core/money';
 import { storeDateTime, storeDay } from '../core/store-time';
 import type { AdjustmentRow, CashierActivity, RefundRow, SalesSummary, VoidRow } from '../services/reports';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validDay } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
@@ -44,21 +45,21 @@ export function Reports() {
         <>
           <table className="list" style={{ maxWidth: 420, marginTop: 12 }}>
             <tbody>
-              <tr><td>{t('Sales')}</td><td className="num">{r.saleCount}</td></tr>
-              <tr><td>{t('Total incl. VAT')}</td><td className="num">{formatSar(r.totalIncl)}</td></tr>
-              <tr><td>{t('VAT')}</td><td className="num">{formatSar(r.totalVat)}</td></tr>
-              <tr><td>{t('Total excl. VAT')}</td><td className="num">{formatSar(r.totalExcl)}</td></tr>
-              <tr><td>{t('Discounts given')}</td><td className="num">{formatSar(r.totalDiscount)}</td></tr>
-              <tr><td>{t('Cash (net of change)')}</td><td className="num">{formatSar(r.cash)}</td></tr>
-              <tr><td>{t('Card')}</td><td className="num">{formatSar(r.card)}</td></tr>
-              <tr><td>{t('Refunds ({0}, paid in cash)', r.refundCount)}</td><td className="num">-{formatSar(r.refundTotal)}</td></tr>
-              <tr><td><strong>{t('Net sales incl. VAT')}</strong></td><td className="num"><strong>{formatSar(r.netIncl)}</strong></td></tr>
-              <tr><td>{t('Net VAT')}</td><td className="num">{formatSar(r.netVat)}</td></tr>
+              <tr><td>{t('Sales')} <InfoIcon id="metric.report.count" /></td><td className="num">{r.saleCount}</td></tr>
+              <tr><td>{t('Total incl. VAT')} <InfoIcon id="metric.report.incl" /></td><td className="num">{formatSar(r.totalIncl)}</td></tr>
+              <tr><td>{t('VAT')} <InfoIcon id="metric.report.vat" /></td><td className="num">{formatSar(r.totalVat)}</td></tr>
+              <tr><td>{t('Total excl. VAT')} <InfoIcon id="metric.report.excl" /></td><td className="num">{formatSar(r.totalExcl)}</td></tr>
+              <tr><td>{t('Discounts given')} <InfoIcon id="metric.report.discounts" /></td><td className="num">{formatSar(r.totalDiscount)}</td></tr>
+              <tr><td>{t('Cash (net of change)')} <InfoIcon id="metric.report.cash" /></td><td className="num">{formatSar(r.cash)}</td></tr>
+              <tr><td>{t('Card')} <InfoIcon id="metric.report.card" /></td><td className="num">{formatSar(r.card)}</td></tr>
+              <tr><td>{t('Refunds ({0}, paid in cash)', r.refundCount)} <InfoIcon id="metric.refundsIncl" /></td><td className="num">-{formatSar(r.refundTotal)}</td></tr>
+              <tr><td><strong>{t('Net sales incl. VAT')} <InfoIcon id="metric.report.netIncl" /></strong></td><td className="num"><strong>{formatSar(r.netIncl)}</strong></td></tr>
+              <tr><td>{t('Net VAT')} <InfoIcon id="metric.report.netVat" /></td><td className="num">{formatSar(r.netVat)}</td></tr>
             </tbody>
           </table>
           <h4>{t('By day')}</h4>
           <table className="list">
-            <thead><tr><th>{t('Day')}</th><th className="num">{t('Sales')}</th><th className="num">{t('Total')}</th><th className="num">{t('VAT')}</th></tr></thead>
+            <thead><tr><th>{t('Day')}</th><th className="num">{t('Sales')} <InfoIcon id="metric.report.count" /></th><th className="num">{t('Total')}</th><th className="num">{t('VAT')} <InfoIcon id="metric.report.vat" /></th></tr></thead>
             <tbody>{r.byDay.map((d) => <tr key={d.day}><td>{d.day}</td><td className="num">{d.saleCount}</td><td className="num">{formatSar(d.totalIncl)}</td><td className="num">{formatSar(d.totalVat)}</td></tr>)}</tbody>
           </table>
           <h4>{t('Top products')}</h4>
@@ -69,7 +70,7 @@ export function Reports() {
           <h4>{t('Activity by cashier')}</h4>
           <p className="hint">{t('Facts for review, not accusations: high numbers can have innocent reasons.')}</p>
           <table className="list">
-            <thead><tr><th>{t('User')}</th><th className="num">{t('Sales')}</th><th className="num">{t('Total')}</th><th className="num">{t('Cash')}</th><th className="num">{t('Card')}</th>
+            <thead><tr><th>{t('User')}</th><th className="num">{t('Sales')} <InfoIcon id="metric.report.count" /></th><th className="num">{t('Total')}</th><th className="num">{t('Cash')}</th><th className="num">{t('Card')} <InfoIcon id="metric.report.card" /></th>
               <th className="num">{t('Discounts')}</th><th className="num">{t('Removed')}</th><th className="num">{t('Reprints')}</th><th className="num">{t('Refunds')}</th><th className="num">{t('Refunds approved')}</th><th className="num">{t('Cash out')}</th><th className="num">{t('Over / short')}</th></tr></thead>
             <tbody>{cashiers.map((c) => (
               <tr key={c.userId}>

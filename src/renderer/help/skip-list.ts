@@ -1,0 +1,21 @@
+/** Labels that have no "i" icon, and why. Only search boxes, date choosers, PIN boxes and the like belong here. */
+export const LABEL_SKIPS: { file: string; label: string; why: string }[] = [
+  { file: 'Stock.tsx', label: 'Add product', why: 'A search box.' },
+  { file: 'Stock.tsx', label: 'Only at or below reorder level', why: 'A filter for the list.' },
+  { file: 'SupplierBill.tsx', label: 'I checked the costs marked above', why: 'A confirmation. It saves no information.' },
+  { file: 'SupplierBill.tsx', label: 'I checked: these are different goods', why: 'A confirmation. It saves no information.' },
+  { file: 'Admin.tsx', label: 'I have checked the warnings', why: 'A confirmation. It saves no information.' },
+  { file: 'Purchases.tsx', label: 'Add product', why: 'A search box.' },
+  { file: 'Purchases.tsx', label: 'From', why: 'A date chooser for a report.' },
+  { file: 'Purchases.tsx', label: 'To', why: 'A date chooser for a report.' },
+  { file: 'Customers.tsx', label: 'Find a customer (name, phone or ID)', why: 'A search box.' },
+  { file: 'Expenses.tsx', label: 'From', why: 'A date chooser for the list.' },
+  { file: 'Expenses.tsx', label: 'To', why: 'A date chooser for the list.' },
+  { file: 'Expenses.tsx', label: 'Period', why: 'A date chooser for the list.' },
+  { file: 'Expenses.tsx', label: 'Status', why: 'A filter for the list.' },
+  { file: 'Expenses.tsx', label: '{asking.q}', why: 'The text is the question itself.' },
+  { file: 'Shift.tsx', label: 'Next cashier PIN', why: 'A PIN box. The login guide covers PINs.' },
+  { file: 'Admin.tsx', label: 'PIN (4–8 digits)', why: 'A PIN box. The login guide covers PINs.' },
+  { file: 'Admin.tsx', label: 'Recovery code (needed on a new computer)', why: 'Used only when restoring. The backup guide covers it.' },
+  { file: 'Admin.tsx', label: 'Test a label (scan or type it)', why: 'A test box. It saves nothing.' },
+];

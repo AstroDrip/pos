@@ -358,3 +358,12 @@ table + h4, .list + h4 { margin-top: var(--sp-5); }
   .top, .page-header, .noprint, .msg.warn { display: none; }
   .bill-card { border: none; max-width: none; padding: 0; }
 }
+
+/* ── Field and figure help ─────────────────────────── */
+.info-wrap { position: relative; display: inline-block; }
+.info-icon { width: 16px; height: 16px; min-height: 0; padding: 0; margin-inline-start: 4px; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font-size: 10px; font-weight: 700; line-height: 14px; cursor: help; text-transform: none; opacity: 0.7; }
+.info-icon:hover, .info-icon[aria-expanded="true"] { opacity: 1; color: var(--text); }
+.info-pop { position: absolute; z-index: 40; top: 22px; inset-inline-start: 0; width: 300px; max-width: 70vw; padding: var(--sp-3); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); font-size: 13px; font-weight: 400; line-height: 1.45; text-align: start; white-space: normal; }
+.info-pop p { margin: var(--sp-1) 0; }
+.info-pop:focus { outline: none; }
+.info-pop .link { padding: 0; min-height: 0; border: 0; background: none; color: var(--primary); text-decoration: underline; cursor: pointer; }

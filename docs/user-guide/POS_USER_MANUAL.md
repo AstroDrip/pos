@@ -59,6 +59,12 @@ Names and numbers in the examples are made up.
 - **Reports and the owner overview**
   - [Read the audit log](#audit-log)
   - [Run the books check](#books-check)
+  - [Understand the balance sheet](#reports-balance-sheet)
+  - [Understand profit and loss](#reports-pnl)
+  - [Understand the trial balance](#reports-trial-balance)
+  - [Understand cash flow](#reports-cashflow)
+  - [Understand VAT](#reports-vat)
+  - [ZATCA and your receipts](#reports-zatca)
   - [View sales for a day or a month](#reports-sales)
   - [Read the owner overview, profit and balances](#reports-owner)
 - **Shifts and daily work**
@@ -68,6 +74,7 @@ Names and numbers in the examples are made up.
   - [Close a shift and check the cash](#shifts-close)
   - [Find a mistake or ask for authorisation](#shifts-mistakes)
 - **Backup and recovery**
+  - [Users, roles and permissions](#admin-roles)
   - [Make a backup and check it worked](#backup-run)
   - [Restore a backup](#backup-restore)
   - [The computer stops responding](#backup-frozen)
@@ -1096,6 +1103,116 @@ Names and numbers in the examples are made up.
 
 - *I cannot see this tab.* Your user does not have permission for it. Ask the owner to check your role in Admin → Users.
 
+<a id="reports-balance-sheet"></a>
+
+### Understand the balance sheet
+
+**What this does:** The balance sheet is a picture of the shop on one day: what it owns, what it owes, and what is left for the owner.
+
+**Where:** Accounting tab, Balance sheet.
+
+**Steps**
+
+1. Assets are what the shop owns or is owed: cash, bank, stock, and money customers owe.
+2. Liabilities are what the shop owes: suppliers, VAT, expenses not yet paid, and advances held for customers.
+3. Owner's equity is what is left for the owner: money put in, plus profit to date.
+4. The two sides must always agree: Assets = Liabilities + Equity.
+5. Example. Cash SAR 5,000, stock SAR 10,000, customers owing SAR 2,000: total assets SAR 17,000.
+6. On the other side: suppliers SAR 4,000, other liabilities SAR 1,000, owner's equity SAR 12,000: also SAR 17,000.
+
+**What you should see:** Use it to see if the shop is healthy on a given day: how much it owns against how much it owes. If it ever says NOT BALANCED, run the books check and call your accountant.
+
+<a id="reports-pnl"></a>
+
+### Understand profit and loss
+
+**What this does:** Profit and loss shows whether the shop made money over a period.
+
+**Where:** Accounting tab, Profit and loss.
+
+**Steps**
+
+1. Sales are what customers paid for goods, without VAT.
+2. Cost of goods sold is what those same goods cost the shop to buy.
+3. Gross profit = sales − cost of goods sold.
+4. Operating expenses are the costs of running the shop: rent, electricity, salaries, wastage.
+5. Net profit = gross profit − operating expenses.
+6. Example. Sales SAR 20,000, cost of goods SAR 12,000: gross profit SAR 8,000. Expenses SAR 3,000: net profit SAR 5,000.
+7. Sales are not profit. Out of that SAR 20,000, only SAR 5,000 is left for the owner.
+8. Rent, electricity and salaries lower the profit in the month they belong to, even if they are paid later.
+
+**What you should see:** Figures are marked provisional until your accountant approves the accounts. Draft expenses are not included until they are posted.
+
+<a id="reports-trial-balance"></a>
+
+### Understand the trial balance
+
+**What this does:** The trial balance lists every account with its debits and credits. It is the first check that the books hold together.
+
+**Where:** Accounting tab, Trial balance.
+
+**Steps**
+
+1. Every event is written twice: once as a debit and once as a credit, for the same amount.
+2. So all debits added up must equal all credits added up.
+3. Example. A SAR 100 cash sale: SAR 100 debit to cash, SAR 100 credit split across sales and VAT.
+4. If the totals differ, something is wrong with the records, and the balance sheet and profit cannot be trusted.
+
+**What you should see:** A green "balanced" tag. Equal totals do not prove every entry is right, only that nothing is one-sided. Use Books check on the Audit tab for a deeper check.
+
+<a id="reports-cashflow"></a>
+
+### Understand cash flow
+
+**What this does:** Cash flow shows money that really moved in and out of cash and bank.
+
+**Where:** Accounting tab, Cash flow.
+
+**Steps**
+
+1. It starts with the cash and bank at the beginning of the dates chosen.
+2. It lists what brought money in or took it out: sales, refunds, customer payments, supplier payments, expenses.
+3. It ends with the cash and bank at the end.
+4. Profit and cash are different. A SAR 1,000 sale on credit is profit today, but no money arrives until the customer pays.
+5. So a profitable shop can run short of cash: goods are sold on credit while suppliers and rent must be paid now.
+
+**What you should see:** The opening figure plus the net change equals the closing figure. The drawer's opening float is not in the accounts, so it is not in this report.
+
+<a id="reports-vat"></a>
+
+### Understand VAT
+
+**What this does:** VAT is a tax of 15% in Saudi Arabia that the shop collects for the government.
+
+**Where:** Accounting tab, VAT summary.
+
+**Steps**
+
+1. Output VAT is the VAT you collected from customers. A SAR 115 shelf price holds SAR 15 of VAT, and SAR 100 is yours.
+2. Input VAT is the VAT you paid on proper tax invoices. It can usually be claimed back.
+3. Net VAT payable = output VAT − input VAT.
+4. Example. Output VAT SAR 300 and input VAT SAR 200: you owe the government SAR 100.
+5. Keep every supplier tax invoice with the supplier's VAT number. Without it, VAT usually cannot be claimed.
+
+**What you should see:** The tag shows that the report matches the VAT accounts. Your accountant files the return. Figures here help you prepare; they are not the filing itself.
+
+<a id="reports-zatca"></a>
+
+### ZATCA and your receipts
+
+**What this does:** ZATCA is the Saudi tax authority. Businesses must issue electronic invoices that follow its rules.
+
+**Where:** Receipts, printed from the Sell tab.
+
+**Steps**
+
+1. Each receipt shows the store details and VAT number from Admin, the VAT, and the invoice number.
+2. Invoice numbers run in order and are never reused.
+3. The direct link that sends invoices to ZATCA is not set up in this app yet. Nothing is sent to ZATCA from here.
+4. Ask the owner before relying on this app alone for ZATCA reporting.
+
+**What you should see:** Receipts print with your store details. Check that the VAT number on the receipt is right.
+
 <a id="reports-sales"></a>
 
 ### View sales for a day or a month
@@ -1234,6 +1351,29 @@ Names and numbers in the examples are made up.
 **What you should see:** The supervisor's name is recorded with the approval.
 
 ## Backup and recovery
+
+<a id="admin-roles"></a>
+
+### Users, roles and permissions
+
+**What this does:** Each person has their own login. Their role decides which tabs and buttons they see.
+
+**Where:** Admin tab, Users.
+
+**Steps**
+
+1. Cashier: sells, opens and closes shifts, and adds customers.
+2. Supervisor: everything a cashier does, plus reports, refunds and discounts. Supervisors cannot change settings, manage users, restore backups or read the audit log.
+3. Administrator: everything, including the Audit tab and the books check.
+4. To add someone, fill in their name, username, PIN and role, then save.
+5. To stop someone logging in, turn them off. Their past work stays on record.
+6. Roles themselves cannot be edited in the app.
+
+**What you should see:** Each person logs in as themselves, so the audit log can show who did what. Never share a login.
+
+**If something goes wrong**
+
+- *A tab is missing for someone.* Their role does not include it. Ask the owner to check their role.
 
 <a id="backup-run"></a>
 

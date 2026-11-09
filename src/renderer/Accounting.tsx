@@ -4,6 +4,7 @@ import { storeDay } from '../core/store-time';
 import type { CashFlow, BalanceSheet, OwnerKpis, ProfitAndLoss } from '../services/financials';
 import type { VatSummary } from '../services/vat-report';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validDay, validText } from './remember';
 import { PageHeader } from './PageHeader';
@@ -47,8 +48,8 @@ export function Accounting() {
   useEffect(() => void call<Gl>('finance.gl', { code: glCode, fromDay: from, toDay: to }).then(setGl, () => setGl(null)), [back, glCode, from, to]);
 
   const name = (a: { nameEn: string; nameAr: string }) => (lang === 'ar' ? a.nameAr : a.nameEn);
-  const Line = ({ l, v, strong, neg }: { l: string; v: number; strong?: boolean; neg?: boolean }) => (
-    <tr><td>{strong ? <strong>{l}</strong> : l}</td><td className={`num${v < 0 ? ' neg' : ''}`}>{strong ? <strong>{neg ? '-' : ''}{formatSar(v)}</strong> : `${neg ? '-' : ''}${formatSar(v)}`}</td></tr>
+  const Line = ({ l, v, strong, neg, info }: { l: string; v: number; strong?: boolean; neg?: boolean; info?: string }) => (
+    <tr><td>{strong ? <strong>{l}</strong> : l}{info && <InfoIcon id={info} />}</td><td className={`num${v < 0 ? ' neg' : ''}`}>{strong ? <strong>{neg ? '-' : ''}{formatSar(v)}</strong> : `${neg ? '-' : ''}${formatSar(v)}`}</td></tr>
   );
 
   return (
@@ -64,29 +65,29 @@ export function Accounting() {
         <>
           <h3>{t('Owner overview')}</h3>
           <div className="kpis">
-            <Tile l={t('Sales incl. VAT')} v={formatSar(k.salesInclVat)} />
-            <Tile l={t('Refunds incl. VAT')} v={formatSar(k.refundsInclVat)} />
-            <Tile l={t('Transactions')} v={String(k.saleCount)} sub={k.averageBasket !== null ? t('Average basket {0}', formatSar(k.averageBasket)) : undefined} />
-            <Tile l={t('Net sales excl. VAT')} v={formatSar(k.netSales)} />
-            <Tile l={t('Gross profit')} v={formatSar(k.grossProfit)} />
-            <Tile l={t('Operating expenses')} v={formatSar(k.operatingExpenses)} />
-            <Tile l={t('Net profit (provisional)')} v={formatSar(k.netProfit)} bad={k.netProfit < 0} />
-            <Tile l={t('Cash collected (net)')} v={formatSar(k.cashCollected)} />
-            <Tile l={t('Card recorded by cashiers')} v={formatSar(k.cardRecorded)} />
-            <Tile l={t('Inventory value (at cost)')} v={formatSar(k.inventoryValue)} />
-            <Tile l={t('Expenses still owed')} v={formatSar(k.expensesOutstanding)} />
-            <Tile l={t('Products at/below reorder level')} v={String(k.lowStockCount)} />
+            <Tile info="metric.salesIncl" l={t('Sales incl. VAT')} v={formatSar(k.salesInclVat)} />
+            <Tile info="metric.refundsIncl" l={t('Refunds incl. VAT')} v={formatSar(k.refundsInclVat)} />
+            <Tile info="metric.transactions" l={t('Transactions')} v={String(k.saleCount)} sub={k.averageBasket !== null ? t('Average basket {0}', formatSar(k.averageBasket)) : undefined} />
+            <Tile info="metric.netSales" l={t('Net sales excl. VAT')} v={formatSar(k.netSales)} />
+            <Tile info="metric.grossProfit" l={t('Gross profit')} v={formatSar(k.grossProfit)} />
+            <Tile info="metric.operating" l={t('Operating expenses')} v={formatSar(k.operatingExpenses)} />
+            <Tile info="metric.netProfit" l={t('Net profit (provisional)')} v={formatSar(k.netProfit)} bad={k.netProfit < 0} />
+            <Tile info="metric.cashCollected" l={t('Cash collected (net)')} v={formatSar(k.cashCollected)} />
+            <Tile info="metric.cardRecorded" l={t('Card recorded by cashiers')} v={formatSar(k.cardRecorded)} />
+            <Tile info="metric.inventoryValue" l={t('Inventory value (at cost)')} v={formatSar(k.inventoryValue)} />
+            <Tile info="metric.expensesOwed" l={t('Expenses still owed')} v={formatSar(k.expensesOutstanding)} />
+            <Tile info="metric.lowStock" l={t('Products at/below reorder level')} v={String(k.lowStockCount)} />
           </div>
           <h4>{t('Money position (right now)')}</h4>
           <p className="hint">{t('Cash and bank is money the store has. Money customers owe is not cash until they pay; money owed to suppliers is not yet paid out.')}</p>
           <div className="kpis">
-            <Tile l={t('Cash and bank (books)')} v={formatSar(k.cashAndBank)} />
-            <Tile l={t('Customers owe the store')} v={formatSar(k.receivablesOutstanding)} sub={t('{0} customers · overdue {1} · due soon {2}', k.customersWithBalance, formatSar(k.receivablesOverdue), formatSar(k.receivablesDueSoon))} />
-            <Tile l={t('Advances held for customers')} v={formatSar(k.customerAdvances)} />
-            <Tile l={t('Store owes suppliers')} v={formatSar(k.payablesOutstanding)} sub={t('{0} suppliers · overdue {1} · due soon {2}', k.suppliersWithBalance, formatSar(k.payablesOverdue), formatSar(k.payablesDueSoon))} />
-            <Tile l={t('Paid to suppliers in advance')} v={formatSar(k.supplierAdvances)} />
-            <Tile l={t('Customer payments received (period)')} v={formatSar(k.collectionsInPeriod)} />
-            <Tile l={t('Supplier payments made (period)')} v={formatSar(k.supplierPaymentsInPeriod)} />
+            <Tile info="metric.cashBank" l={t('Cash and bank (books)')} v={formatSar(k.cashAndBank)} />
+            <Tile info="metric.receivables" l={t('Customers owe the store')} v={formatSar(k.receivablesOutstanding)} sub={t('{0} customers · overdue {1} · due soon {2}', k.customersWithBalance, formatSar(k.receivablesOverdue), formatSar(k.receivablesDueSoon))} />
+            <Tile info="metric.customerAdvances" l={t('Advances held for customers')} v={formatSar(k.customerAdvances)} />
+            <Tile info="metric.payables" l={t('Store owes suppliers')} v={formatSar(k.payablesOutstanding)} sub={t('{0} suppliers · overdue {1} · due soon {2}', k.suppliersWithBalance, formatSar(k.payablesOverdue), formatSar(k.payablesDueSoon))} />
+            <Tile info="metric.supplierAdvances" l={t('Paid to suppliers in advance')} v={formatSar(k.supplierAdvances)} />
+            <Tile info="metric.collections" l={t('Customer payments received (period)')} v={formatSar(k.collectionsInPeriod)} />
+            <Tile info="metric.supplierPayments" l={t('Supplier payments made (period)')} v={formatSar(k.supplierPaymentsInPeriod)} />
           </div>
         </>
       )}
@@ -100,16 +101,16 @@ export function Accounting() {
           </div>
           <table className="list" style={{ maxWidth: 560 }}>
             <tbody>
-              <Line l={t('Sales (excl. VAT)')} v={pl.salesGross} />
-              <Line l={t('Less sales returns')} v={pl.returns} neg />
-              <Line l={t('Net sales')} v={pl.netSales} strong />
+              <Line info="metric.salesGross" l={t('Sales (excl. VAT)')} v={pl.salesGross} />
+              <Line info="metric.returns" l={t('Less sales returns')} v={pl.returns} neg />
+              <Line info="metric.netSales" l={t('Net sales')} v={pl.netSales} strong />
               <tr><td colSpan={2} className="hint">{t('Discounts given ({0}) are already deducted from sales.', formatSar(pl.discountsGiven))}</td></tr>
-              <Line l={t('Cost of goods sold')} v={pl.cogs} neg />
-              <Line l={t('Gross profit')} v={pl.grossProfit} strong />
+              <Line info="metric.cogs" l={t('Cost of goods sold')} v={pl.cogs} neg />
+              <Line info="metric.grossProfit" l={t('Gross profit')} v={pl.grossProfit} strong />
               {pl.grossMarginBp !== null && <tr><td>{t('Gross margin')}</td><td className="num">{formatSar(pl.grossMarginBp)}%{/* basis points shown as a percentage with 2 decimals */}</td></tr>}
               {pl.operating.map((o) => <Line key={o.code} l={`${o.code} ${name(o)}`} v={o.amount} neg />)}
-              <Line l={t('Total operating expenses')} v={pl.totalOperating} neg />
-              <Line l={t('Net profit')} v={pl.netProfit} strong />
+              <Line info="metric.operating" l={t('Total operating expenses')} v={pl.totalOperating} neg />
+              <Line info="metric.netProfit" l={t('Net profit')} v={pl.netProfit} strong />
               <tr><td colSpan={2} className="hint">{t('VAT is not income or cost: output VAT {0}, recoverable input VAT {1}.', formatSar(pl.outputVat), formatSar(pl.inputVat))}</td></tr>
             </tbody>
           </table>
@@ -126,12 +127,12 @@ export function Accounting() {
               <tr><td>{t('Sales at 15%')}</td><td className="num">{formatSar(vat.salesStandard.net)}</td><td className="num">{formatSar(vat.salesStandard.vat)}</td></tr>
               <tr><td>{t('Less refunds at 15%')}</td><td className="num">-{formatSar(vat.refundsStandard.net)}</td><td className="num">-{formatSar(vat.refundsStandard.vat)}</td></tr>
               <tr><td>{t('Sales at 0% (zero-rated or exempt)')}</td><td className="num">{formatSar(vat.salesZeroOrExempt.net - vat.refundsZeroOrExempt.net)}</td><td className="num">0.00</td></tr>
-              <tr><td><strong>{t('Output VAT')}</strong></td><td /><td className="num"><strong>{formatSar(vat.outputVat)}</strong></td></tr>
+              <tr><td><strong>{t('Output VAT')} <InfoIcon id="metric.outputVat" /></strong></td><td /><td className="num"><strong>{formatSar(vat.outputVat)}</strong></td></tr>
               <tr><td>{t('Supplier invoices (recoverable VAT)')}</td><td className="num">{formatSar(vat.purchasesRecoverable.net)}</td><td className="num">{formatSar(vat.purchasesRecoverable.vat)}</td></tr>
               <tr><td>{t('Less returns to suppliers')}</td><td className="num">-{formatSar(vat.purchaseReturnsRecoverable.net)}</td><td className="num">-{formatSar(vat.purchaseReturnsRecoverable.vat)}</td></tr>
               <tr><td>{t('Expenses (recoverable VAT)')}</td><td className="num">{formatSar(vat.expensesRecoverable.net - vat.expensesReversedRecoverable.net)}</td><td className="num">{formatSar(vat.expensesRecoverable.vat - vat.expensesReversedRecoverable.vat)}</td></tr>
-              <tr><td><strong>{t('Input VAT')}</strong></td><td /><td className="num"><strong>{formatSar(vat.inputVat)}</strong></td></tr>
-              <tr><td><strong>{vat.netVatDue >= 0 ? t('Net VAT payable') : t('Net VAT refundable')}</strong></td><td /><td className="num"><strong>{formatSar(Math.abs(vat.netVatDue))}</strong></td></tr>
+              <tr><td><strong>{t('Input VAT')} <InfoIcon id="metric.inputVat" /></strong></td><td /><td className="num"><strong>{formatSar(vat.inputVat)}</strong></td></tr>
+              <tr><td><strong>{vat.netVatDue >= 0 ? t('Net VAT payable') : t('Net VAT refundable')}</strong> <InfoIcon id="metric.netVat" /></td><td /><td className="num"><strong>{formatSar(Math.abs(vat.netVatDue))}</strong></td></tr>
               {vat.purchasesNonRecoverableVat !== 0 && <tr><td colSpan={3} className="hint">{t('VAT paid but not recoverable (treated as cost): {0}', formatSar(vat.purchasesNonRecoverableVat))}</td></tr>}
             </tbody>
           </table>
@@ -143,10 +144,10 @@ export function Accounting() {
           <h3>{t('Cash flow')}</h3>
           <p className="hint">{t('Money that actually moved in and out of cash and bank. This is not the same as profit: a sale on credit is profit before any money arrives.')}</p>
           <table className="list"><tbody>
-            <Line l={t('Cash and bank at the start')} v={cf.opening} strong />
+            <Line info="metric.cashOpening" l={t('Cash and bank at the start')} v={cf.opening} strong />
             {cf.groups.filter((g) => g.amount !== 0).map((g) => <Line key={g.id} l={t(FLOW_LABEL[g.id])} v={g.amount} />)}
-            <Line l={t('Net change')} v={cf.net} strong />
-            <Line l={t('Cash and bank at the end')} v={cf.closing} strong />
+            <Line info="metric.cashNet" l={t('Net change')} v={cf.net} strong />
+            <Line info="metric.cashClosing" l={t('Cash and bank at the end')} v={cf.closing} strong />
           </tbody></table>
         </div>
       )}
@@ -157,7 +158,7 @@ export function Accounting() {
             <table className="list"><tbody>
               <tr><th colSpan={2}>{t('Assets')}</th></tr>
               {bs.assets.map((a) => <Line key={a.code} l={`${a.code} ${name(a)}`} v={a.amount} />)}
-              <Line l={t('Total assets')} v={bs.totalAssets} strong />
+              <Line info="metric.totalAssets" l={t('Total assets')} v={bs.totalAssets} strong />
             </tbody></table>
             <table className="list"><tbody>
               <tr><th colSpan={2}>{t('Liabilities')}</th></tr>
@@ -165,7 +166,7 @@ export function Accounting() {
               <tr><th colSpan={2}>{t('Equity')}</th></tr>
               {bs.equity.map((a) => <Line key={a.code} l={`${a.code} ${name(a)}`} v={a.amount} />)}
               <Line l={t('Profit to date (not yet closed)')} v={bs.currentEarnings} />
-              <Line l={t('Total liabilities and equity')} v={bs.totalLiabilitiesAndEquity} strong />
+              <Line info="metric.totalLE" l={t('Total liabilities and equity')} v={bs.totalLiabilitiesAndEquity} strong />
             </tbody></table>
           </div>
         </>
@@ -200,6 +201,6 @@ export function Accounting() {
   );
 }
 
-function Tile({ l, v, sub, bad }: { l: string; v: string; sub?: string; bad?: boolean }) {
-  return <div className="kpi"><div className="l">{l}</div><div className={`v${bad ? ' neg' : ''}`}>{v}</div>{sub && <div className="l">{sub}</div>}</div>;
+function Tile({ l, v, sub, bad, info }: { l: string; v: string; sub?: string; bad?: boolean; info?: string }) {
+  return <div className="kpi"><div className="l">{l}{info && <InfoIcon id={info} />}</div><div className={`v${bad ? ' neg' : ''}`}>{v}</div>{sub && <div className="l">{sub}</div>}</div>;
 }

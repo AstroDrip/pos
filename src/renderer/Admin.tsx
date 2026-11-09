@@ -6,6 +6,7 @@ import type { Supplier } from '../services/parties';
 import type { SyncHealth } from '../services/dashboard-sync';
 import { formatQty } from '../core/money';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useReturnTick } from './TabHost';
 import { PageHeader } from './PageHeader';
 import { useI18n } from './i18n';
@@ -147,10 +148,10 @@ function Users() {
   return (
     <form className="card" onSubmit={save}>
       <h3>{t('Users')}</h3>
-      <label>{t('Username')}</label><input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
-      <label>{t('Display name')}</label><input value={f.displayName} onChange={(e) => setF({ ...f, displayName: e.target.value })} />
+      <label>{t('Username')} <InfoIcon id="field.user.username" /></label><input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
+      <label>{t('Display name')} <InfoIcon id="field.user.displayName" /></label><input value={f.displayName} onChange={(e) => setF({ ...f, displayName: e.target.value })} />
       <label>{t('PIN (4–8 digits)')}</label><input type="password" value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value })} />
-      <label>{t('Role')}</label>
+      <label>{t('Role')} <InfoIcon id="field.user.role" /></label>
       <select value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
         <option value="cashier">{t('Cashier')}</option><option value="supervisor">{t('Supervisor')}</option><option value="admin">{t('Administrator')}</option>
       </select>
@@ -195,14 +196,14 @@ function Suppliers() {
   return (
     <form className="card" onSubmit={save}>
       <h3>{t('Suppliers')}</h3>
-      <label>{t('Name')}</label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-      <label>{t('Phone')}</label><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
-      <label>{t('VAT number')}</label><input value={f.vatNumber} onChange={(e) => setF({ ...f, vatNumber: e.target.value })} />
-      <label>{t('Payment terms (days)')}</label><input value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} />
-      <label>{t('Address')}</label><input aria-label="supplier address" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} />
-      <label>{t('CR number')}</label><input aria-label="supplier cr" value={f.crNumber} onChange={(e) => setF({ ...f, crNumber: e.target.value })} />
-      <label>{t('Our customer number at this supplier')}</label><input aria-label="our customer number" value={f.ourCustomerNo} onChange={(e) => setF({ ...f, ourCustomerNo: e.target.value })} />
-      <label>{t('Salesman')}</label><input aria-label="supplier salesman" value={f.salesman} onChange={(e) => setF({ ...f, salesman: e.target.value })} />
+      <label>{t('Name')} <InfoIcon id="field.supplier.name" /></label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+      <label>{t('Phone')} <InfoIcon id="field.supplier.phone" /></label><input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
+      <label>{t('VAT number')} <InfoIcon id="field.supplier.vat" /></label><input value={f.vatNumber} onChange={(e) => setF({ ...f, vatNumber: e.target.value })} />
+      <label>{t('Payment terms (days)')} <InfoIcon id="field.supplier.terms" /></label><input value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} />
+      <label>{t('Address')} <InfoIcon id="field.supplier.address" /></label><input aria-label="supplier address" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} />
+      <label>{t('CR number')} <InfoIcon id="field.supplier.cr" /></label><input aria-label="supplier cr" value={f.crNumber} onChange={(e) => setF({ ...f, crNumber: e.target.value })} />
+      <label>{t('Our customer number at this supplier')} <InfoIcon id="field.supplier.ourNo" /></label><input aria-label="our customer number" value={f.ourCustomerNo} onChange={(e) => setF({ ...f, ourCustomerNo: e.target.value })} />
+      <label>{t('Salesman')} <InfoIcon id="field.supplier.salesman" /></label><input aria-label="supplier salesman" value={f.salesman} onChange={(e) => setF({ ...f, salesman: e.target.value })} />
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       <p className="row">
         <button className="primary">{editing ? t('Save supplier') : t('Add supplier')}</button>
@@ -337,17 +338,17 @@ function ScaleLabels() {
           ))}
         </tbody>
       </table>
-      <label>{t('Layout name')}</label>
+      <label>{t('Layout name')} <InfoIcon id="field.scale.name" /></label>
       <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-      <label>{t('Fields in label order')}</label>
+      <label>{t('Fields in label order')} <InfoIcon id="field.scale.fields" /></label>
       <input aria-label="layout spec" value={f.spec} onChange={(e) => setF({ ...f, spec: e.target.value })} />
       <small className="ar" style={{ direction: 'ltr' }}>lit=21 · item:5 · plu:4 · weight_g:5 · weight_kg3:5 · price:5 · pieces:2 · skip:1 · check</small>
-      <label>{t('Item code is looked up as')}</label>
+      <label>{t('Item code is looked up as')} <InfoIcon id="field.scale.lookup" /></label>
       <select value={f.itemMatches} onChange={(e) => setF({ ...f, itemMatches: e.target.value as 'plu' | 'sku' })}>
         <option value="plu">PLU</option>
         <option value="sku">SKU</option>
       </select>
-      <label><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
+      <label><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')} <InfoIcon id="field.active" /></label>
       <p><button className="primary" disabled={!f.name.trim()} onClick={save}>{f.id ? t('Update layout') : t('Add layout')}</button></p>
       <label>{t('Test a label (scan or type it)')}</label>
       <div className="row">

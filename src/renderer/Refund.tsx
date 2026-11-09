@@ -3,6 +3,7 @@ import { formatQty, formatSar, parseQty, roundDiv } from '../core/money';
 import { storeDateTime } from '../core/store-time';
 import type { RecentSale, RefundableSale, RefundResult } from '../services/refunds';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useReturnTick } from './TabHost';
 import { EmptyRow, PageHeader } from './PageHeader';
 import { HelpLink } from './HelpLink';
@@ -109,7 +110,7 @@ export function Refund({ canApprove, request }: { canApprove: boolean; request?:
       <PageHeader title={t('Refund')} desc={t('Find the sale by its receipt number, choose what comes back, pay the cash.')} actions={<HelpLink article="returns-refund" />} />
       <form className="row" style={{ maxWidth: 520 }} onSubmit={find}>
         <div style={{ flex: 1 }}>
-          <label>{t('Invoice number from the receipt')}</label>
+          <label>{t('Invoice number from the receipt')} <InfoIcon id="field.refund.invoice" /></label>
           <input autoFocus data-kb-search="refund" aria-label="refund invoice" placeholder="INV-00000001" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
         </div>
         <button type="submit" style={{ alignSelf: 'flex-end' }} disabled={!invoiceNo.trim()}>{t('Find sale')}</button>
@@ -187,7 +188,7 @@ export function Refund({ canApprove, request }: { canApprove: boolean; request?:
               </table>
               {invalid && <p className="msg error">{t('Check the quantities: no more than what is left, whole units for items sold by piece.')}</p>}
 
-              <label>{t('Reason')}</label>
+              <label>{t('Reason')} <InfoIcon id="field.refund.reason" /></label>
               <select value={reason} onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])}>
                 {REASONS.map((r) => <option key={r} value={r}>{t(r)}</option>)}
               </select>

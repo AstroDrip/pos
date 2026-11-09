@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { customerEnter, moveActive } from '../core/suggest-keys';
 import type { Customer } from '../services/parties';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useI18n } from './i18n';
 import { useSuggest } from './useSuggest';
 
@@ -86,9 +87,9 @@ export function CustomerBox({ canCreate, onPick, onKey, onFocusBox, onLeave, onE
     return (
       <div className="row" role="group" aria-label="add customer">
         <div style={{ width: '100%' }}>
-          <label htmlFor="new-customer-name" style={{ marginTop: 0 }}>{t('New customer name')}</label>
+          <label htmlFor="new-customer-name" style={{ marginTop: 0 }}>{t('New customer name')} <InfoIcon id="field.customer.name" /></label>
           <input id="new-customer-name" autoFocus value={adding.name} onChange={(e) => setAdding({ ...adding, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setAdding(null); } else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void saveNew(); } }} />
-          <label htmlFor="new-customer-phone">{t('Phone (optional)')}</label>
+          <label htmlFor="new-customer-phone">{t('Phone (optional)')} <InfoIcon id="field.customer.phone" /></label>
           <input id="new-customer-phone" value={adding.phone} onChange={(e) => setAdding({ ...adding, phone: e.target.value })} onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setAdding(null); } else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void saveNew(); } }} />
           <p>
             <button type="button" disabled={!adding.name.trim()} onClick={() => void saveNew()}>{t('Add customer')}</button>{' '}
@@ -101,7 +102,7 @@ export function CustomerBox({ canCreate, onPick, onKey, onFocusBox, onLeave, onE
 
   return (
     <div className="searchbox" style={{ width: '100%' }}>
-      <label htmlFor="customer-phone" style={{ marginTop: 0 }}>{t('Customer (optional)')}</label>
+      <label htmlFor="customer-phone" style={{ marginTop: 0 }}>{t('Customer (optional)')} <InfoIcon id="field.sale.customer" /></label>
       <input
         id="customer-phone"
         data-kb-search="customer"

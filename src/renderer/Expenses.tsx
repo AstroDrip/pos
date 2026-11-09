@@ -3,6 +3,7 @@ import { formatSar, parseSar, roundDiv } from '../core/money';
 import { storeDay } from '../core/store-time';
 import type { ExpenseCategory, ExpenseRow, ExpenseSummary, PayMethod, VatClass } from '../services/expenses';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validDay, validOneOf, validText } from './remember';
 import { EmptyRow, PageHeader } from './PageHeader';
@@ -96,7 +97,7 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
         <div><label>{t('From')}</label><input type="date" value={range[0]} onChange={(e) => { setPreset('custom'); setRange([e.target.value, range[1]]); }} /></div>
         <div><label>{t('To')}</label><input type="date" value={range[1]} onChange={(e) => { setPreset('custom'); setRange([range[0], e.target.value]); }} /></div>
         <div>
-          <label>{t('Category')}</label>
+          <label>{t('Category')} <InfoIcon id="field.expense.category" /></label>
           <select value={filter.categoryId} onChange={(e) => setFilter({ ...filter, categoryId: Number(e.target.value) })}>
             <option value={0}>{t('All')}</option>
             {cats.map((c) => <option key={c.id} value={c.id}>{lang === 'ar' ? c.nameAr : c.nameEn}</option>)}
@@ -109,20 +110,20 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
             {STATES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
           </select>
         </div>
-        <div><label>{t('Payee')}</label><input data-kb-search="filter" value={filter.payee} onChange={(e) => setFilter({ ...filter, payee: e.target.value })} /></div>
+        <div><label>{t('Payee')} <InfoIcon id="field.expense.payee" /></label><input data-kb-search="filter" value={filter.payee} onChange={(e) => setFilter({ ...filter, payee: e.target.value })} /></div>
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
 
       {sum && (
         <>
           <div className="kpis" style={{ marginTop: 12 }}>
-            <Kpi l={t('Expenses in period (posted, incl. VAT)')} v={formatSar(sum.totalPosted)} />
-            <Kpi l={t('Excl. recoverable VAT')} v={formatSar(sum.netOfRecoverableVat)} />
-            <Kpi l={t('Recoverable input VAT')} v={formatSar(sum.recoverableVat)} />
-            <Kpi l={t('Paid in period (cash basis)')} v={formatSar(sum.paidInPeriod)} />
-            <Kpi l={t('Still owed today')} v={formatSar(sum.outstandingNow)} />
-            <Kpi l={t('Overdue today')} v={formatSar(sum.overdueNow)} bad={sum.overdueNow > 0} />
-            <Kpi l={t('Drafts waiting')} v={String(sum.draftsCount)} />
+            <Kpi info="metric.expense.posted" l={t('Expenses in period (posted, incl. VAT)')} v={formatSar(sum.totalPosted)} />
+            <Kpi info="metric.expense.net" l={t('Excl. recoverable VAT')} v={formatSar(sum.netOfRecoverableVat)} />
+            <Kpi info="metric.expense.vat" l={t('Recoverable input VAT')} v={formatSar(sum.recoverableVat)} />
+            <Kpi info="metric.expense.paid" l={t('Paid in period (cash basis)')} v={formatSar(sum.paidInPeriod)} />
+            <Kpi info="metric.expense.owed" l={t('Still owed today')} v={formatSar(sum.outstandingNow)} />
+            <Kpi info="metric.expense.overdue" l={t('Overdue today')} v={formatSar(sum.overdueNow)} bad={sum.overdueNow > 0} />
+            <Kpi info="metric.expense.drafts" l={t('Drafts waiting')} v={String(sum.draftsCount)} />
           </div>
           <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap', marginTop: 12 }}>
             <div style={{ minWidth: 280 }}>
@@ -169,8 +170,8 @@ export function Expenses({ can }: { can: (p: string) => boolean }) {
   );
 }
 
-function Kpi({ l, v, bad }: { l: string; v: string; bad?: boolean }) {
-  return <div className="kpi"><div className="l">{l}</div><div className={`v${bad ? ' neg' : ''}`}>{v}</div></div>;
+function Kpi({ l, v, bad, info }: { l: string; v: string; bad?: boolean; info?: string }) {
+  return <div className="kpi"><div className="l">{l}{info && <InfoIcon id={info} />}</div><div className={`v${bad ? ' neg' : ''}`}>{v}</div></div>;
 }
 
 /** Simple labelled bars: every bar also shows its number, so nothing depends on reading the bar length. */
@@ -262,34 +263,34 @@ function ExpenseForm({ cats, can, initial, onClose }: { cats: ExpenseCategory[];
       <h3>{initial ? t('Edit draft {0}', initial.expenseNo) : t('New expense')}</h3>
       <div className="row" style={{ flexWrap: 'wrap' }}>
         <div>
-          <label>{t('Category')}</label>
+          <label>{t('Category')} <InfoIcon id="field.expense.category" /></label>
           <select aria-label="expense category" value={f.categoryId} onChange={(e) => set({ categoryId: Number(e.target.value) })}>
             <option value={0}>{t('— choose —')}</option>
             {cats.map((c) => <option key={c.id} value={c.id}>{lang === 'ar' ? c.nameAr : c.nameEn}{c.kind === 'capital' ? ` (${t('asset')})` : ''}</option>)}
           </select>
         </div>
-        <div><label>{t('Description')}</label><input aria-label="expense description" value={f.description} onChange={(e) => set({ description: e.target.value })} /></div>
+        <div><label>{t('Description')} <InfoIcon id="field.expense.description" /></label><input aria-label="expense description" value={f.description} onChange={(e) => set({ description: e.target.value })} /></div>
       </div>
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        <div><label>{t('Payee / supplier')}</label><input value={f.payee} onChange={(e) => set({ payee: e.target.value })} /></div>
-        <div><label>{t('Invoice / reference no.')}</label><input value={f.invoiceRef} onChange={(e) => set({ invoiceRef: e.target.value })} /></div>
-        <div><label>{t('Supplier VAT no.')}</label><input value={f.supplierVatNo} onChange={(e) => set({ supplierVatNo: e.target.value })} /></div>
+        <div><label>{t('Payee / supplier')} <InfoIcon id="field.expense.payee" /></label><input value={f.payee} onChange={(e) => set({ payee: e.target.value })} /></div>
+        <div><label>{t('Invoice / reference no.')} <InfoIcon id="field.expense.invoice" /></label><input value={f.invoiceRef} onChange={(e) => set({ invoiceRef: e.target.value })} /></div>
+        <div><label>{t('Supplier VAT no.')} <InfoIcon id="field.expense.vatNo" /></label><input value={f.supplierVatNo} onChange={(e) => set({ supplierVatNo: e.target.value })} /></div>
       </div>
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        <div><label>{t('Expense date (when the cost belongs)')}</label><input type="date" value={f.expenseDate} onChange={(e) => set({ expenseDate: e.target.value })} /></div>
-        <div><label>{t('Due date')}</label><input type="date" value={f.dueDate} onChange={(e) => set({ dueDate: e.target.value })} /></div>
+        <div><label>{t('Expense date (when the cost belongs)')} <InfoIcon id="field.expense.date" /></label><input type="date" value={f.expenseDate} onChange={(e) => set({ expenseDate: e.target.value })} /></div>
+        <div><label>{t('Due date')} <InfoIcon id="field.expense.due" /></label><input type="date" value={f.dueDate} onChange={(e) => set({ dueDate: e.target.value })} /></div>
       </div>
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        <div><label>{t('Total incl. VAT (SAR)')}</label><input aria-label="expense amount" value={f.gross} onChange={(e) => set({ gross: e.target.value })} /></div>
+        <div><label>{t('Total incl. VAT (SAR)')} <InfoIcon id="field.expense.total" /></label><input aria-label="expense amount" value={f.gross} onChange={(e) => set({ gross: e.target.value })} /></div>
         <div>
-          <label>{t('VAT treatment')}</label>
+          <label>{t('VAT treatment')} <InfoIcon id="field.expense.vatClass" /></label>
           <select value={f.vatClass} onChange={(e) => set({ vatClass: e.target.value as VatClass })}>
             {VAT.map((v) => <option key={v} value={v}>{t(VAT_LABEL[v])}</option>)}
           </select>
         </div>
         {f.vatClass === 'standard' && (
           <div>
-            <label>{t('VAT amount from the invoice (SAR)')}</label>
+            <label>{t('VAT amount from the invoice (SAR)')} <InfoIcon id="field.expense.vat" /></label>
             <div className="row">
               <input value={f.vatAmount} onChange={(e) => set({ vatAmount: e.target.value })} />
               <button type="button" title={t('Suggests 15/115 of the total. Check it against the invoice.')} disabled={!(gross > 0)}
@@ -299,18 +300,18 @@ function ExpenseForm({ cats, can, initial, onClose }: { cats: ExpenseCategory[];
         )}
       </div>
       {f.vatClass === 'standard' && (
-        <label><input type="checkbox" checked={f.vatRecoverable} onChange={(e) => set({ vatRecoverable: e.target.checked })} /> {t('Input VAT is recoverable (tax invoice with supplier VAT number)')}</label>
+        <label><input type="checkbox" checked={f.vatRecoverable} onChange={(e) => set({ vatRecoverable: e.target.checked })} /> {t('Input VAT is recoverable (tax invoice with supplier VAT number)')} <InfoIcon id="field.vat.recoverable" /></label>
       )}
-      <label><input type="checkbox" checked={f.prepaid} onChange={(e) => set({ prepaid: e.target.checked })} /> {t('Covers several months (prepaid, e.g. yearly rent)')}</label>
+      <label><input type="checkbox" checked={f.prepaid} onChange={(e) => set({ prepaid: e.target.checked })} /> {t('Covers several months (prepaid, e.g. yearly rent)')} <InfoIcon id="field.expense.prepaid" /></label>
       {f.prepaid && (
         <div className="row">
-          <div><label>{t('First month')}</label><input type="month" value={f.periodStart} onChange={(e) => set({ periodStart: e.target.value })} /></div>
-          <div><label>{t('Last month')}</label><input type="month" value={f.periodEnd} onChange={(e) => set({ periodEnd: e.target.value })} /></div>
+          <div><label>{t('First month')} <InfoIcon id="field.expense.firstMonth" /></label><input type="month" value={f.periodStart} onChange={(e) => set({ periodStart: e.target.value })} /></div>
+          <div><label>{t('Last month')} <InfoIcon id="field.expense.lastMonth" /></label><input type="month" value={f.periodEnd} onChange={(e) => set({ periodEnd: e.target.value })} /></div>
         </div>
       )}
       <div className="row">
-        <div><label>{t('Notes')}</label><input value={f.notes} onChange={(e) => set({ notes: e.target.value })} /></div>
-        <div><label>{t('Receipt reference (file name or folder no.)')}</label><input value={f.attachmentRef} onChange={(e) => set({ attachmentRef: e.target.value })} /></div>
+        <div><label>{t('Notes')} <InfoIcon id="field.expense.notes" /></label><input value={f.notes} onChange={(e) => set({ notes: e.target.value })} /></div>
+        <div><label>{t('Receipt reference (file name or folder no.)')} <InfoIcon id="field.expense.receipt" /></label><input value={f.attachmentRef} onChange={(e) => set({ attachmentRef: e.target.value })} /></div>
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
       <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
@@ -399,10 +400,10 @@ function ExpenseDetail({ id, can, onEdit, onClose }: { id: number; can: (p: stri
 
       {e.status === 'posted' && e.outstanding > 0 && can('expense.pay') && (
         <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div><label>{t('Pay amount (SAR)')}</label><input aria-label="pay amount" value={pay.amount} onChange={(x) => setPay({ ...pay, amount: x.target.value })} /></div>
+          <div><label>{t('Pay amount (SAR)')} <InfoIcon id="field.expense.pay" /></label><input aria-label="pay amount" value={pay.amount} onChange={(x) => setPay({ ...pay, amount: x.target.value })} /></div>
           <div><label>{t('From')}</label><select value={pay.method} onChange={(x) => setPay({ ...pay, method: x.target.value as PayMethod })}><option value="bank">{t('Bank')}</option><option value="till">{t('Till cash (open shift)')}</option></select></div>
-          <div><label>{t('Payment date')}</label><input type="date" value={pay.paidOn} onChange={(x) => setPay({ ...pay, paidOn: x.target.value })} /></div>
-          <div><label>{t('Reference')}</label><input value={pay.reference} onChange={(x) => setPay({ ...pay, reference: x.target.value })} /></div>
+          <div><label>{t('Payment date')} <InfoIcon id="field.expense.payDate" /></label><input type="date" value={pay.paidOn} onChange={(x) => setPay({ ...pay, paidOn: x.target.value })} /></div>
+          <div><label>{t('Reference')} <InfoIcon id="field.expense.reference" /></label><input value={pay.reference} onChange={(x) => setPay({ ...pay, reference: x.target.value })} /></div>
           <button className="primary" disabled={busy || Number.isNaN(sarOrZero(pay.amount)) || sarOrZero(pay.amount) <= 0}
             onClick={() => act(() => call('expense.pay', { id, requestKey: payKey.current, amount: sarOrZero(pay.amount), method: pay.method, paidOn: pay.paidOn, reference: pay.reference || undefined }), t('Payment recorded'))}>
             {t('Record payment')}
@@ -472,22 +473,22 @@ function Recurring({ cats, can, onChange }: { cats: ExpenseCategory[]; can: (p: 
       {can('expense.approve') && (
         <div className="card section">
           <div className="row" style={{ flexWrap: 'wrap' }}>
-            <div><label>{t('Name')}</label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
-            <div><label>{t('Category')}</label><select value={f.categoryId} onChange={(e) => setF({ ...f, categoryId: Number(e.target.value) })}><option value={0}>{t('— choose —')}</option>{cats.map((c) => <option key={c.id} value={c.id}>{t(c.nameEn)}</option>)}</select></div>
-            <div><label>{t('Expected amount (SAR)')}</label><input value={f.expected} onChange={(e) => setF({ ...f, expected: e.target.value })} /></div>
+            <div><label>{t('Name')} <InfoIcon id="field.recurring.name" /></label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+            <div><label>{t('Category')} <InfoIcon id="field.expense.category" /></label><select value={f.categoryId} onChange={(e) => setF({ ...f, categoryId: Number(e.target.value) })}><option value={0}>{t('— choose —')}</option>{cats.map((c) => <option key={c.id} value={c.id}>{t(c.nameEn)}</option>)}</select></div>
+            <div><label>{t('Expected amount (SAR)')} <InfoIcon id="field.recurring.expected" /></label><input value={f.expected} onChange={(e) => setF({ ...f, expected: e.target.value })} /></div>
           </div>
           <div className="row" style={{ flexWrap: 'wrap' }}>
-            <div><label>{t('Every')}</label><select value={f.interval} onChange={(e) => setF({ ...f, interval: e.target.value as RecurringRow['interval'] })}><option value="monthly">{t('monthly')}</option><option value="quarterly">{t('quarterly')}</option><option value="yearly">{t('yearly')}</option></select></div>
-            <div><label>{t('Start')}</label><input type="date" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></div>
-            <div><label>{t('End (optional)')}</label><input type="date" value={f.endDate} onChange={(e) => setF({ ...f, endDate: e.target.value })} /></div>
-            <div><label>{t('Due day')}</label><input value={f.dueDay} onChange={(e) => setF({ ...f, dueDay: e.target.value })} /></div>
+            <div><label>{t('Every')} <InfoIcon id="field.recurring.every" /></label><select value={f.interval} onChange={(e) => setF({ ...f, interval: e.target.value as RecurringRow['interval'] })}><option value="monthly">{t('monthly')}</option><option value="quarterly">{t('quarterly')}</option><option value="yearly">{t('yearly')}</option></select></div>
+            <div><label>{t('Start')} <InfoIcon id="field.recurring.start" /></label><input type="date" value={f.startDate} onChange={(e) => setF({ ...f, startDate: e.target.value })} /></div>
+            <div><label>{t('End (optional)')} <InfoIcon id="field.recurring.end" /></label><input type="date" value={f.endDate} onChange={(e) => setF({ ...f, endDate: e.target.value })} /></div>
+            <div><label>{t('Due day')} <InfoIcon id="field.recurring.dueDay" /></label><input value={f.dueDay} onChange={(e) => setF({ ...f, dueDay: e.target.value })} /></div>
           </div>
           <div className="row" style={{ flexWrap: 'wrap' }}>
-            <div><label>{t('Payee')}</label><input value={f.payee} onChange={(e) => setF({ ...f, payee: e.target.value })} /></div>
-            <div><label>{t('VAT treatment')}</label><select value={f.vatClass} onChange={(e) => setF({ ...f, vatClass: e.target.value as VatClass })}>{VAT.map((v) => <option key={v} value={v}>{t(VAT_LABEL[v])}</option>)}</select></div>
+            <div><label>{t('Payee')} <InfoIcon id="field.expense.payee" /></label><input value={f.payee} onChange={(e) => setF({ ...f, payee: e.target.value })} /></div>
+            <div><label>{t('VAT treatment')} <InfoIcon id="field.expense.vatClass" /></label><select value={f.vatClass} onChange={(e) => setF({ ...f, vatClass: e.target.value as VatClass })}>{VAT.map((v) => <option key={v} value={v}>{t(VAT_LABEL[v])}</option>)}</select></div>
           </div>
-          <label><input type="checkbox" checked={f.variableAmount} onChange={(e) => setF({ ...f, variableAmount: e.target.checked })} /> {t('Amount changes each time (e.g. electricity)')}</label>
-          <label><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
+          <label><input type="checkbox" checked={f.variableAmount} onChange={(e) => setF({ ...f, variableAmount: e.target.checked })} /> {t('Amount changes each time (e.g. electricity)')} <InfoIcon id="field.recurring.varies" /></label>
+          <label><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')} <InfoIcon id="field.active" /></label>
           {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
           <p><button className="primary" disabled={!f.name.trim() || !f.categoryId || !(sarOrZero(f.expected) > 0)} onClick={save}>{f.id ? t('Update') : t('Add recurring expense')}</button></p>
         </div>
@@ -521,10 +522,10 @@ function Categories({ cats, onChange }: { cats: ExpenseCategory[]; onChange: () 
           <td><button onClick={() => setF({ id: c.id, nameEn: c.nameEn, nameAr: c.nameAr, accountCode: c.accountCode, active: c.active })}>{t('Edit')}</button></td></tr>
       ))}</tbody></table>
       <div className="row" style={{ maxWidth: 720, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div><label>{t('Name (English)')}</label><input value={f.nameEn} onChange={(e) => setF({ ...f, nameEn: e.target.value })} /></div>
-        <div><label>{t('Name (Arabic)')}</label><input value={f.nameAr} onChange={(e) => setF({ ...f, nameAr: e.target.value })} /></div>
-        <div><label>{t('Account')}</label><select value={f.accountCode} onChange={(e) => setF({ ...f, accountCode: e.target.value })}>{accounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.nameEn}</option>)}</select></div>
-        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')}</label>
+        <div><label>{t('Name (English)')} <InfoIcon id="field.expenseCat.nameEn" /></label><input value={f.nameEn} onChange={(e) => setF({ ...f, nameEn: e.target.value })} /></div>
+        <div><label>{t('Name (Arabic)')} <InfoIcon id="field.expenseCat.nameAr" /></label><input value={f.nameAr} onChange={(e) => setF({ ...f, nameAr: e.target.value })} /></div>
+        <div><label>{t('Account')} <InfoIcon id="field.expenseCat.account" /></label><select value={f.accountCode} onChange={(e) => setF({ ...f, accountCode: e.target.value })}>{accounts.map((a) => <option key={a.code} value={a.code}>{a.code} {a.nameEn}</option>)}</select></div>
+        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {t('Active')} <InfoIcon id="field.active" /></label>
         <button disabled={!f.nameEn.trim()} onClick={save}>{f.id ? t('Update') : t('Add category')}</button>
       </div>
       {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}

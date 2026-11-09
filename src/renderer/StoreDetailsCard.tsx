@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { StoreDetails } from '../services/store-details';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useI18n } from './i18n';
 
 type Msg = { kind: 'ok' | 'error'; text: string } | null;
@@ -17,7 +18,7 @@ export function StoreDetailsCard() {
 
   const field = (k: keyof StoreDetails, label: string) => (
     <div key={k}>
-      <label>{label}</label>
+      <label>{label} <InfoIcon id={`field.store.${k}`} /></label>
       <input aria-label={`store ${k}`} value={d[k]} onChange={(e) => setD({ ...d, [k]: e.target.value })} />
     </div>
   );
@@ -67,7 +68,7 @@ export function StoreDetailsCard() {
       <h4>{t('Receipt footer')}</h4>
       {field('footerAr', t('Thank-you line (Arabic)'))}
       {field('footerEn', t('Thank-you line (English)'))}
-      <label>{t('Logo (PNG or JPEG, up to 200 KB)')}</label>
+      <label>{t('Logo (PNG or JPEG, up to 200 KB)')} <InfoIcon id="field.store.logo" /></label>
       <input type="file" aria-label="store logo" accept="image/png,image/jpeg" onChange={(e) => pickLogo(e.target.files?.[0])} />
       {d.logo && <button type="button" onClick={() => setD({ ...d, logo: '' })}>{t('Remove logo')}</button>}
       <h4>{t('Preview')}</h4>

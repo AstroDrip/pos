@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatSar, parseSar } from '../core/money';
 import type { Product } from '../services/catalog';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validOneOf, validText } from './remember';
 import { PageHeader } from './PageHeader';
@@ -75,19 +76,19 @@ export function Products() {
       <div className="grid-cards">
       <form className="card" onSubmit={save}>
         <h3>{t('New product')}</h3>
-        <label>SKU</label><input value={form.sku} onChange={set('sku')} />
-        <label>{t('Name (Arabic)')}</label><input dir="rtl" value={form.nameAr} onChange={set('nameAr')} />
-        <label>{t('Name (English)')}</label><input value={form.nameEn} onChange={set('nameEn')} />
-        <label>{t('Sold by')}</label>
+        <label>SKU <InfoIcon id="field.product.sku" /></label><input value={form.sku} onChange={set('sku')} />
+        <label>{t('Name (Arabic)')} <InfoIcon id="field.product.nameAr" /></label><input dir="rtl" value={form.nameAr} onChange={set('nameAr')} />
+        <label>{t('Name (English)')} <InfoIcon id="field.product.nameEn" /></label><input value={form.nameEn} onChange={set('nameEn')} />
+        <label>{t('Sold by')} <InfoIcon id="field.product.sellMode" /></label>
         <select value={form.sellMode} onChange={set('sellMode')}>
           <option value="unit">{t('Piece')}</option>
           <option value="weight">{t('Weight (kg)')}</option>
         </select>
-        <label>{form.sellMode === 'weight' ? t('Shelf price incl. VAT (SAR per kg)') : t('Shelf price incl. VAT (SAR)')}</label>
+        <label>{form.sellMode === 'weight' ? t('Shelf price incl. VAT (SAR per kg)') : t('Shelf price incl. VAT (SAR)')} <InfoIcon id="field.product.price" /></label>
         <input value={form.price} onChange={set('price')} />
-        <label>{t('VAT %')}</label><input value={form.vat} onChange={set('vat')} />
-        <label>{t('Barcode (optional)')}</label><input value={form.barcode} onChange={set('barcode')} />
-        <label>{t('PLU (optional, needed for scale labels)')}</label><input value={form.plu} onChange={set('plu')} />
+        <label>{t('VAT %')} <InfoIcon id="field.product.vat" /></label><input value={form.vat} onChange={set('vat')} />
+        <label>{t('Barcode (optional)')} <InfoIcon id="field.product.barcode" /></label><input value={form.barcode} onChange={set('barcode')} />
+        <label>{t('PLU (optional, needed for scale labels)')} <InfoIcon id="field.product.plu" /></label><input value={form.plu} onChange={set('plu')} />
         {msg && <p className={`msg ${msg.kind}`}>{msg.text}</p>}
         <p><button className="primary">{t('Save product')}</button></p>
       </form>
@@ -141,17 +142,17 @@ function EditProduct({ product, onDone }: { product: Product; onDone: () => void
   return (
     <div className="card section">
       <h3>{product.nameEn} · {product.sku}</h3>
-      <label>{product.sellMode === 'weight' ? t('Shelf price incl. VAT (SAR per kg)') : t('Shelf price incl. VAT (SAR)')}</label>
+      <label>{product.sellMode === 'weight' ? t('Shelf price incl. VAT (SAR per kg)') : t('Shelf price incl. VAT (SAR)')} <InfoIcon id="field.product.price" /></label>
       <div className="row">
         <input aria-label="new price" value={price} onChange={(e) => setPrice(e.target.value)} />
         <button onClick={() => run(() => call('catalog.setPrice', { productId: product.id, priceIncl: parseSar(price) }))}>{t('Save price')}</button>
       </div>
-      <label>{t('Other names for search (comma-separated)')}</label>
+      <label>{t('Other names for search (comma-separated)')} <InfoIcon id="field.product.aliases" /></label>
       <div className="row">
         <input value={aliases} onChange={(e) => setAliases(e.target.value)} />
         <button onClick={() => run(() => call('catalog.setAliases', { productId: product.id, aliases: aliases.split(',').map((a) => a.trim()).filter(Boolean) }))}>{t('Save names')}</button>
       </div>
-      <label>{t('Reason')}</label>
+      <label>{t('Reason')} <InfoIcon id="field.product.reason" /></label>
       <div className="row">
         <input aria-label="status reason" value={reason} onChange={(e) => setReason(e.target.value)} />
         {product.active

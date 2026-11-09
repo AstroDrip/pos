@@ -3,6 +3,7 @@ import { formatSar, parseSar } from '../core/money';
 import { storeDateTime } from '../core/store-time';
 import type { PastShift, ShiftSummary } from '../services/shifts';
 import { call } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useReturnTick } from './TabHost';
 import { useI18n } from './i18n';
 import { EmptyRow } from './PageHeader';
@@ -39,13 +40,13 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
       <h3>{t('Shift #{0}', s.shiftId)}</h3>
       <table className="list">
         <tbody>
-          <tr><td>{t('Opening float')}</td><td className="num">{formatSar(s.openingFloat)}</td></tr>
+          <tr><td>{t('Opening float')} <InfoIcon id="metric.shift.float" /></td><td className="num">{formatSar(s.openingFloat)}</td></tr>
           <tr><td>{t('Sales ({0})', s.saleCount)}</td><td /></tr>
-          <tr><td>{t('Cash sales')}</td><td className="num">{formatSar(s.cashSales)}</td></tr>
-          <tr><td>{t('Card sales')}</td><td className="num">{formatSar(s.cardSales)}</td></tr>
-          <tr><td>{t('Cash in / out')}</td><td className="num">{formatSar(s.cashIn)} / {formatSar(s.cashOut)}</td></tr>
-          <tr><td>{t('Refunds paid in cash ({0})', s.refundCount)}</td><td className="num">{formatSar(s.cashRefunds)}</td></tr>
-          <tr><td><strong>{t('Expected cash in drawer')}</strong></td><td className="num"><strong>{formatSar(s.expectedCash)}</strong></td></tr>
+          <tr><td>{t('Cash sales')} <InfoIcon id="metric.shift.cash" /></td><td className="num">{formatSar(s.cashSales)}</td></tr>
+          <tr><td>{t('Card sales')} <InfoIcon id="metric.shift.card" /></td><td className="num">{formatSar(s.cardSales)}</td></tr>
+          <tr><td>{t('Cash in / out')} <InfoIcon id="metric.shift.moves" /></td><td className="num">{formatSar(s.cashIn)} / {formatSar(s.cashOut)}</td></tr>
+          <tr><td>{t('Refunds paid in cash ({0})', s.refundCount)} <InfoIcon id="metric.shift.refunds" /></td><td className="num">{formatSar(s.cashRefunds)}</td></tr>
+          <tr><td><strong>{t('Expected cash in drawer')} <InfoIcon id="metric.shift.expected" /></strong></td><td className="num"><strong>{formatSar(s.expectedCash)}</strong></td></tr>
         </tbody>
       </table>
 
@@ -59,7 +60,7 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
             </select>
             <input placeholder={t('Amount')} value={move.amount} onChange={(e) => setMove({ ...move, amount: e.target.value })} />
           </div>
-          <label>{t('Reason')}</label>
+          <label>{t('Reason')} <InfoIcon id="field.cash.reason" /></label>
           <input value={move.reason} onChange={(e) => setMove({ ...move, reason: e.target.value })} />
           <p>
             <button onClick={() => run(() => call('cash.move', { kind: move.kind, amount: parseSar(move.amount), reason: move.reason }), t('Recorded'))}>
@@ -70,7 +71,7 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
       )}
 
       <h4>{t('Close shift')}</h4>
-      <label>{t('Counted cash in drawer (SAR)')}</label>
+      <label>{t('Counted cash in drawer (SAR)')} <InfoIcon id="field.shift.counted" /></label>
       <input value={counted} onChange={(e) => setCounted(e.target.value)} />
       <p>
         <button
@@ -89,8 +90,8 @@ export function Shift({ can, onUserChange }: { can: (p: string) => boolean; onUs
       <h4>{t('Hand over to the next cashier')}</h4>
       <p className="hint">{t('Count the drawer, then the next cashier types their username and PIN. Your shift closes and theirs opens with this cash.')}</p>
       <div className="row">
-        <div><label>{t('Counted cash in drawer (SAR)')}</label><input aria-label="handover counted cash" value={hand.counted} onChange={(e) => setHand({ ...hand, counted: e.target.value })} /></div>
-        <div><label>{t('Next cashier username')}</label><input aria-label="handover username" value={hand.username} onChange={(e) => setHand({ ...hand, username: e.target.value })} /></div>
+        <div><label>{t('Counted cash in drawer (SAR)')} <InfoIcon id="field.shift.counted" /></label><input aria-label="handover counted cash" value={hand.counted} onChange={(e) => setHand({ ...hand, counted: e.target.value })} /></div>
+        <div><label>{t('Next cashier username')} <InfoIcon id="field.shift.nextUser" /></label><input aria-label="handover username" value={hand.username} onChange={(e) => setHand({ ...hand, username: e.target.value })} /></div>
         <div><label>{t('Next cashier PIN')}</label><input aria-label="handover pin" type="password" inputMode="numeric" value={hand.pin} onChange={(e) => setHand({ ...hand, pin: e.target.value })} /></div>
       </div>
       <p>

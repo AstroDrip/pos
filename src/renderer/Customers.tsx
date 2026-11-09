@@ -4,6 +4,7 @@ import { storeDateTime } from '../core/store-time';
 import type { FinStatus } from '../core/status';
 import type { ArAgeingRow, CreditInvoice, CustomerAccount, StatementLine } from '../services/credit';
 import { call, type ApiError } from './api';
+import { InfoIcon } from './InfoIcon';
 import { useRemembered, useReturnTick } from './TabHost';
 import { validId, validOneOf, validText } from './remember';
 import { PageHeader } from './PageHeader';
@@ -88,8 +89,8 @@ export function Customers({ can, request }: { can: (p: string) => boolean; reque
           {browsing && !openId && all.items.length < all.total && <p><button type="button" aria-label="show more customers" onClick={() => void loadAll(all.items.length)}>{t('Show more')}</button></p>}
           {can('customer.manage') && !openId && (
             <div className="row" style={{ maxWidth: 600, alignItems: 'flex-end', marginTop: 8 }}>
-              <div><label>{t('New customer name')}</label><input value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} /></div>
-              <div><label>{t('Phone')}</label><input value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} /></div>
+              <div><label>{t('New customer name')} <InfoIcon id="field.customer.name" /></label><input value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} /></div>
+              <div><label>{t('Phone')} <InfoIcon id="field.customer.phone" /></label><input value={newCust.phone} onChange={(e) => setNewCust({ ...newCust, phone: e.target.value })} /></div>
               <button disabled={!newCust.name.trim()} onClick={async () => {
                 try {
                   const id = await call<number>('customer.create', { name: newCust.name, phone: newCust.phone || undefined });
@@ -109,8 +110,8 @@ export function Customers({ can, request }: { can: (p: string) => boolean; reque
   );
 }
 
-function Amount({ l, v, bad, small }: { l: string; v: string; bad?: boolean; small?: boolean }) {
-  return <div className="kpi"><div className="l">{l}</div><div className={`v${bad ? ' neg' : ''}${small ? ' sm' : ''}`} title={v}>{v}</div></div>;
+function Amount({ l, v, bad, small, info }: { l: string; v: string; bad?: boolean; small?: boolean; info?: string }) {
+  return <div className="kpi"><div className="l">{l}{info && <InfoIcon id={info} />}</div><div className={`v${bad ? ' neg' : ''}${small ? ' sm' : ''}`} title={v}>{v}</div></div>;
 }
 
 function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean; onClose: () => void }) {
@@ -154,15 +155,15 @@ function Account({ id, can, onClose }: { id: number; can: (p: string) => boolean
         <button onClick={onClose}>{t('Close')}</button>
       </div>
       <div className="amounts" style={{ marginTop: 8 }}>
-        <Amount l={t('Owed now')} v={formatSar(a.outstanding)} />
-        <Amount l={t('Overdue')} v={formatSar(a.overdue)} bad={a.overdue > 0} />
-        <Amount l={t('Advance held')} v={formatSar(a.advance)} />
-        <Amount l={t('Credit limit')} v={!a.creditEnabled ? t('Credit off') : a.creditLimit === null ? t('No fixed limit') : formatSar(a.creditLimit)} />
-        <Amount l={t('Available credit')} v={!a.creditEnabled ? '—' : a.available === null ? t('No fixed limit') : formatSar(Math.max(a.available, 0))} />
+        <Amount info="metric.customer.owed" l={t('Owed now')} v={formatSar(a.outstanding)} />
+        <Amount info="metric.customer.overdue" l={t('Overdue')} v={formatSar(a.overdue)} bad={a.overdue > 0} />
+        <Amount info="metric.customer.advance" l={t('Advance held')} v={formatSar(a.advance)} />
+        <Amount info="metric.customer.limit" l={t('Credit limit')} v={!a.creditEnabled ? t('Credit off') : a.creditLimit === null ? t('No fixed limit') : formatSar(a.creditLimit)} />
+        <Amount info="metric.customer.available" l={t('Available credit')} v={!a.creditEnabled ? '—' : a.available === null ? t('No fixed limit') : formatSar(Math.max(a.available, 0))} />
         <Amount l={t('Terms')} v={a.paymentTermsDays === null ? t('No due date') : t('{0} days', a.paymentTermsDays)} />
         <Amount l={t('Unpaid / partly paid invoices')} v={`${a.unpaidCount} / ${a.partialCount}`} />
-        <Amount l={t('Lifetime purchases')} v={formatSar(a.lifetimePurchases)} />
-        <Amount l={t('Lifetime payments')} v={formatSar(a.lifetimePayments)} />
+        <Amount info="metric.customer.purchases" l={t('Lifetime purchases')} v={formatSar(a.lifetimePurchases)} />
+        <Amount info="metric.customer.payments" l={t('Lifetime payments')} v={formatSar(a.lifetimePayments)} />
         <div className="kpi"><div className="l">{t('Last purchase / payment')}</div>
           <div className="v sm"><span className="line">{a.lastPurchase ? storeDateTime(a.lastPurchase).slice(0, 10) : '—'}</span><span className="line">{a.lastPayment ? storeDateTime(a.lastPayment).slice(0, 10) : '—'}</span></div></div>
       </div>
@@ -292,13 +293,13 @@ function Collect({ account, can, onDone }: { account: CustomerAccount; can: (p: 
     <div className="subpanel" role="group" aria-label="collect payment">
       <h4>{t('Receive a payment')} <HelpLink article="customers-receive-payment" /></h4>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div><label>{t('Amount received (SAR)')}</label><input aria-label="payment amount" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-        <div><label>{t('Method')}</label>
+        <div><label>{t('Amount received (SAR)')} <InfoIcon id="field.customer.received" /></label><input aria-label="payment amount" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+        <div><label>{t('Method')} <InfoIcon id="field.customer.method" /></label>
           <select value={method} onChange={(e) => setMethod(e.target.value as typeof method)}>
             <option value="cash">{t('cash')}</option><option value="card">{t('card')}</option>{can('customer.payment.bank') && <option value="bank">{t('bank')}</option>}
           </select>
         </div>
-        <div><label>{t('Reference')}</label><input value={ref} onChange={(e) => setRef(e.target.value)} /></div>
+        <div><label>{t('Reference')} <InfoIcon id="field.customer.reference" /></label><input value={ref} onChange={(e) => setRef(e.target.value)} /></div>
         <button disabled={!(amt > 0) || open.length === 0} onClick={suggest}>{t('Suggest: oldest first')}</button>
       </div>
       {open.length > 0 && (
@@ -353,16 +354,16 @@ function Settings({ account, onDone }: { account: CustomerAccount; onDone: (m: M
   return (
     <div className="subpanel">
       <h4>{t('Credit settings')}</h4>
-      <label><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> {t('Allowed to buy on credit')}</label>
+      <label><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> {t('Allowed to buy on credit')} <InfoIcon id="field.customer.creditOn" /></label>
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div><label>{t('Credit limit (SAR)')}</label><input disabled={f.noLimit} value={f.limit} onChange={(e) => setF({ ...f, limit: e.target.value })} /></div>
-        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noLimit} onChange={(e) => setF({ ...f, noLimit: e.target.checked })} /> {t('No fixed limit (trusted customer)')}</label>
-        <div><label>{t('Pay within (days)')}</label><input disabled={f.noDue} value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} /></div>
-        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noDue} onChange={(e) => setF({ ...f, noDue: e.target.checked })} /> {t('No due date')}</label>
+        <div><label>{t('Credit limit (SAR)')} <InfoIcon id="field.customer.limit" /></label><input disabled={f.noLimit} value={f.limit} onChange={(e) => setF({ ...f, limit: e.target.value })} /></div>
+        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noLimit} onChange={(e) => setF({ ...f, noLimit: e.target.checked })} /> {t('No fixed limit (trusted customer)')} <InfoIcon id="field.customer.noLimit" /></label>
+        <div><label>{t('Pay within (days)')} <InfoIcon id="field.customer.terms" /></label><input disabled={f.noDue} value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} /></div>
+        <label style={{ flex: '0 0 auto' }}><input type="checkbox" checked={f.noDue} onChange={(e) => setF({ ...f, noDue: e.target.checked })} /> {t('No due date')} <InfoIcon id="field.customer.noDue" /></label>
       </div>
       <div className="row">
-        <div><label>{t('Address')}</label><input value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
-        <div><label>{t('Notes')}</label><input value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
+        <div><label>{t('Address')} <InfoIcon id="field.customer.address" /></label><input value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
+        <div><label>{t('Notes')} <InfoIcon id="field.customer.notes" /></label><input value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
       </div>
       {f.enabled && !f.noLimit && !f.limit.trim() && <p className="msg warn">{t('Type a credit limit, or tick "No fixed limit" for a trusted customer.')}</p>}
       <p><button className="primary" disabled={f.enabled && !f.noLimit && Number.isNaN(sar(f.limit))} onClick={async () => {

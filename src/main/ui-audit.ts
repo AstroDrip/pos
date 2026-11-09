@@ -974,6 +974,22 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await openNamed('Sell');
     await js(`document.querySelector('[aria-label="bill left open"] button:last-child')?.click()`);
     await sleep(300);
+
+    // The small "i" opens the right text, closes with Esc and does not join the Tab order.
+    await focus('input[aria-label="product search"]');
+    const before = await js<string>('document.activeElement?.getAttribute("aria-label") ?? ""');
+    await js(`document.querySelector('.info-icon[aria-label="What is VAT?"]')?.click()`);
+    await sleep(300);
+    const text = await js<string>(`document.querySelector('.info-pop')?.textContent ?? ''`);
+    flow('info-icon-opens-right-text', text.includes('The VAT inside this bill'), text.slice(0, 80));
+    key('Escape');
+    await sleep(200);
+    const closed = await js<boolean>(`!document.querySelector('.info-pop')`);
+    const after = await js<string>('document.activeElement?.getAttribute("aria-label") ?? ""');
+    flow('info-icon-esc-closes-and-keeps-focus', closed && after === before, `closed ${closed}, focus ${after}`);
+    const inTab = await js<number>(`[...document.querySelectorAll('.info-icon')].filter((b) => b.tabIndex !== -1).length`);
+    flow('tab-order-unchanged-on-sell', inTab === 0, `icons in the Tab order: ${inTab}`);
+    await sleep(300);
   }
 
   /** What survives the screen being wiped, as after a restart. */
