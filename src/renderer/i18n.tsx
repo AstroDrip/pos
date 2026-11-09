@@ -154,6 +154,10 @@ const AR: Record<string, string> = {
   "A bill was left open.": "توجد فاتورة تُركت مفتوحة.",
   "Restore": "استعادة",
   "Discard": "تجاهل",
+  // master prompt A
+  "Out of stock": "نفد من المخزون",
+  "Often bought": "يُشترى كثيراً",
+  "Usually sold around now": "يباع عادةً في هذا الوقت",
   // keyboard shortcuts
   "Keyboard shortcuts": 'اختصارات لوحة المفاتيح',
   "Function": 'الوظيفة',

@@ -9,6 +9,8 @@
  * The score is only used to order products inside the same search match level; it never moves money or stock.
  */
 import type Database from 'better-sqlite3';
+import { MIN_PRODUCT_SALES, MIN_STORE_DAYS } from '../core/rank';
+import { storeHourBlock, storeWeekday } from '../core/store-time';
 import type { Ctx } from './context';
 
 export const DEMAND_MIN_SALES = 3;
@@ -33,6 +35,7 @@ let cache = new WeakMap<Database.Database, CacheEntry>();
 /** Tests only: forget every cached score. */
 export function resetDemandCache(): void {
   cache = new WeakMap();
+  patterns = new WeakMap();
 }
 
 // New sales (id above the last one counted), per product, per window.
@@ -112,5 +115,46 @@ export function demandScores(ctx: Ctx, now: Date = new Date(ctx.now())): Map<num
   }
   e.map = map;
   cache.set(ctx.db, e);
+  return map;
+}
+
+interface PatternEntry {
+  key: string;
+  map: Map<number, { hourShare: number; dayShare: number }>;
+}
+let patterns = new WeakMap<Database.Database, PatternEntry>();
+
+/**
+ * When each product tends to sell: its share of sales in this 4-hour block and on this weekday, last 90 days.
+ * Empty until the store has MIN_STORE_DAYS of history; only products with MIN_PRODUCT_SALES sales. Worked out once
+ * per new sale, block and day.
+ */
+export function demandPatterns(ctx: Ctx, now: Date = new Date(ctx.now())): Map<number, { hourShare: number; dayShare: number }> {
+  const iso = now.toISOString();
+  const hour = storeHourBlock(iso);
+  const day = storeWeekday(iso);
+  const top = (ctx.db.prepare('SELECT COALESCE(MAX(id), 0) AS m, MIN(created_at) AS first FROM sales').get() as { m: number; first: string | null });
+  const key = `${top.m}|${hour}|${day}`;
+  const cached = patterns.get(ctx.db);
+  if (cached?.key === key) return cached.map;
+  const map: PatternEntry['map'] = new Map();
+  if (top.first && now.getTime() - Date.parse(top.first) >= MIN_STORE_DAYS * DAY_MS) {
+    const rows = ctx.db
+      .prepare(
+        `SELECT l.product_id AS p, CAST(strftime('%H', s.created_at, '+3 hours') AS INTEGER) / 4 AS h, CAST(strftime('%w', s.created_at, '+3 hours') AS INTEGER) AS d, COUNT(DISTINCT s.id) AS c
+           FROM sales s JOIN sale_lines l ON l.sale_id = s.id WHERE s.created_at >= ? GROUP BY p, h, d`,
+      )
+      .all(new Date(now.getTime() - 90 * DAY_MS).toISOString()) as { p: number; h: number; d: number; c: number }[];
+    const totals = new Map<number, { all: number; hour: number; day: number }>();
+    for (const r of rows) {
+      const t = totals.get(r.p) ?? { all: 0, hour: 0, day: 0 };
+      t.all += r.c;
+      if (r.h === hour) t.hour += r.c;
+      if (r.d === day) t.day += r.c;
+      totals.set(r.p, t);
+    }
+    for (const [p, t] of totals) if (t.all >= MIN_PRODUCT_SALES) map.set(p, { hourShare: t.hour / t.all, dayShare: t.day / t.all });
+  }
+  patterns.set(ctx.db, { key, map });
   return map;
 }

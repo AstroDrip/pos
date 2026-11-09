@@ -141,6 +141,9 @@ export function SearchBox({
               <span>
                 {lang === 'ar' ? h.product.nameAr : h.product.nameEn}
                 <small className="ar"> {lang === 'ar' ? h.product.nameEn : h.product.nameAr} · {h.product.sku}</small>
+                {!h.signals.inStock && <small className="tag">{t('Out of stock')}</small>}
+                {h.signals.often && <small className="tag">{t('Often bought')}</small>}
+                {h.signals.now && <small className="tag">{t('Usually sold around now')}</small>}
               </span>
               <span className="num">
                 {formatSar(h.product.priceIncl)}

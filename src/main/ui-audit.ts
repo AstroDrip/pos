@@ -38,7 +38,10 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     });
     return wrap(window.document);
   })();`;
-  const js = <T = unknown>(code: string): Promise<T> => wc.executeJavaScript(`{ ${VISIBLE_DOCUMENT} const document = window.__auditDocument; ${code} }`, true) as Promise<T>;
+  const js = <T = unknown>(code: string): Promise<T> =>
+    (wc.executeJavaScript(`{ ${VISIBLE_DOCUMENT} const document = window.__auditDocument; ${code} }`, true) as Promise<T>).catch((e: Error) => {
+      throw new Error(`${e.message} in: ${code.slice(0, 160)}`);
+    });
   const waitFor = async (expr: string, ms = 4000) => {
     const end = Date.now() + ms;
     while (Date.now() < end) {
@@ -72,7 +75,9 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
   const capture = async (name: string) => {
     await sleep(300);
     await painted();
-    const raw = (await wc.executeJavaScript(COLLECT_SOURCE, true)) as Omit<Snapshot, 'screen'> & { scrollHeight: number };
+    const raw = (await wc.executeJavaScript(COLLECT_SOURCE, true).catch((e: Error) => {
+      throw new Error(`${e.message} collecting ${name}`);
+    })) as Omit<Snapshot, 'screen'> & { scrollHeight: number };
     const snap: Snapshot = { screen: name, viewport: raw.viewport, scrollWidth: raw.scrollWidth, boxes: raw.boxes, scrollers: raw.scrollers };
     const findings: Finding[] = auditGeometry(snap);
     writeFileSync(join(outDir, `${name}.png`), (await wc.capturePage()).toPNG());
@@ -240,6 +245,10 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     };
     const rows = (label: string) => js<number>(`document.querySelectorAll('table[aria-label="${label}"] tbody tr:not(.empty)').length`);
     await tabTo('Customers');
+    await click('button', 'Close'); // tabs stay as they were left, so an earlier flow's account may still be open
+    await sleep(200);
+    await js(`(() => { const e = document.querySelector('input[aria-label="customer search"]'); if (e) { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, ''); e.dispatchEvent(new Event('input', { bubbles: true })); } })()`);
+    await sleep(500);
     const people = await rows('customers list');
     await js(`document.querySelector('table[aria-label="customers list"] tbody tr')?.click()`);
     await sleep(500);
@@ -688,8 +697,10 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
     await sleep(600);
     await letter('m');
     await sleep(300);
-    const stillSell = await js<boolean>(`document.querySelector('.top nav button.active')?.textContent.trim().endsWith('Sell')`);
-    flow('palette-rechecks-before-running', stillSell && (await lineCount()) === 1, `on sell ${stillSell}, lines ${await lineCount()}`);
+    // M is allowed with a bill now that tabs stay open: the item scanned meanwhile is still on the bill afterwards.
+    await js(`[...document.querySelectorAll('.top nav button')].find((b) => b.textContent.trim().endsWith('Sell'))?.click()`);
+    await sleep(500);
+    flow('palette-scan-keeps-bill-after-m', (await lineCount()) === 1, `lines ${await lineCount()}`);
     await esc();
 
     await focus(box);

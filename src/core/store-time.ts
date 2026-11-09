@@ -31,3 +31,13 @@ export function nextDay(day: string): string {
 
 /** SQLite expression giving the store day of a UTC timestamp column. */
 export const sqlStoreDay = (column: string) => `substr(datetime(${column}, '+${STORE_UTC_OFFSET_MIN} minutes'), 1, 10)`;
+
+/** Which 4-hour block of the store's day (0 to 5) a UTC timestamp falls in. */
+export function storeHourBlock(isoUtc: string): number {
+  return Math.floor(new Date(Date.parse(isoUtc) + STORE_UTC_OFFSET_MIN * 60_000).getUTCHours() / 4);
+}
+
+/** The store's weekday, 0 = Sunday. */
+export function storeWeekday(isoUtc: string): number {
+  return new Date(Date.parse(isoUtc) + STORE_UTC_OFFSET_MIN * 60_000).getUTCDay();
+}

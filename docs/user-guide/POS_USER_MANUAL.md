@@ -16,6 +16,7 @@ Names and numbers in the examples are made up.
 - **Selling**
   - [Scan a product](#selling-scan)
   - [Find a product by name or code](#selling-search)
+  - [What the tags in the search list mean](#selling-search-tags)
   - [Change a quantity (+, − or type a number)](#selling-quantity)
   - [Sell weighed goods (scale labels)](#selling-weighed)
   - [Remove an item or clear the whole bill](#selling-remove)
@@ -262,6 +263,27 @@ Names and numbers in the examples are made up.
 
 - *"No matching products".* Check the spelling, try fewer letters, or try the Arabic name. See "The cashier cannot find a product".
 - *Typed digits added a different product.* Digits always look up the exact code. Use ↓ to pick from the list if you meant a name.
+
+<a id="selling-search-tags"></a>
+
+### What the tags in the search list mean
+
+**What this does:** Small tags beside a product say what the app knows about it from this shop's past sales. They help you find items faster.
+
+**Where:** Sell tab, the list under the search box.
+
+**Steps**
+
+1. "Often bought" means customers have bought this item often in recent weeks.
+2. "Usually sold around now" means it sells more than usual at this time of day. It needs at least 4 weeks of sales in the shop.
+3. "Out of stock" means the system shows no stock. The item still appears, and it comes after items that are in stock.
+4. A scanned barcode or an exact code always comes first, however popular other items are.
+
+**What you should see:** The first tags appear once there are some sales. "Often bought" and "Usually sold around now" are guesses from past sales. They are not orders, and they do not promise a sale.
+
+**If something goes wrong**
+
+- *An item is tagged Out of stock but is on the shelf.* The stock count is wrong. Ask a supervisor to count it on the Stock tab.
 
 <a id="selling-quantity"></a>
 

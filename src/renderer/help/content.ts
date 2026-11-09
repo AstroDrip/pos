@@ -194,6 +194,22 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    id: 'selling-search-tags',
+    section: 'selling',
+    title: 'What the tags in the search list mean',
+    keywords: ['often bought', 'usually sold', 'out of stock', 'popular', 'tag', 'demand'],
+    what: 'Small tags beside a product say what the app knows about it from this shop\'s past sales. They help you find items faster.',
+    where: 'Sell tab, the list under the search box.',
+    steps: [
+      '"Often bought" means customers have bought this item often in recent weeks.',
+      '"Usually sold around now" means it sells more than usual at this time of day. It needs at least 4 weeks of sales in the shop.',
+      '"Out of stock" means the system shows no stock. The item still appears, and it comes after items that are in stock.',
+      'A scanned barcode or an exact code always comes first, however popular other items are.',
+    ],
+    expect: 'The first tags appear once there are some sales. "Often bought" and "Usually sold around now" are guesses from past sales. They are not orders, and they do not promise a sale.',
+    problems: [{ problem: 'An item is tagged Out of stock but is on the shelf.', fix: 'The stock count is wrong. Ask a supervisor to count it on the Stock tab.' }],
+  },
+  {
     id: 'selling-quantity',
     section: 'selling',
     title: 'Change a quantity (+, − or type a number)',

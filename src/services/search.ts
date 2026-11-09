@@ -1,7 +1,8 @@
 import { normalizeForSearch, tokens } from '../core/search-normalize';
 import type { Product } from './catalog';
 import type { Statement } from 'better-sqlite3';
-import { demandScores } from './demand';
+import { NOW_LIFT_MIN, OFTEN_BOUGHT_MIN, liftOf, rankScore } from '../core/rank';
+import { demandPatterns, demandScores } from './demand';
 import type { Ctx } from './context';
 
 // Indexed product search (audit Part 2). Every query below uses an index; see SEARCH_PERFORMANCE_REPORT.md
@@ -15,6 +16,8 @@ export interface SearchHit {
   product: Product;
   rank: number;
   matchedBy: 'barcode' | 'sku' | 'plu' | 'name' | 'name_prefix' | 'word_prefix' | 'alias' | 'sku_prefix';
+  /** Why it may be shown with a tag. Past sales are a guess, never an order. */
+  signals: { often: boolean; now: boolean; inStock: boolean };
 }
 
 const PRODUCT_COLUMNS = `p.id, p.sku, p.name_ar AS nameAr, p.name_en AS nameEn, u.code AS unitCode, p.sell_mode AS sellMode,
@@ -87,7 +90,7 @@ export function searchProducts(ctx: Ctx, text: string, limit = 20): SearchHit[] 
   const add = (rows: Row[], rank: number, matchedBy: SearchHit['matchedBy']) => {
     for (const r of rows) {
       const prev = hits.get(r.id);
-      if (!prev || prev.rank > rank) hits.set(r.id, { product: toProduct(r), rank, matchedBy });
+      if (!prev || prev.rank > rank) hits.set(r.id, { product: toProduct(r), rank, matchedBy, signals: { often: false, now: false, inStock: false } });
     }
   };
   const from = `FROM products p JOIN units u ON u.id = p.unit_id`;
@@ -142,8 +145,19 @@ export function searchProducts(ctx: Ctx, text: string, limit = 20): SearchHit[] 
   // Inside one match level, products customers buy more often come first (completed sales, net of refunds).
   // Demand never moves a product above a stronger match level.
   const demand = demandScores(ctx);
-  const d = (h: SearchHit) => demand.get(h.product.id) ?? 0;
+  const when = demandPatterns(ctx);
+  const ids = [...hits.keys()];
+  const stocked = new Set((ctx.db.prepare('SELECT product_id AS p FROM stock_balances WHERE qty > 0 AND product_id IN (SELECT value FROM json_each(?))').all(JSON.stringify(ids)) as { p: number }[]).map((r) => r.p));
+  const score = (h: SearchHit) => {
+    const w = when.get(h.product.id);
+    return rankScore({ history: demand.get(h.product.id) ?? 0, hourShare: w?.hourShare ?? null, dayShare: w?.dayShare ?? null });
+  };
+  for (const h of hits.values()) {
+    const w = when.get(h.product.id);
+    h.signals = { often: (demand.get(h.product.id) ?? 0) >= OFTEN_BOUGHT_MIN, now: !!w && liftOf(w.hourShare, 6) >= NOW_LIFT_MIN, inStock: stocked.has(h.product.id) };
+  }
+  const shelf = (h: SearchHit) => (h.signals.inStock ? 0 : 1);
   return [...hits.values()]
-    .sort((a, b) => a.rank - b.rank || d(b) - d(a) || a.product.nameEn.length - b.product.nameEn.length || a.product.nameEn.localeCompare(b.product.nameEn))
+    .sort((a, b) => a.rank - b.rank || shelf(a) - shelf(b) || score(b) - score(a) || a.product.nameEn.length - b.product.nameEn.length || a.product.nameEn.localeCompare(b.product.nameEn))
     .slice(0, limit);
 }
