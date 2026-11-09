@@ -13,6 +13,7 @@ import { EmptyRow, PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { focusWhenReady, useScreenKeys } from './Keyboard';
 import { HelpLink } from './HelpLink';
+import { VatReview } from './VatReview';
 import { SupplierBill } from './SupplierBill';
 import { PurchaseReports, SavedBills } from './SupplierBillsView';
 import { ProductName, useI18n } from './i18n';
@@ -26,7 +27,7 @@ const sar = (s: string) => {
     return NaN;
   }
 };
-const SECTIONS_ALL = ['bill', 'invoice', 'return', 'pay', 'ageing', 'register', 'saved', 'reports'] as const;
+const SECTIONS_ALL = ['bill', 'invoice', 'return', 'pay', 'ageing', 'register', 'saved', 'vat', 'reports'] as const;
 type Section = (typeof SECTIONS_ALL)[number];
 
 /** Purchasing (plan Phase 4). Posting rules are provisional until the accountant approves. */
@@ -61,6 +62,7 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
     { id: 'ageing', label: 'Ageing', show: true },
     { id: 'register', label: 'Purchase register', show: true },
     { id: 'saved', label: 'Saved bills', show: true },
+    { id: 'vat', label: 'Proforma VAT', show: true },
     { id: 'reports', label: 'Purchase reports', show: true },
   ];
   useEffect(() => {
@@ -87,6 +89,7 @@ export function Purchases({ can }: { can: (p: string) => boolean }) {
       {section === 'ageing' && <Ageing />}
       {section === 'register' && <Register />}
       {section === 'saved' && <SavedBills />}
+      {section === 'vat' && <VatReview can={can} />}
       {section === 'reports' && <PurchaseReports />}
     </div>
   );

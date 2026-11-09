@@ -30,6 +30,7 @@ import {
   supplierAgeing, supplierBalances, supplierStatement, uninvoicedGrns,
 } from '../services/purchasing';
 import { vatSummary } from '../services/vat-report';
+import { attachFinalDocument, claimVat, decideVat, getVatReview, listVatReviews, markNotClaimed, recordFinalInvoice, reverseVatClaim, verifyFinalInvoice } from '../services/vat-review';
 import {
   applyCustomerAdvance, creditControls, creditReceiptData, customerAccount, customerStatement, findCreditCustomers, listCustomerAccounts, receivablesAgeing,
   recordCustomerReceipt, reverseCustomerReceipt, setInvoiceDispute, suggestCustomerAllocation, updateCustomerCredit, writeOffInvoice,
@@ -65,7 +66,7 @@ type Payload<C extends Channel> = z.infer<(typeof schemas)[C]>;
 type Handler<C extends Channel> = (p: Payload<C>, s: Session) => unknown;
 
 /** Money and backup actions: a failure here is worth a line in the audit log, whatever the reason. */
-const FAILURE_LOGGED: ReadonlySet<Channel> = new Set(['sale.finalize', 'refund.create', 'credit.receipt', 'credit.writeOff', 'purchase.pay', 'expense.pay', 'backup.run', 'restore.apply']);
+const FAILURE_LOGGED: ReadonlySet<Channel> = new Set(['sale.finalize', 'refund.create', 'credit.receipt', 'credit.writeOff', 'purchase.pay', 'expense.pay', 'vat.claim', 'vat.reverse', 'backup.run', 'restore.apply']);
 
 const PUBLIC: ReadonlySet<Channel> = new Set(['auth.status', 'auth.setupAdmin', 'auth.login', 'restore.prepare', 'restore.apply']);
 
@@ -143,6 +144,15 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv) {
       return null;
     },
     'bill.create': (p, s) => createSupplierBill(ctx, userId(s), p),
+    'vat.list': (_p, s) => listVatReviews(ctx, userId(s)),
+    'vat.get': (p, s) => getVatReview(ctx, userId(s), p.billId),
+    'vat.recordFinal': (p, s) => recordFinalInvoice(ctx, userId(s), p),
+    'vat.attach': (p, s) => attachFinalDocument(ctx, userId(s), p),
+    'vat.verify': (p, s) => verifyFinalInvoice(ctx, userId(s), p),
+    'vat.decide': (p, s) => decideVat(ctx, userId(s), p),
+    'vat.claim': (p, s) => claimVat(ctx, userId(s), p),
+    'vat.reverse': (p, s) => reverseVatClaim(ctx, userId(s), p),
+    'vat.notClaimed': (p, s) => markNotClaimed(ctx, userId(s), p),
     'bill.list': (p, s) => listBills(ctx, userId(s), p.fromDay, p.toDay),
     'bill.get': (p, s) => getBill(ctx, userId(s), p.id),
     'bill.priceHistory': (p, s) => priceHistory(ctx, userId(s), p.productId),

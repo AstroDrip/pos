@@ -231,7 +231,7 @@ export function checkCashFlow(ctx: Ctx, report?: CashFlow): Finding[] {
 const SOURCE_TABLES: Record<string, string> = {
   sale: 'sales', refund: 'refunds', cash_movement: 'cash_movements', customer_receipt: 'customer_receipts', customer_writeoff: 'customer_writeoffs', expense: 'expenses',
   expense_payment: 'expense_payments', expense_amort: 'expense_amortization', expense_reversal: 'expenses', customer_advance_applied: 'receipt_allocations', supplier_advance_applied: 'supplier_payment_allocations', grn: 'goods_receipts', purchase_invoice: 'purchase_invoices', purchase_return: 'purchase_returns', shift_close: 'register_shifts',
-  stock_adjustment: 'stock_adjustments', supplier_opening: 'supplier_opening_balances', supplier_payment: 'supplier_payments',
+  vat_claim: 'supplier_vat_claims', stock_adjustment: 'stock_adjustments', supplier_opening: 'supplier_opening_balances', supplier_payment: 'supplier_payments',
 };
 
 /** Entries that do not come from a document in the app. */

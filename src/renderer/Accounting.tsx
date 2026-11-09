@@ -133,6 +133,8 @@ export function Accounting() {
               <tr><td>{t('Expenses (recoverable VAT)')}</td><td className="num">{formatSar(vat.expensesRecoverable.net - vat.expensesReversedRecoverable.net)}</td><td className="num">{formatSar(vat.expensesRecoverable.vat - vat.expensesReversedRecoverable.vat)}</td></tr>
               <tr><td><strong>{t('Input VAT')} <InfoIcon id="metric.inputVat" /></strong></td><td /><td className="num"><strong>{formatSar(vat.inputVat)}</strong></td></tr>
               <tr><td><strong>{vat.netVatDue >= 0 ? t('Net VAT payable') : t('Net VAT refundable')}</strong> <InfoIcon id="metric.netVat" /></td><td /><td className="num"><strong>{formatSar(Math.abs(vat.netVatDue))}</strong></td></tr>
+              {vat.supplierVatClaims !== 0 && <tr><td colSpan={3} className="hint">{t('Proforma VAT claimed this period (part of input VAT): {0}', formatSar(vat.supplierVatClaims))}</td></tr>}
+              {vat.supplierVatPending !== 0 && <tr><td colSpan={3} className="hint">{t('Proforma VAT still under review (estimate, not input VAT): {0}', formatSar(vat.supplierVatPending))}</td></tr>}
               {vat.purchasesNonRecoverableVat !== 0 && <tr><td colSpan={3} className="hint">{t('VAT paid but not recoverable (treated as cost): {0}', formatSar(vat.purchasesNonRecoverableVat))}</td></tr>}
             </tbody>
           </table>

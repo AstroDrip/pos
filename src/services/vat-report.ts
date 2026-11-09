@@ -2,6 +2,7 @@ import { nextDay, sqlStoreDay, storeDayStartUtc } from '../core/store-time';
 import { DomainError, type Ctx } from './context';
 import { recognizePrepaid } from './expenses';
 import { requirePermission } from './users';
+import { vatClaimsBetween, vatPendingBetween } from './vat-review';
 
 // VAT summary for a period (Saudi business days), for the owner's accountant. PROVISIONAL:
 //  - It is a working summary, NOT the official ZATCA VAT return form; the accountant files the return.
@@ -27,6 +28,8 @@ export interface VatSummary {
   expensesRecoverable: VatLine;
   expensesReversedRecoverable: VatLine;
   purchasesNonRecoverableVat: number; // VAT paid that cannot be reclaimed (cost, not input VAT)
+  supplierVatClaims: number; // proforma VAT later claimed, less reversals, by claim date. Part of input VAT
+  supplierVatPending: number; // VAT on proformas still under review. An estimate, not input VAT
   outputVat: number;
   inputVat: number;
   netVatDue: number; // positive = payable to ZATCA, negative = refundable
@@ -60,7 +63,8 @@ export function vatSummary(ctx: Ctx, userId: number, from: string, to: string): 
     (ctx.db.prepare('SELECT COALESCE(SUM(vat_amount),0) AS v FROM purchase_invoices WHERE vat_recoverable = 0 AND invoice_date BETWEEN ? AND ?').get(from, to) as { v: number }).v -
     (ctx.db.prepare('SELECT COALESCE(SUM(vat_amount),0) AS v FROM purchase_returns WHERE vat_recoverable = 0 AND return_date BETWEEN ? AND ?').get(from, to) as { v: number }).v;
   const outputVat = salesStandard.vat - refundsStandard.vat;
-  const inputVat = purchasesRecoverable.vat - purchaseReturnsRecoverable.vat + expensesRecoverable.vat - expensesReversedRecoverable.vat;
+  const supplierVatClaims = vatClaimsBetween(ctx, from, to);
+  const inputVat = purchasesRecoverable.vat - purchaseReturnsRecoverable.vat + expensesRecoverable.vat - expensesReversedRecoverable.vat + supplierVatClaims;
   const ledger = (code: string) =>
     (ctx.db
       .prepare(`SELECT COALESCE(SUM(l.debit) - SUM(l.credit),0) AS v FROM journal_lines l JOIN journal_entries j ON j.id = l.entry_id JOIN accounts a ON a.id = l.account_id
@@ -80,6 +84,8 @@ export function vatSummary(ctx: Ctx, userId: number, from: string, to: string): 
     expensesRecoverable,
     expensesReversedRecoverable,
     purchasesNonRecoverableVat: nonRec,
+    supplierVatClaims,
+    supplierVatPending: vatPendingBetween(ctx, from, to),
     outputVat,
     inputVat,
     netVatDue: outputVat - inputVat,

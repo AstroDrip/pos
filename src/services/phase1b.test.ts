@@ -227,6 +227,8 @@ describe('CSV import', () => {
 /** Makes a fresh database look like one created by schema v1 (undoes migrations 2 and 3). */
 function rollBackToV1(db: ReturnType<typeof openDatabase>) {
   db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
+  db.exec(`DROP TABLE supplier_vat_claims; DROP TABLE supplier_vat_attachments; DROP TABLE supplier_vat_events; DROP TABLE supplier_vat_reviews;
+    DELETE FROM role_permissions WHERE permission_code LIKE 'vat.%'; DELETE FROM permissions WHERE code LIKE 'vat.%';`); // undo migration 15
   db.exec('DROP TABLE integrity_reviews; DROP TABLE integrity_findings; DROP TABLE integrity_runs;'); // undo migration 14
   db.exec(`DROP INDEX ix_audit_at; DROP INDEX ix_audit_action; DROP INDEX ix_audit_entity; DROP INDEX ix_audit_user;
     DELETE FROM role_permissions WHERE permission_code IN ('audit.view', 'audit.export', 'integrity.view');
