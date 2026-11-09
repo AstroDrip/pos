@@ -1,3 +1,4 @@
+import { normalizeForSearch } from '../core/search-normalize';
 import { appendAudit } from './audit';
 import { DomainError, type Ctx } from './context';
 import { requirePermission } from './users';
@@ -158,10 +159,11 @@ export function getCustomer(ctx: Ctx, id: number): Customer | null {
 
 export function findCustomers(ctx: Ctx, text: string): Customer[] {
   const t = text.trim().replace(/[%_]/g, '');
-  if (!t) return [];
+  const name = normalizeForSearch(t).replace(/[%_]/g, '');
+  if (!t || !name) return [];
   const rows = ctx.db
-    .prepare('SELECT id, name, phone, vat_number AS vatNumber FROM customers WHERE phone LIKE ? OR name LIKE ? LIMIT 2000')
-    .all(`%${t}%`, `%${t}%`) as Customer[];
+    .prepare('SELECT id, name, phone, vat_number AS vatNumber FROM customers WHERE phone LIKE ? OR vat_number LIKE ? OR pos_norm(name) LIKE ? LIMIT 2000')
+    .all(`%${t}%`, `%${t}%`, `%${name}%`) as Customer[];
   return rankCustomers(ctx, rows, t);
 }
 

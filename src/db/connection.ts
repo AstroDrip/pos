@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { normalizeForSearch } from '../core/search-normalize';
 import { backfillSupplierAllocations } from '../services/purchasing';
 import { ensureSearchIndex } from '../services/search';
 import { migrate, pendingMigrations } from './migrations';
@@ -36,6 +37,7 @@ export function openDatabase(path: string, opts: OpenOptions = {}): Db {
   db.pragma('synchronous = FULL'); // survive power loss at the till, at a small speed cost
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
+  db.function('pos_norm', { deterministic: true }, (s: unknown) => normalizeForSearch(String(s ?? ''))); // Arabic spelling variants in name searches
   // Plan §J: snapshot an existing database before changing its schema.
   const pending = pendingMigrations(db);
   if (pending.length > 0) {
