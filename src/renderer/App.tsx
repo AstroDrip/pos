@@ -17,6 +17,7 @@ import { TabPane, UserProvider, useRemembered } from './TabHost';
 import { Customers } from './Customers';
 import { Products } from './Products';
 import { Purchases } from './Purchases';
+import { OnlineOrders } from './OnlineOrders';
 import { Refund } from './Refund';
 import { Reports } from './Reports';
 import { Sell } from './Sell';
@@ -25,12 +26,13 @@ import { Stock } from './Stock';
 import { ThemeSelect } from './theme';
 
 type Status = { needsSetup: boolean; user: User | null };
-type Tab = 'sell' | 'refund' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin' | 'audit' | 'help';
+type Tab = 'sell' | 'refund' | 'online' | 'customers' | 'purchases' | 'expenses' | 'accounting' | 'stock' | 'products' | 'reports' | 'shift' | 'admin' | 'audit' | 'help';
 
 // The one list of screens, in sidebar order. Each screen belongs to a group; a role sees only what it may open.
 const TABS: { id: Tab; label: string; perm?: string; group: string }[] = [
   { id: 'sell', label: 'Sell', group: 'Sales' },
   { id: 'refund', label: 'Refund', group: 'Sales' },
+  { id: 'online', label: 'Online orders', perm: 'sale.create', group: 'Sales' },
   { id: 'customers', label: 'Customers', perm: 'customer.payment.record', group: 'Sales' },
   { id: 'shift', label: 'Shift', group: 'Sales' },
   { id: 'products', label: 'Products', perm: 'product.manage', group: 'Inventory' },
@@ -159,6 +161,7 @@ function Workspace({ user, onAuthChange }: { user: User; onAuthChange: () => voi
       {can('reports.view') && <HealthBanner />}
       {pane('sell', <Sell canDiscount={can('sale.discount')} canCredit={can('customer.credit.sell')} canCreateCustomer={can('customer.manage')} />)}
       {pane('refund', <Refund canApprove={can('sale.refund')} request={refundRequest} />)}
+      {pane('online', <OnlineOrders />)}
       {pane('stock', <Stock can={can} />)}
       {pane('products', <Products />)}
       {pane('reports', <Reports />)}

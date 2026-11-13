@@ -19,6 +19,36 @@
         "dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "store-sql",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "store/scripts/dev-sql-server.ts"
+      ],
+      "port": 4445
+    },
+    {
+      "name": "store",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "store",
+        "run",
+        "dev"
+      ],
+      "port": 3100
+    },
+    {
+      "name": "store-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "store",
+        "run",
+        "start"
+      ],
+      "port": 3100
     }
   ]
 }

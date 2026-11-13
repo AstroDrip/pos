@@ -18,3 +18,8 @@ dashboard/next-env.d.ts
 dashboard/*.tsbuildinfo
 .vercel/
 !dashboard/.env.example
+store/.next/
+store/node_modules/
+store/next-env.d.ts
+store/*.tsbuildinfo
+!store/.env.example

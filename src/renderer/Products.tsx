@@ -9,11 +9,12 @@ import { validOneOf, validText } from './remember';
 import { PageHeader } from './PageHeader';
 import { useSuggest } from './useSuggest';
 import { ProductName, useI18n } from './i18n';
+import { CategoryPicker } from './CategoryPicker';
 
 const PAGE = 100;
 type Status = 'active' | 'inactive' | 'all';
 
-const empty = { sku: '', nameAr: '', nameEn: '', sellMode: 'unit' as 'unit' | 'weight', vat: '15', price: '', barcode: '', plu: '' };
+const empty = { sku: '', nameAr: '', nameEn: '', sellMode: 'unit' as 'unit' | 'weight', vat: '15', price: '', barcode: '', plu: '', categoryId: null as number | null };
 
 export function Products() {
   const back = useReturnTick();
@@ -47,7 +48,7 @@ export function Products() {
     if (browsing) void load(0).catch(loadFailed);
   };
 
-  const set = (k: keyof typeof empty) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
+  const set = (k: Exclude<keyof typeof empty, 'categoryId'>) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +56,7 @@ export function Products() {
     try {
       await call('catalog.create', {
         sku: form.sku,
+        categoryId: form.categoryId,
         nameAr: form.nameAr,
         nameEn: form.nameEn,
         unitCode: form.sellMode === 'weight' ? 'KG' : 'PCS',
@@ -84,6 +86,8 @@ export function Products() {
         <div className="wide"><label>{t('Name (English)')} <InfoIcon id="field.product.nameEn" /></label><input value={form.nameEn} onChange={set('nameEn')} /></div>
         <div className="wide"><label>{t('Name (Arabic)')} <InfoIcon id="field.product.nameAr" /></label><input dir="rtl" value={form.nameAr} onChange={set('nameAr')} /></div>
         </div>
+        <h4 className="form-group">{t('Category')}</h4>
+        <div className="form-grid"><CategoryPicker value={form.categoryId} onChange={(categoryId) => setForm({ ...form, categoryId })} /></div>
         <h4 className="form-group">{t('Selling price and tax')}</h4>
         <div className="form-grid">
         <div><label>{t('Sold by')} <InfoIcon id="field.product.sellMode" /></label>
@@ -140,7 +144,18 @@ function EditProduct({ product, onDone }: { product: Product; onDone: () => void
   const [aliases, setAliases] = useState('');
   const [reason, setReason] = useState('');
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
   useEffect(() => void call<string[]>('catalog.aliases', { productId: product.id }).then((a) => setAliases(a.join(', '))), [product.id]);
+  useEffect(() => void call<number | null>('catalog.categoryOf', { productId: product.id }).then(setCategoryId), [product.id]);
+  const changeCategory = async (id: number | null) => {
+    setMsg(null);
+    try {
+      await call('catalog.setCategory', { productId: product.id, categoryId: id });
+      setCategoryId(id);
+    } catch (e) {
+      setMsg({ kind: 'error', text: t((e as Error).message) });
+    }
+  };
   const run = async (fn: () => Promise<unknown>) => {
     setMsg(null);
     try {
@@ -158,6 +173,7 @@ function EditProduct({ product, onDone }: { product: Product; onDone: () => void
         <input aria-label="new price" value={price} onChange={(e) => setPrice(e.target.value)} />
         <button onClick={() => run(() => call('catalog.setPrice', { productId: product.id, priceIncl: parseSar(price) }))}>{t('Save price')}</button>
       </div>
+      <div className="form-grid"><CategoryPicker value={categoryId} onChange={(id) => void changeCategory(id)} /></div>
       <label>{t('Other names for search (comma-separated)')} <InfoIcon id="field.product.aliases" /></label>
       <div className="row">
         <input value={aliases} onChange={(e) => setAliases(e.target.value)} />

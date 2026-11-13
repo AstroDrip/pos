@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+/* The design tokens from docs/ecommerce/UI_UX_DESIGN_SPEC.md. This file holds Tailwind setup only. */
+@theme {
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-900: #1c4a3c;
+  --color-brand-700: #2c6a55;
+  --color-brand-100: #e4f0ea;
+  --color-leaf-500: #7ac52b;
+  --color-ink-900: #16201c;
+  --color-ink-600: #5e6b65;
+  --color-ink-400: #66726c;
+  --color-line: #e6eae7;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f6f7f5;
+  --color-success: #1f7a4d;
+  --color-warning: #9a6400;
+  --color-danger: #b3382c;
+
+  --radius-field: 1rem;
+  --radius-card: 1.25rem;
+  --radius-nav: 0.875rem;
+
+  --shadow-float: 0 8px 24px rgb(22 32 28 / 0.12);
+
+  --container-shop: 75rem;
+  --container-admin: 90rem;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-ink-900 antialiased;
+  }
+}

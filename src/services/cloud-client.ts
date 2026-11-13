@@ -60,7 +60,7 @@ export function normaliseUrl(input: string): string {
 
 const TIMEOUT_MS = 60_000;
 
-async function call(fetchFn: FetchFn, url: string, init: RequestInit): Promise<Response> {
+export async function cloudCall(fetchFn: FetchFn, url: string, init: RequestInit): Promise<Response> {
   let res: Response;
   try {
     res = await fetchFn(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -82,30 +82,30 @@ const json = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'cont
 
 export async function enrollDevice(fetchFn: FetchFn, url: string, input: { code: string; deviceName: string; appVersion: string; recoveryVerifier?: string }): Promise<CloudCreds> {
   const base = normaliseUrl(url);
-  const r = (await (await call(fetchFn, `${base}/api/device/enroll`, json(input))).json()) as { storeId: string; deviceId: string; deviceSecret: string };
+  const r = (await (await cloudCall(fetchFn, `${base}/api/device/enroll`, json(input))).json()) as { storeId: string; deviceId: string; deviceSecret: string };
   return { url: base, storeId: r.storeId, deviceId: r.deviceId, secret: r.deviceSecret };
 }
 
 export async function recoverDevice(fetchFn: FetchFn, url: string, input: { storeId: string; recoveryToken: string; deviceName: string; revokeOthers: boolean }): Promise<CloudCreds> {
   const base = normaliseUrl(url);
-  const r = (await (await call(fetchFn, `${base}/api/device/recover`, json(input))).json()) as { storeId: string; deviceId: string; deviceSecret: string };
+  const r = (await (await cloudCall(fetchFn, `${base}/api/device/recover`, json(input))).json()) as { storeId: string; deviceId: string; deviceSecret: string };
   return { url: base, storeId: r.storeId, deviceId: r.deviceId, secret: r.deviceSecret };
 }
 
 export function makeCloudApi(creds: CloudCreds, fetchFn: FetchFn, appVersion: string): CloudApi {
   const auth = { authorization: `Bearer ${creds.deviceId}.${creds.secret}` };
-  const post = async (path: string, body: unknown) => call(fetchFn, `${creds.url}/api/device/${path}`, { ...json(body), headers: { 'content-type': 'application/json', ...auth } });
+  const post = async (path: string, body: unknown) => cloudCall(fetchFn, `${creds.url}/api/device/${path}`, { ...json(body), headers: { 'content-type': 'application/json', ...auth } });
   const chunkUrl = (id: string, i: number) => `${creds.url}/api/device/backup/chunk?backupId=${encodeURIComponent(id)}&index=${i}`;
   return {
     sync: async (events) => (await (await post('sync', { appVersion, events })).json()) as { acceptedIds: string[] },
     heartbeat: async () => void (await post('heartbeat', { appVersion })),
     setVerifier: async (recoveryVerifier) => void (await post('recovery-verifier', { recoveryVerifier })),
     start: async (meta) => (await (await post('backup/start', meta)).json()) as { have: number[]; status: string },
-    putChunk: async (id, i, sha, data) => void (await call(fetchFn, chunkUrl(id, i), { method: 'PUT', headers: { 'content-type': 'application/octet-stream', 'x-chunk-sha256': sha, ...auth }, body: new Uint8Array(data) })),
+    putChunk: async (id, i, sha, data) => void (await cloudCall(fetchFn, chunkUrl(id, i), { method: 'PUT', headers: { 'content-type': 'application/octet-stream', 'x-chunk-sha256': sha, ...auth }, body: new Uint8Array(data) })),
     finish: async (backupId) => void (await post('backup/finish', { backupId })),
-    list: async () => ((await (await call(fetchFn, `${creds.url}/api/device/backup/list`, { headers: auth })).json()) as { backups: RemoteBackup[] }).backups,
+    list: async () => ((await (await cloudCall(fetchFn, `${creds.url}/api/device/backup/list`, { headers: auth })).json()) as { backups: RemoteBackup[] }).backups,
     getChunk: async (id, i) => {
-      const r = await call(fetchFn, chunkUrl(id, i), { headers: auth });
+      const r = await cloudCall(fetchFn, chunkUrl(id, i), { headers: auth });
       return { data: Buffer.from(await r.arrayBuffer()), sha256: r.headers.get('x-chunk-sha256') ?? '' };
     },
     verified: async (backupId, ok, detail) => void (await post('backup/verified', { backupId, ok, detail })),

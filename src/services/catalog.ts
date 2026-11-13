@@ -31,6 +31,12 @@ export interface ProductInput {
   barcodes?: string[];
   plu?: string;
   aliases?: string[];
+  categoryId?: number | null;
+}
+
+export interface ProductCategory {
+  id: number;
+  nameEn: string;
 }
 
 const SELECT_PRODUCT = `
@@ -62,10 +68,10 @@ export function createProduct(ctx: Ctx, userId: number, input: ProductInput): nu
       id = Number(
         ctx.db
           .prepare(
-            `INSERT INTO products (sku, name_ar, name_en, unit_id, sell_mode, vat_rate_bp, price_incl, reorder_level, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO products (sku, name_ar, name_en, category_id, unit_id, sell_mode, vat_rate_bp, price_incl, reorder_level, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
-          .run(input.sku.trim(), input.nameAr.trim(), input.nameEn.trim(), unit.id, input.sellMode, input.vatRateBp, input.priceIncl, input.reorderLevel ?? 0, now, now)
+          .run(input.sku.trim(), input.nameAr.trim(), input.nameEn.trim(), requireCategory(ctx, input.categoryId), unit.id, input.sellMode, input.vatRateBp, input.priceIncl, input.reorderLevel ?? 0, now, now)
           .lastInsertRowid,
       );
     } catch (e) {
@@ -79,6 +85,44 @@ export function createProduct(ctx: Ctx, userId: number, input: ProductInput): nu
     indexProduct(ctx, id);
     appendAudit(ctx, { userId, action: 'product.create', entity: 'product', entityId: id, details: { ...input } });
     return id;
+  })();
+}
+
+function requireCategory(ctx: Ctx, id: number | null | undefined): number | null {
+  if (id === null || id === undefined) return null;
+  if (!ctx.db.prepare('SELECT 1 FROM categories WHERE id = ?').get(id)) throw new DomainError('VALIDATION', 'That category does not exist');
+  return id;
+}
+
+export function listProductCategories(ctx: Ctx): ProductCategory[] {
+  return ctx.db.prepare('SELECT id, name_en AS nameEn FROM categories ORDER BY name_en COLLATE NOCASE').all() as ProductCategory[];
+}
+
+export function productCategory(ctx: Ctx, productId: number): number | null {
+  const r = ctx.db.prepare('SELECT category_id AS id FROM products WHERE id = ?').get(productId) as { id: number | null } | undefined;
+  if (!r) throw new DomainError('NOT_FOUND', 'Product not found');
+  return r.id;
+}
+
+/** New apps are English only for now, so the Arabic name holds the same text until it is translated. */
+export function createProductCategory(ctx: Ctx, userId: number, name: string): number {
+  requirePermission(ctx, userId, 'product.manage');
+  const clean = name.trim();
+  if (!clean || clean.length > 80) throw new DomainError('VALIDATION', 'Enter a category name');
+  return ctx.db.transaction(() => {
+    if (ctx.db.prepare('SELECT 1 FROM categories WHERE name_en = ? COLLATE NOCASE').get(clean)) throw new DomainError('CONFLICT', 'That category already exists');
+    const id = Number(ctx.db.prepare('INSERT INTO categories (name_ar, name_en) VALUES (?, ?)').run(clean, clean).lastInsertRowid);
+    appendAudit(ctx, { userId, action: 'category.create', entity: 'category', entityId: id, details: { name: clean } });
+    return id;
+  })();
+}
+
+export function setProductCategory(ctx: Ctx, userId: number, productId: number, categoryId: number | null): void {
+  requirePermission(ctx, userId, 'product.manage');
+  ctx.db.transaction(() => {
+    const before = productCategory(ctx, productId);
+    ctx.db.prepare('UPDATE products SET category_id = ?, updated_at = ? WHERE id = ?').run(requireCategory(ctx, categoryId), ctx.now(), productId);
+    appendAudit(ctx, { userId, action: 'product.category', entity: 'product', entityId: productId, details: { from: before, to: categoryId } });
   })();
 }
 
@@ -133,6 +177,25 @@ export function setPrice(ctx: Ctx, userId: number, productId: number, priceIncl:
     ctx.db.prepare('UPDATE products SET price_incl = ?, updated_at = ? WHERE id = ?').run(priceIncl, now, productId);
     ctx.db.prepare('INSERT INTO price_history (product_id, old_price, new_price, changed_by, changed_at) VALUES (?, ?, ?, ?, ?)').run(productId, p.priceIncl, priceIncl, userId, now);
     appendAudit(ctx, { userId, action: 'product.price', entity: 'product', entityId: productId, details: { old: p.priceIncl, new: priceIncl }, before: { price: p.priceIncl }, after: { price: priceIncl } });
+  })();
+}
+
+export function addBarcode(ctx: Ctx, userId: number, productId: number, barcode: string): void {
+  requirePermission(ctx, userId, 'product.manage');
+  ctx.db.transaction(() => {
+    if (!getProduct(ctx, productId)) throw new DomainError('NOT_FOUND', 'Product not found');
+    addBarcodeTx(ctx, productId, barcode);
+    appendAudit(ctx, { userId, action: 'product.barcode', entity: 'product', entityId: productId, details: { barcode } });
+  })();
+}
+
+export function removeBarcode(ctx: Ctx, userId: number, productId: number, barcode: string): void {
+  requirePermission(ctx, userId, 'product.manage');
+  ctx.db.transaction(() => {
+    const existing = ctx.db.prepare('SELECT 1 FROM product_barcodes WHERE product_id = ? AND barcode = ?').get(productId, barcode) as { 1: number } | undefined;
+    if (!existing) throw new DomainError('NOT_FOUND', 'Barcode not found');
+    ctx.db.prepare('DELETE FROM product_barcodes WHERE product_id = ? AND barcode = ?').run(productId, barcode);
+    appendAudit(ctx, { userId, action: 'product.barcode.remove', entity: 'product', entityId: productId, details: { barcode } });
   })();
 }
 

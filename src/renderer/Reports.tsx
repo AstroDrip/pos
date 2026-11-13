@@ -39,6 +39,7 @@ export function Reports() {
     call<RefundRow[]>('report.refunds', { fromDay: from, toDay: to }).then(setRefunds, () => setRefunds([]));
     call<AdjustmentRow[]>('report.adjustments', { fromDay: from, toDay: to }).then(setAdjustments, () => setAdjustments([]));
   }, [from, to, back]);
+  const showOnline = !!r && r.topProducts.some((p) => p.onlineQty > 0);
 
   return (
     <div className="page">
@@ -83,10 +84,22 @@ export function Reports() {
                 <thead><tr><th>{t('Day')}</th><th className="num">{t('Sales')} <InfoIcon id="metric.report.count" /></th><th className="num">{t('Total')}</th><th className="num">{t('VAT')} <InfoIcon id="metric.report.vat" /></th></tr></thead>
                 <tbody>{r.byDay.length === 0 && <EmptyRow cols={4} text={t('No sales in these dates.')} />}{r.byDay.map((d) => <tr key={d.day}><td>{d.day}</td><td className="num">{d.saleCount}</td><td className="num">{formatSar(d.totalIncl)}</td><td className="num">{formatSar(d.totalVat)}</td></tr>)}</tbody>
               </table>
+              {r.channels.online.count > 0 && (
+                <>
+                  <h4>{t('In store and online')} <InfoIcon id="metric.report.online" /></h4>
+                  <table className="list" aria-label="sales by channel" style={{ maxWidth: 480 }}>
+                    <thead><tr><th /><th className="num">{t('Sales')}</th><th className="num">{t('Total')}</th></tr></thead>
+                    <tbody>
+                      <tr><td>{t('In store')}</td><td className="num">{r.channels.inStore.count}</td><td className="num">{formatSar(r.channels.inStore.totalIncl)}</td></tr>
+                      <tr><td>{t('Online orders ({0} pickup, {1} delivery)', r.channels.online.pickup, r.channels.online.delivery)}</td><td className="num">{r.channels.online.count}</td><td className="num">{formatSar(r.channels.online.totalIncl)}</td></tr>
+                    </tbody>
+                  </table>
+                </>
+              )}
               <h4>{t('Top products')}</h4>
               <table className="list">
-                <thead><tr><th>{t('Product')}</th><th className="num">{t('Qty')}</th><th className="num">{t('Total')}</th></tr></thead>
-                <tbody>{r.topProducts.length === 0 && <EmptyRow cols={3} text={t('No sales in these dates.')} />}{r.topProducts.map((p) => <tr key={p.productId}><td>{p.nameEn}</td><td className="num">{formatQty(p.qty)}</td><td className="num">{formatSar(p.totalIncl)}</td></tr>)}</tbody>
+                <thead><tr><th>{t('Product')}</th><th className="num">{t('Qty')}</th><th className="num">{t('Total')}</th>{showOnline && <th className="num">{t('Online qty')}</th>}</tr></thead>
+                <tbody>{r.topProducts.length === 0 && <EmptyRow cols={3} text={t('No sales in these dates.')} />}{r.topProducts.map((p) => <tr key={p.productId}><td>{p.nameEn}</td><td className="num">{formatQty(p.qty)}</td><td className="num">{formatSar(p.totalIncl)}</td>{showOnline && <td className="num">{formatQty(p.onlineQty)}</td>}</tr>)}</tbody>
               </table>
             </>
           )}
@@ -106,6 +119,7 @@ export function Reports() {
                       <div className="pairs">
                         <div><span className="k">{t('Discounts')}</span><span>{c.discountCount} / {formatSar(c.discountTotal)}</span></div>
                         <div><span className="k">{t('Removed')}</span><span>{c.removals} / {formatSar(c.removedValue)}</span></div>
+                        {c.onlineHandovers > 0 && <div><span className="k">{t('Online orders handed over')}</span><span>{c.onlineHandovers}</span></div>}
                         <div><span className="k">{t('Reprints')}</span><span>{c.reprints}</span></div>
                         <div><span className="k">{t('Refunds')}</span><span>{c.refundCount} / {formatSar(c.refundTotal)}</span></div>
                         <div><span className="k">{t('Refunds approved')}</span><span>{c.refundsApproved}</span></div>

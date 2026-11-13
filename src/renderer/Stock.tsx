@@ -67,6 +67,7 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
   useEffect(() => {
     if (can('reports.view')) void call<StockRow[]>('report.stock', { onlyLow }).then(setRows);
   }, [onlyLow, msg, can, back]);
+  const heldOnline = rows.some((r) => r.reservedOnline > 0);
   const { items: found } = useSuggest<Product>(search, (q) => call<Product[]>('catalog.search', { text: q }));
 
   const save = async () => {
@@ -144,14 +145,14 @@ export function Stock({ can }: { can: (p: string) => boolean }) {
         <div>
           <label><input type="checkbox" checked={onlyLow} onChange={(e) => setOnlyLow(e.target.checked)} /> {t('Only at or below reorder level')}</label>
           <table className="list" aria-label="stock on hand">
-            <thead><tr><th>SKU</th><th>{t('Product')}</th><th className="num">{t('Qty')} <InfoIcon id="metric.stock.qty" /></th><th className="num">{t('Reorder at')} <InfoIcon id="metric.stock.reorder" /></th><th className="num">{t('Avg cost')} <InfoIcon id="metric.stock.cost" /></th></tr></thead>
+            <thead><tr><th>SKU</th><th>{t('Product')}</th><th className="num">{t('Qty')} <InfoIcon id="metric.stock.qty" /></th><th className="num">{t('Reorder at')} <InfoIcon id="metric.stock.reorder" /></th><th className="num">{t('Avg cost')} <InfoIcon id="metric.stock.cost" /></th>{heldOnline && <th className="num">{t('Held online')} <InfoIcon id="metric.stock.heldOnline" /></th>}</tr></thead>
             <tbody>
               {rows.length === 0 && <EmptyRow cols={5} text={onlyLow ? t('Nothing is at or below its reorder level.') : t('No products yet.')} />}
               {rows.length > 0 && !rows.some(matches) && <EmptyRow cols={5} text={t('No product matches that.')} />}
               {rows.filter(matches).map((r) => (
                 <tr key={r.productId}>
                   <td>{r.sku}</td><td><ProductName en={r.nameEn} ar={r.nameAr} /></td>
-                  <td className={`num${r.qty < 0 ? ' neg' : ''}`}>{formatQty(r.qty, 0)}</td><td className="num">{formatQty(r.reorderLevel, 0)}</td><td className="num">{formatSar(r.avgCost)}</td>
+                  <td className={`num${r.qty < 0 ? ' neg' : ''}`}>{formatQty(r.qty, 0)}</td><td className="num">{formatQty(r.reorderLevel, 0)}</td><td className="num">{formatSar(r.avgCost)}</td>{heldOnline && <td className="num">{r.reservedOnline ? formatQty(r.reservedOnline, 0) : ''}</td>}
                 </tr>
               ))}
             </tbody>

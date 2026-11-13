@@ -227,6 +227,11 @@ describe('CSV import', () => {
 /** Makes a fresh database look like one created by schema v1 (undoes migrations 2 and 3). */
 function rollBackToV1(db: ReturnType<typeof openDatabase>) {
   db.prepare('DELETE FROM schema_migrations WHERE version >= 2').run();
+  db.exec("DROP TABLE commerce_reserved; DELETE FROM settings WHERE key = 'commerce_last_checkpoint_day';"); // undo migration 20
+  db.exec("DROP TABLE commerce_order_links; DROP TABLE commerce_orders; DELETE FROM settings WHERE key = 'commerce_command_cursor';"); // undo migration 19
+  db.exec(`DROP TRIGGER trg_commerce_movement; DROP TRIGGER trg_commerce_product_insert; DROP TRIGGER trg_commerce_product_update; DROP TRIGGER trg_commerce_barcode_insert;
+    DROP TRIGGER trg_commerce_barcode_delete; DROP TRIGGER trg_commerce_category_insert; DROP TRIGGER trg_commerce_category_update; DROP TABLE commerce_outbox;
+    DELETE FROM settings WHERE key LIKE 'commerce_%';`); // undo migration 18
   db.exec("DROP TABLE cloud_uploads; DELETE FROM settings WHERE key = 'cloud_backup_every_hours';"); // undo migration 17
   db.exec('DROP TABLE prepaid_runs;'); // undo migration 16
   db.exec(`DROP TABLE supplier_vat_claims; DROP TABLE supplier_vat_attachments; DROP TABLE supplier_vat_events; DROP TABLE supplier_vat_reviews;

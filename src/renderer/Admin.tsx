@@ -4,6 +4,7 @@ import { useRemembered } from './TabHost';
 import { Views } from './Figures';
 import { HelpLink } from './HelpLink';
 import { CloudBackup } from './CloudBackup';
+import { OnlineStore } from './OnlineStore';
 import { HardwareTest } from './HardwareTest';
 import type { BackupStatus } from '../services/backup';
 import type { DryRun } from '../services/import';
@@ -21,7 +22,7 @@ import { StoreDetailsCard } from './StoreDetailsCard';
 
 type Msg = { kind: 'ok' | 'error' | 'warn'; text: string } | null;
 
-const ADMIN_SECTIONS = ['backup', 'store', 'users', 'scale', 'import', 'hardware', 'keys'] as const;
+const ADMIN_SECTIONS = ['backup', 'store', 'online', 'users', 'scale', 'import', 'hardware', 'keys'] as const;
 type AdminSection = (typeof ADMIN_SECTIONS)[number];
 
 export function Admin({ can }: { can: (p: string) => boolean }) {
@@ -30,7 +31,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
   const settings = can('settings.manage');
   const sections: { id: AdminSection; label: string }[] = [
     ...(can('backup.run') ? [{ id: 'backup' as const, label: t('Backup and recovery') }] : []),
-    ...(settings ? [{ id: 'store' as const, label: t('Store details') }] : []),
+    ...(settings ? [{ id: 'store' as const, label: t('Store details') }, { id: 'online' as const, label: t('Online store') }] : []),
     ...(can('user.manage') ? [{ id: 'users' as const, label: t('Users') }] : []),
     ...(settings ? [{ id: 'scale' as const, label: t('Scale labels') }] : []),
     ...(can('product.manage') || can('supplier.manage') ? [{ id: 'import' as const, label: t('Import from CSV') }] : []),
@@ -47,6 +48,7 @@ export function Admin({ can }: { can: (p: string) => boolean }) {
         {can('settings.manage') && <DashboardHealth />}
       </div>
       <div hidden={shown !== 'store'} className="admin-section">{can('settings.manage') && <StoreDetailsCard />}</div>
+      <div hidden={shown !== 'online'} className="admin-section">{can('settings.manage') && <OnlineStore />}</div>
       <div hidden={shown !== 'users'} className="admin-section">{can('user.manage') && <Users />}</div>
       <div hidden={shown !== 'scale'} className="admin-section">{can('settings.manage') && <ScaleLabels />}</div>
       <div hidden={shown !== 'import'} className="admin-section">{(can('product.manage') || can('supplier.manage')) && <Import />}</div>

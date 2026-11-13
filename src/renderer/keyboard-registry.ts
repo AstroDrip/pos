@@ -9,10 +9,10 @@
 import { DEFAULT_BINDINGS, DEFAULT_COMBOS, comboOf, type Bindings, type LetterId, type ShortcutId } from '../core/shortcuts';
 import type { CheckoutStep } from './checkout-keys';
 
-export type ScreenContext = 'sell' | 'refund' | 'customers' | 'stock' | 'products' | 'purchases' | 'expenses' | 'accounting' | 'reports' | 'shift' | 'admin' | 'help' | 'audit';
+export type ScreenContext = 'sell' | 'refund' | 'online' | 'customers' | 'stock' | 'products' | 'purchases' | 'expenses' | 'accounting' | 'reports' | 'shift' | 'admin' | 'help' | 'audit';
 export type Effect = 'ui' | 'focus' | 'open-workflow' | 'operation';
 
-const EVERY: ScreenContext[] = ['sell', 'refund', 'customers', 'stock', 'products', 'purchases', 'expenses', 'accounting', 'reports', 'shift', 'admin', 'help', 'audit'];
+const EVERY: ScreenContext[] = ['sell', 'refund', 'online', 'customers', 'stock', 'products', 'purchases', 'expenses', 'accounting', 'reports', 'shift', 'admin', 'help', 'audit'];
 
 export interface Shortcut {
   id: string;
@@ -92,7 +92,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
 
 /** The guide F1 opens on each screen. */
 export const CONTEXT_HELP: Record<ScreenContext, string> = {
-  sell: 'start-keys', refund: 'returns-refund', customers: 'customers-find-add', stock: 'stock-overview', products: 'stock-products', purchases: 'suppliers-enter-bill',
+  sell: 'start-keys', refund: 'returns-refund', online: 'selling-weighed', customers: 'customers-find-add', stock: 'stock-overview', products: 'stock-products', purchases: 'suppliers-enter-bill',
   expenses: 'expenses-record', accounting: 'reports-pnl', reports: 'reports-sales', shift: 'shifts-open', admin: 'backup-run', help: 'start-keys', audit: 'audit-log',
 };
 

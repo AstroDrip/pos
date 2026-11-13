@@ -8,7 +8,8 @@ import { makeCtx } from '../services/context';
 import { CHANNELS } from '../shared/ipc';
 import { appendAudit } from '../services/audit';
 import { backupStatus, createBackup, encryptedSnapshot, installRestore } from '../services/backup';
-import { createHandlers, type BackupEnv, type CloudEnv, type Printer, type Session } from './handlers';
+import { createHandlers, type BackupEnv, type CloudEnv, type CommerceEnv, type Printer, type Session } from './handlers';
+import { COMMERCE_ROUND_MS, commerceRetryDelayMs, commerceTick, makeCommerceTransport, restartAfterRestore, type CommerceCreds } from '../services/commerce-sync';
 import { makeCloudApi, type CloudCreds } from '../services/cloud-client';
 import { cloudTick } from '../services/cloud-jobs';
 import { paperWidth } from '../services/hardware';
@@ -118,6 +119,13 @@ function makeBackupEnv(dataDir: string, dbPath: string): BackupEnv {
           .run(restored.now(), null, info.backupId, info.manifestJson);
         appendAudit(restored, { userId: null, action: 'backup.restore', entity: 'backup', entityId: info.backupId, details: { restoredByUserIdInOldDb: info.userId } });
       })();
+      // The online store must not trust events from before the restore: a new epoch, kept outside the database, and a fresh full load.
+      const commerce = makeCommerceEnv(dataDir);
+      const creds = commerce.getCreds();
+      if (creds) {
+        commerce.saveCreds({ ...creds, epoch: (creds.epoch ?? 0) + 1 });
+        restartAfterRestore(restored);
+      }
       restored.db.close();
       if (!process.env.POS_NO_RELAUNCH) app.relaunch(); // automated tests restart the app themselves
       app.exit(0);
@@ -133,6 +141,26 @@ function makeCloudEnv(dataDir: string): CloudEnv {
       if (!existsSync(file)) return null;
       try {
         return JSON.parse(safeStorage.decryptString(readFileSync(file))) as CloudCreds;
+      } catch {
+        return null; // from another Windows user or computer: this device has to connect again
+      }
+    },
+    saveCreds(c) {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('Windows secure storage is not available');
+      writeFileSync(file, safeStorage.encryptString(JSON.stringify(c)));
+    },
+    clearCreds: () => rmSync(file, { force: true }),
+    fetch: (url, init) => net.fetch(url, init),
+  };
+}
+
+function makeCommerceEnv(dataDir: string): CommerceEnv {
+  const file = join(dataDir, 'commerce-device.bin');
+  return {
+    getCreds() {
+      if (!existsSync(file)) return null;
+      try {
+        return JSON.parse(safeStorage.decryptString(readFileSync(file))) as CommerceCreds;
       } catch {
         return null; // from another Windows user or computer: this device has to connect again
       }
@@ -170,7 +198,8 @@ app.whenReady().then(() => {
     return;
   }
   const cloudEnv = makeCloudEnv(dataDir);
-  const dispatch = createHandlers(ctx, printer, backupEnv, cloudEnv);
+  const commerceEnv = makeCommerceEnv(dataDir);
+  const dispatch = createHandlers(ctx, printer, backupEnv, cloudEnv, commerceEnv);
   // Cloud round: never on the checkout path, and at most one at a time.
   let cloudBusy = false;
   const cloudRound = () => {
@@ -189,6 +218,23 @@ app.whenReady().then(() => {
       .catch((e: unknown) => console.error('[cloud] round failed', (e as Error).name))
       .finally(() => (cloudBusy = false));
   };
+  // Online store round: same rule, never on the checkout path. It waits longer after each failure.
+  let commerceBusy = false;
+  let commerceFailures = 0;
+  let commerceNextTry = 0;
+  setInterval(() => {
+    if (commerceBusy || !ctx.db.open || Date.now() < commerceNextTry) return;
+    const c = commerceEnv.getCreds();
+    if (!c) return;
+    commerceBusy = true;
+    void commerceTick(ctx, makeCommerceTransport(c, commerceEnv.fetch), c.deviceId, c.epoch ?? 0)
+      .then((r) => {
+        commerceFailures = r.ok ? 0 : commerceFailures + 1;
+        commerceNextTry = Date.now() + commerceRetryDelayMs(commerceFailures);
+      })
+      .catch((e: unknown) => console.error('[commerce] round failed', (e as Error).name))
+      .finally(() => (commerceBusy = false));
+  }, COMMERCE_ROUND_MS);
   setTimeout(cloudRound, 60_000);
   setInterval(cloudRound, CLOUD_ROUND_MS);
   // Read 90 days of sales once now, so the first search does not pay for it (later updates are incremental).

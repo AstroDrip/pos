@@ -9,7 +9,9 @@ import { keyToRecoveryCode, recoveryCodeToKey } from '../services/backup-crypto'
 import { getShortcuts, saveShortcuts } from '../services/shortcuts';
 import { billProductCost, createSupplierBill, findSupplierItem, getBill, listBills, priceHistory, purchasesBySupplier, supplierItemsFor } from '../services/supplier-bills';
 import { getStoreDetails, saveStoreDetails } from '../services/store-details';
-import { createProduct, getAliases, itemInfo, listProducts, lookup, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive } from '../services/catalog';
+import { createProduct, createProductCategory, getAliases, itemInfo, listProductCategories, listProducts, lookup, productCategory, saveScaleLayout, scaleLayouts, searchProducts, setAliases, setPrice, setProductActive, setProductCategory } from '../services/catalog';
+import { handOverOrder, onlineOrders } from '../services/commerce-orders';
+import { commerceStatus, enrollCommerce, startCommerce, stopCommerce, type CommerceCreds } from '../services/commerce-sync';
 import { searchProducts as indexedSearch } from '../services/search';
 import { DomainError, type Ctx } from '../services/context';
 import { appendAudit, appendFailure, verifyAuditChain } from '../services/audit';
@@ -65,6 +67,14 @@ export interface BackupEnv {
 }
 
 /** The device's cloud credential lives in Windows secure storage, outside the database and outside every backup. */
+/** The online store credential is separate from the owner dashboard's, and also kept in Windows secure storage. */
+export interface CommerceEnv {
+  getCreds(): CommerceCreds | null;
+  saveCreds(c: CommerceCreds): void;
+  clearCreds(): void;
+  fetch: FetchFn;
+}
+
 export interface CloudEnv {
   getCreds(): CloudCreds | null;
   saveCreds(c: CloudCreds): void;
@@ -85,7 +95,7 @@ const FAILURE_LOGGED: ReadonlySet<Channel> = new Set(['sale.finalize', 'refund.c
 
 const PUBLIC: ReadonlySet<Channel> = new Set(['auth.status', 'auth.setupAdmin', 'auth.login', 'restore.prepare', 'restore.apply', 'cloud.recover', 'cloud.restorePrepare']);
 
-export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, cloud?: CloudEnv) {
+export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, cloud?: CloudEnv, commerce?: CommerceEnv) {
   const userId = (s: Session) => s.user!.id;
   let prepared: { stagingPath: string; backupId: string; manifestJson: string; newerLocal: boolean; cloudApi?: CloudApi } | null = null;
 
@@ -216,6 +226,16 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, c
     'shortcuts.save': (p, s) => saveShortcuts(ctx, userId(s), p.overrides),
     'catalog.list': (p, s) => listProducts(ctx, userId(s), p),
     'catalog.itemInfo': (p) => itemInfo(ctx, p.productId),
+    'catalog.categories': (_p, s) => {
+      requirePermission(ctx, userId(s), 'product.manage');
+      return listProductCategories(ctx);
+    },
+    'catalog.categoryOf': (p, s) => {
+      requirePermission(ctx, userId(s), 'product.manage');
+      return productCategory(ctx, p.productId);
+    },
+    'catalog.addCategory': (p, s) => createProductCategory(ctx, userId(s), p.name),
+    'catalog.setCategory': (p, s) => setProductCategory(ctx, userId(s), p.productId, p.categoryId),
     'catalog.setPrice': (p, s) => setPrice(ctx, userId(s), p.productId, p.priceIncl),
     'catalog.setActive': (p, s) => setProductActive(ctx, userId(s), p.productId, p.active, p.reason),
     'catalog.aliases': (p, s) => {
@@ -437,6 +457,27 @@ export function createHandlers(ctx: Ctx, printer: Printer, backup?: BackupEnv, c
       return null;
     },
     'hw.drawer': (_p, s) => drawerCheck(ctx, userId(s)),
+    'online.list': (_p, s) => onlineOrders(ctx, userId(s)),
+    'online.handover': (p, s) => handOverOrder(ctx, userId(s), p),
+    'commerce.status': (_p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      const c = commerce?.getCreds() ?? null;
+      return { ...commerceStatus(ctx), configured: c !== null, url: c?.url ?? null };
+    },
+    'commerce.connect': async (p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      if (!commerce) throw new DomainError('VALIDATION', 'The online store is not available here');
+      const creds = await cloudCall(() => enrollCommerce(commerce.fetch, p.url, { code: p.code.trim(), deviceName: p.deviceName, appVersion: backup?.appVersion ?? 'unknown' }));
+      commerce.saveCreds(creds);
+      startCommerce(ctx, userId(s));
+      return null;
+    },
+    'commerce.disconnect': (_p, s) => {
+      requirePermission(ctx, userId(s), 'settings.manage');
+      stopCommerce(ctx, userId(s));
+      commerce?.clearCreds();
+      return null;
+    },
     'cloud.status': (_p, s) => {
       requirePermission(ctx, userId(s), 'backup.run');
       const c = cloud?.getCreds() ?? null;

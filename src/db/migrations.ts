@@ -17,6 +17,9 @@ import * as m014 from './migrations/014_integrity';
 import * as m015 from './migrations/015_vat_review';
 import * as m016 from './migrations/016_prepaid_runs';
 import * as m017 from './migrations/017_cloud_backup';
+import * as m018 from './migrations/018_commerce_sync';
+import * as m019 from './migrations/019_online_orders';
+import * as m020 from './migrations/020_commerce_health';
 
 export interface Migration {
   version: number;
@@ -43,6 +46,9 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 15, name: 'vat_review', sql: m015.sql },
   { version: 16, name: 'prepaid_runs', sql: m016.sql },
   { version: 17, name: 'cloud_backup', sql: m017.sql },
+  { version: 18, name: 'commerce_sync', sql: m018.sql },
+  { version: 19, name: 'online_orders', sql: m019.sql },
+  { version: 20, name: 'commerce_health', sql: m020.sql },
 ];
 
 /** Versions not yet applied to this database (empty for a brand-new file before migrate()). */

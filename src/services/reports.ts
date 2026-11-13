@@ -10,6 +10,8 @@ export interface StockRow {
   qty: number;
   reorderLevel: number;
   avgCost: number;
+  /** Held by accepted online orders not yet handed over (last figure from the website). Not taken from stock. */
+  reservedOnline: number;
 }
 
 export function stockOnHand(ctx: Ctx, userId: number, onlyLow = false): StockRow[] {
@@ -17,8 +19,8 @@ export function stockOnHand(ctx: Ctx, userId: number, onlyLow = false): StockRow
   return ctx.db
     .prepare(
       `SELECT p.id AS productId, p.sku, p.name_en AS nameEn, p.name_ar AS nameAr, COALESCE(b.qty,0) AS qty,
-              p.reorder_level AS reorderLevel, COALESCE(b.avg_cost,0) AS avgCost
-       FROM products p LEFT JOIN stock_balances b ON b.product_id = p.id
+              p.reorder_level AS reorderLevel, COALESCE(b.avg_cost,0) AS avgCost, COALESCE(cr.reserved,0) AS reservedOnline
+       FROM products p LEFT JOIN stock_balances b ON b.product_id = p.id LEFT JOIN commerce_reserved cr ON cr.product_id = p.id
        WHERE p.active = 1 ${onlyLow ? 'AND COALESCE(b.qty,0) <= p.reorder_level' : ''}
        ORDER BY ${onlyLow ? 'qty - p.reorder_level, ' : ''}p.name_en`,
     )
@@ -42,7 +44,12 @@ export interface SalesSummary {
   netIncl: number;
   netVat: number;
   byDay: { day: string; saleCount: number; totalIncl: number; totalVat: number }[];
-  topProducts: { productId: number; nameEn: string; qty: number; totalIncl: number }[];
+  /** Online orders handed over at the POS are normal sales; this splits the totals above by where the order came from. */
+  channels: {
+    inStore: { count: number; totalIncl: number };
+    online: { count: number; totalIncl: number; pickup: number; delivery: number };
+  };
+  topProducts: { productId: number; nameEn: string; qty: number; totalIncl: number; onlineQty: number; onlineTotalIncl: number }[];
 }
 
 /** Sales for store days fromDay..toDay inclusive ("YYYY-MM-DD", Saudi time). */
@@ -58,13 +65,22 @@ export function salesSummary(ctx: Ctx, userId: number, fromDay: string, toDay: s
               COALESCE(SUM(change_given),0) AS change
        FROM sales WHERE created_at >= ? AND created_at < ?`,
     )
-    .get(from, to) as Omit<SalesSummary, 'from' | 'to' | 'cash' | 'card' | 'byDay' | 'topProducts'> & { change: number };
+    .get(from, to) as Omit<SalesSummary, 'from' | 'to' | 'cash' | 'card' | 'byDay' | 'topProducts' | 'channels'> & { change: number };
   const tender = (k: string) =>
     (ctx.db.prepare('SELECT COALESCE(SUM(p.amount),0) AS v FROM payments p JOIN sales s ON s.id = p.sale_id WHERE p.tender = ? AND s.created_at >= ? AND s.created_at < ?').get(k, from, to) as { v: number }).v;
   const { change, ...totals } = t;
   const r = ctx.db
     .prepare('SELECT count(*) AS n, COALESCE(SUM(total_incl),0) AS incl, COALESCE(SUM(total_vat),0) AS vat FROM refunds WHERE created_at >= ? AND created_at < ?')
     .get(from, to) as { n: number; incl: number; vat: number };
+  const on = ctx.db
+    .prepare(
+      `SELECT count(*) AS n, COALESCE(SUM(s.total_incl),0) AS incl,
+              COALESCE(SUM(CASE WHEN o.fulfilment = 'pickup' THEN 1 ELSE 0 END),0) AS pickup,
+              COALESCE(SUM(CASE WHEN o.fulfilment = 'delivery' THEN 1 ELSE 0 END),0) AS delivery
+       FROM sales s JOIN commerce_order_links k ON k.sale_id = s.id JOIN commerce_orders o ON o.order_id = k.order_id
+       WHERE s.created_at >= ? AND s.created_at < ?`,
+    )
+    .get(from, to) as { n: number; incl: number; pickup: number; delivery: number };
   return {
     from: fromDay,
     to: toDay,
@@ -76,6 +92,10 @@ export function salesSummary(ctx: Ctx, userId: number, fromDay: string, toDay: s
     refundVat: r.vat,
     netIncl: totals.totalIncl - r.incl,
     netVat: totals.totalVat - r.vat,
+    channels: {
+      inStore: { count: totals.saleCount - on.n, totalIncl: totals.totalIncl - on.incl },
+      online: { count: on.n, totalIncl: on.incl, pickup: on.pickup, delivery: on.delivery },
+    },
     byDay: ctx.db
       .prepare(
         `SELECT ${sqlStoreDay('created_at')} AS day, count(*) AS saleCount, SUM(total_incl) AS totalIncl, SUM(total_vat) AS totalVat
@@ -84,8 +104,10 @@ export function salesSummary(ctx: Ctx, userId: number, fromDay: string, toDay: s
       .all(from, to) as SalesSummary['byDay'],
     topProducts: ctx.db
       .prepare(
-        `SELECT l.product_id AS productId, MAX(l.name_en) AS nameEn, SUM(l.qty) AS qty, SUM(l.line_incl) AS totalIncl
-         FROM sale_lines l JOIN sales s ON s.id = l.sale_id WHERE s.created_at >= ? AND s.created_at < ?
+        `SELECT l.product_id AS productId, MAX(l.name_en) AS nameEn, SUM(l.qty) AS qty, SUM(l.line_incl) AS totalIncl,
+                COALESCE(SUM(CASE WHEN k.sale_id IS NOT NULL THEN l.qty END),0) AS onlineQty,
+                COALESCE(SUM(CASE WHEN k.sale_id IS NOT NULL THEN l.line_incl END),0) AS onlineTotalIncl
+         FROM sale_lines l JOIN sales s ON s.id = l.sale_id LEFT JOIN commerce_order_links k ON k.sale_id = s.id WHERE s.created_at >= ? AND s.created_at < ?
          GROUP BY l.product_id ORDER BY totalIncl DESC LIMIT 20`,
       )
       .all(from, to) as SalesSummary['topProducts'],
@@ -123,6 +145,7 @@ export interface CashierActivity {
   user: string;
   sales: number;
   salesTotal: number;
+  onlineHandovers: number; // online orders this user handed over (already counted in sales)
   cashNet: number;
   card: number;
   discountCount: number;
@@ -158,6 +181,7 @@ export function cashierActivity(ctx: Ctx, userId: number, fromDay: string, toDay
       const pay = (t: string) => one(`SELECT COALESCE(SUM(p.amount),0) AS v FROM payments p JOIN sales s ON s.id = p.sale_id WHERE s.user_id = ? AND p.tender = ? AND s.created_at >= ? AND s.created_at < ?`, u.id, t, from, to).v!;
       const audit = (actions: string) => ctx.db.prepare(`SELECT details_json FROM audit_log WHERE user_id = ? AND action IN (${actions}) AND at >= ? AND at < ?`).all(u.id, from, to) as { details_json: string }[];
       const removed = audit("'sale.line_removed','sale.bill_cleared'");
+      const online = one('SELECT count(*) AS n FROM sales s JOIN commerce_order_links k ON k.sale_id = s.id WHERE s.user_id = ? AND s.created_at >= ? AND s.created_at < ?', u.id, from, to);
       const ref = one('SELECT count(*) AS n, COALESCE(SUM(total_incl),0) AS v FROM refunds WHERE user_id = ? AND created_at >= ? AND created_at < ?', u.id, from, to);
       const approved = one('SELECT count(*) AS n FROM refunds WHERE approved_by = ? AND created_at >= ? AND created_at < ?', u.id, from, to);
       const out = one(`SELECT count(*) AS n, COALESCE(SUM(amount),0) AS v FROM cash_movements WHERE user_id = ? AND kind = 'out' AND at >= ? AND at < ?`, u.id, from, to);
@@ -167,6 +191,7 @@ export function cashierActivity(ctx: Ctx, userId: number, fromDay: string, toDay
         user: u.display_name,
         sales: s.n!,
         salesTotal: s.total!,
+        onlineHandovers: online.n!,
         cashNet: pay('cash') - s.change!,
         card: pay('card'),
         discountCount: s.discN!,

@@ -213,7 +213,7 @@ export async function runUiAudit(win: BrowserWindow, outDir: string, hooks: UiAu
 
   /** Opens every tab of the demo shop and reports what each one shows. */
   async function demoTour(tabs: string[]) {
-    const FORM_VIEW = /receivegoods|recordwastage|stockcount|recogniseprepaid|storedetails|scalelabels|importfromcsv|hardwaretest/; // views that are forms, or rightly empty in the demo
+    const FORM_VIEW = /receivegoods|recordwastage|stockcount|recogniseprepaid|storedetails|onlinestore|scalelabels|importfromcsv|hardwaretest/; // views that are forms, or rightly empty in the demo
     const rows = () => js<number>(`document.querySelectorAll('table tbody tr:not(.empty), .kpi').length`);
     const empties = () => js<string[]>(`[...document.querySelectorAll('tr.empty')].map((e) => e.textContent.trim())`);
     const look = async (name: string) => {
