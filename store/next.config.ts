@@ -7,6 +7,8 @@ const repoRoot = join(__dirname, '..');
 
 const config: NextConfig = {
   poweredByHeader: false,
+  // The build checks the website code only. Tests also load the real POS, whose packages are not installed on the host.
+  typescript: { tsconfigPath: 'tsconfig.build.json' },
   reactStrictMode: true,
   turbopack: { root: repoRoot },
   outputFileTracingRoot: repoRoot,
