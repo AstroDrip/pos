@@ -23,6 +23,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h1 className="text-2xl font-bold">Staff sign in</h1>
           <p className="mt-1 text-sm text-ink-600">{readEnv().displayName}</p>
         </div>
+        {readEnv().demo && (
+          <p role="note" className="rounded-field bg-surface-soft p-3 text-sm">
+            {readEnv().demoPassword ? 'Demo: sign in as demo, with the password set in STORE_DEMO_PASSWORD on the host.' : 'Demo: staff sign-in is off. Set STORE_DEMO_PASSWORD on the host to turn it on.'}
+          </p>
+        )}
         {message && <p role="alert" className="rounded-field bg-surface-soft p-3 text-sm text-danger">{message}</p>}
         <Field label="Username" name="username" autoComplete="username" required maxLength={40} />
         <Field label="Password" name="password" type="password" autoComplete="current-password" required maxLength={200} />

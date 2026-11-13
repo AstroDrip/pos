@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { logoutAction } from '@/app/actions';
 import { AdminNav } from '@/components/admin/AdminNav';
+import { DemoBanner } from '@/components/shop-parts';
 import { readEnv } from '@/server/env';
 import { requireStaff } from '@/server/session';
 
@@ -10,6 +11,7 @@ export default async function StaffLayout({ children }: { children: ReactNode })
   const user = await requireStaff();
   return (
     <div className="min-h-dvh bg-surface-soft">
+      <DemoBanner show={readEnv().demo} />
       <header className="bg-brand-900 text-white">
         <div className="mx-auto flex max-w-admin flex-wrap items-center justify-between gap-x-4 px-4 pt-2">
           <p className="py-2 font-semibold">{readEnv().displayName} admin</p>

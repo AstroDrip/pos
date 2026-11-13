@@ -37,3 +37,9 @@ export function EmptyState({ title, children }: { title: string; children: React
     </div>
   );
 }
+
+/** Shown on every page in demo mode, so nobody mistakes it for a real shop. */
+export function DemoBanner({ show }: { show: boolean }) {
+  if (!show) return null;
+  return <p role="note" className="bg-brand-900 px-4 py-2 text-center text-sm text-white">Demo shop with made-up products. Orders are not real and may disappear.</p>;
+}

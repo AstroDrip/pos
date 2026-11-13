@@ -28,6 +28,17 @@ npm run staff:create
 5. Never put `DATABASE_URL_UNPOOLED` or `NEON_LOCAL_ENDPOINT` on the host.
 6. Commercial use needs a paid Vercel plan.
 
+## Demo on Vercel, with no database
+
+To look at the design and click through it before any database exists:
+
+1. Set up the Vercel project as in steps 1 to 3 above.
+2. Add `STORE_DEMO` = `1`.
+3. Optional: add `STORE_DEMO_PASSWORD` (at least 10 characters) to open the staff pages as user `demo`. Without it, staff sign-in is off.
+4. Do not add the two database settings. If either is set, demo mode is switched off.
+
+The site then runs a throwaway database inside the server with made-up products, and every page shows a demo notice. Each server copy has its own data, and it is wiped when Vercel restarts it. Orders, carts on the server and staff sign-ins can vanish, and if Vercel runs pages and API routes on separate copies, an order may not show on the staff pages. Never use demo mode for real customers.
+
 ## 3. Check it
 
 Open `/api/health`. It should show `"ok": true`. Then sign in at `/admin/login`.
